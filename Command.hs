@@ -59,24 +59,21 @@ getKey ms = do
  a full refresh:
  data Command m = Change (LSCHANGE) | Refresh (Linestate -> m LineState)
  --}
-data Command m = Finish | RefreshLine (LineState -> m LineState)
+data Command (m :: * -> *) = Finish | ChangeCmd LineChange
 
 type Commands m = Map.Map Key (Command m)
-
-pureCommand :: Monad m => (LineState -> LineState) -> Command m
-pureCommand f = RefreshLine (\ls -> return (f ls))
 
 simpleCommands :: Monad m => Commands m
 simpleCommands = Map.fromList $ [
                     (KeyChar '\n', Finish)
-                    ,(KeySpecial KeyLeft, pureCommand goLeft)
-                    ,(KeySpecial KeyRight, pureCommand goRight)
-                    ,(KeySpecial Backspace, pureCommand deletePrev)
-                    ,(KeySpecial DeleteForward, pureCommand deleteNext)
+                    ,(KeySpecial KeyLeft, ChangeCmd goLeft)
+                    ,(KeySpecial KeyRight, ChangeCmd goRight)
+                    ,(KeySpecial Backspace, ChangeCmd deletePrev)
+                    ,(KeySpecial DeleteForward, ChangeCmd deleteNext)
                     ] ++ map insertionCommand [' '..'~']
             
 
 insertionCommand :: Monad m => Char -> (Key,Command m)
-insertionCommand c = (KeyChar c, pureCommand $ insertChar c)
+insertionCommand c = (KeyChar c, ChangeCmd $ insertChar c)
 
                     
