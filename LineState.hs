@@ -4,25 +4,28 @@ import System.Console.Terminfo
 import Control.Monad
 
 -- | Keep track of all of the output capabilities we can use.
-data Actions = Actions {left, right :: Int -> TermOutput,
+-- 
+-- We'll be frequently using the (automatic) 'Monoid' instance for 
+-- @Actions -> TermOutput@.
+data Actions = Actions {leftA, rightA :: Int -> TermOutput,
                         clearToLineEnd :: TermOutput,
                         nl :: TermOutput}
-
--- TODO
--- type Action = Action -> TermOutput
 
 getActions :: Capability Actions
 getActions = liftM4 Actions moveLeft moveRight clearEOL newline
 
+text :: String -> Actions -> TermOutput
+text str _ = termText str
+
+left,right :: Int -> Actions -> TermOutput
+left = flip leftA
+right = flip rightA
+
 type LineChange = LineState -> (LineState, Actions -> TermOutput)
 
-noChange :: Actions -> TermOutput
-noChange _ = mempty
-
-refreshAfterCursor :: String -> Actions -> TermOutput
-refreshAfterCursor ys actions = mconcat [clearToLineEnd actions,
-                                           termText ys,
-                                           left actions (length ys)]
+addAfterCursor, refreshAfterCursor :: String -> Actions -> TermOutput
+addAfterCursor ys = mconcat [text ys, left (length ys)]
+refreshAfterCursor ys = mconcat [clearToLineEnd, text ys, left (length ys)]
 
 
 data LineState = LS String -- characters to left of cursor, reversed
@@ -43,48 +46,26 @@ lineState s = LS [] s
 
 
 moveToStart, moveToEnd :: LineChange
-moveToStart (LS xs ys) = (LS [] (reverse xs ++ ys), flip left (length xs))
-moveToEnd (LS xs ys) = (LS (reverse ys ++ xs) [], flip right (length ys))
+moveToStart (LS xs ys) = (LS [] (reverse xs ++ ys), left (length xs))
+moveToEnd (LS xs ys) = (LS (reverse ys ++ xs) [], right (length ys))
 
 
 goLeft, goRight, deleteNext, deletePrev :: LineChange
-goLeft ls@(LS [] _) = (ls,noChange) 
-goLeft (LS (x:xs) ys) = (LS xs (x:ys), flip left 1)
+goLeft ls@(LS [] _) = (ls, mempty) 
+goLeft (LS (x:xs) ys) = (LS xs (x:ys), left 1)
 
-goRight ls@(LS _ []) = (ls,noChange)
-goRight (LS ys (x:xs)) = (LS (x:ys) xs, flip right 1)
+goRight ls@(LS _ []) = (ls, mempty)
+goRight (LS ys (x:xs)) = (LS (x:ys) xs, right 1)
 
 -- add a character to the left of the cursor
 insertChar :: Char -> LineChange
 insertChar c (LS xs ys) =  (LS (c:xs) ys, 
-                            \actions -> termText [c]
-                            -- TODO: no need for clearEOL
-                                    `mappend` refreshAfterCursor ys actions)
+                            text [c] `mappend` addAfterCursor ys)
 
-deleteNext ls@(LS _ []) = (ls, noChange)
+deleteNext ls@(LS _ []) = (ls, mempty)
 deleteNext (LS xs (y:ys)) = (LS xs ys, refreshAfterCursor ys)
 
-deletePrev ls@(LS [] _) = (ls,noChange)
+deletePrev ls@(LS [] _) = (ls, mempty)
 deletePrev (LS (x:xs) ys) = (LS xs ys, 
-                             \actions -> left actions 1
-                                    `mappend` refreshAfterCursor ys actions)
+                              left 1 `mappend` refreshAfterCursor ys)
 
-{--
--- TODO: don't always need to refresh whole line
--- also, use variety of methods instead of just moveLeft (eg hpa,
--- cr+moveRight)
-refreshLS :: Capability (LineState -> LineState -> TermOutput)
-refreshLS = do
-    clrEOS <- clearEOS -- don't just clear to end of line, because we might
-                        -- be on multiple lines in the display.
-    left <- moveLeft 
-    return (\ls ls' -> mconcat [left $ fst $ lengths ls, 
-                                termText (lineContents ls'),
-                                clrEOS 1, left $ snd $ lengths ls'])
---}
-{-
-printLS :: Capability (String -> LineState -> TermOutput)
-printLS = do
-    refresh <- refreshLS
-    return (\s ls -> mconcat [termText s, refresh ls])
--}
