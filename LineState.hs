@@ -179,7 +179,7 @@ clearDeadText n
         let numLinesToClear = linesLeft layout pos n
         tell clearToLineEnd
         when (numLinesToClear > 1) $ do
-            replicateM (numLinesToClear - 1) $ (tell clearToLineEnd >> tell nl)
+            replicateM (numLinesToClear - 1) $ (tell nl >> tell clearToLineEnd)
             tell $ up (numLinesToClear - 1)
             tell $ right (termCol pos)
             return ()
