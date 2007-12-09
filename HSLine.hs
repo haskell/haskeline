@@ -85,8 +85,8 @@ repeatTillFinish settings commands = f
                     Nothing -> f ls
                     Just Finish -> return ls
                     Just (ChangeCmd g) -> do
-                        let (ls',act) = g ls
+                        let newLS = g ls
                         liftIO $ runTermOutput (terminal settings) 
-                            $ act (actions settings)
-                        repeatTillFinish settings commands ls'
+                            $ diffLineStates ls newLS (actions settings)
+                        repeatTillFinish settings commands newLS
                 
