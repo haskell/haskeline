@@ -13,7 +13,7 @@ import System.Posix.Terminal
 data Key = KeyChar Char | KeySpecial SKey
                 deriving (Show,Eq,Ord)
 data SKey = KeyLeft | KeyRight | KeyUp | KeyDown
-            | Backspace | DeleteForward
+            | Backspace | DeleteForward | KillLine
                 deriving (Eq,Ord,Enum,Show)
 
 getKeySequences :: Terminal -> IO (Map.Map String SKey)
@@ -38,9 +38,9 @@ keyCapabilities = [(keyLeft,KeyLeft),
 sttyKeys :: IO (Map.Map String SKey)
 sttyKeys = do
     attrs <- getTerminalAttributes stdOutput
-    return $ case controlChar attrs Erase of
-        Just c -> Map.singleton [c] Backspace
-        Nothing -> Map.empty
+    let getStty (k,c) = do {str <- controlChar attrs k; return ([str],c)}
+    return $ Map.fromList $ catMaybes
+            $ map getStty [(Erase,Backspace),(Kill,KillLine)]
 
 getKey :: [(String, SKey)] -> IO Key
 getKey ms = do 
@@ -70,6 +70,7 @@ simpleCommands = Map.fromList $ [
                     ,(KeySpecial KeyRight, ChangeCmd goRight)
                     ,(KeySpecial Backspace, ChangeCmd deletePrev)
                     ,(KeySpecial DeleteForward, ChangeCmd deleteNext)
+                    ,(KeySpecial KillLine, ChangeCmd killLine)
                     ] ++ map insertionCommand [' '..'~']
             
 

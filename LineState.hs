@@ -75,9 +75,11 @@ matchInit xs ys = (xs,ys)
 
 
 type LineChange = LineState -> LineState
-moveToStart, moveToEnd :: LineChange
+
+moveToStart, moveToEnd, killLine :: LineChange
 moveToStart (LS xs ys) = LS [] (reverse xs ++ ys)
 moveToEnd (LS xs ys) = LS (reverse ys ++ xs) []
+killLine _ = LS [] []
 
 
 goLeft, goRight, deleteNext, deletePrev :: LineChange
