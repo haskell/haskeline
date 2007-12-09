@@ -3,9 +3,10 @@ module Main where
 import qualified Data.Map as Map
 import LineState
 import Command
+import WindowSize
 
 import System.Console.Terminfo
-import Control.Monad.Trans
+import Control.Monad.RWS
 import System.IO
 import Control.Exception
 import Data.Maybe (fromMaybe)
@@ -70,23 +71,35 @@ runHSLine prefix commands = do
     wrapTerminalOps (terminal settings) $ do
         let initLS = lineState ""
         liftIO $ putStr prefix
-        result <- repeatTillFinish settings commands (lineState "")
+        layout <- liftIO $ getLayout
+        let prefixLen = length prefix
+        let pos = TermPos {termRow = prefixLen `div` width layout,
+                            termCol = prefixLen `rem` width layout}
+        result <- repeatTillFinish settings commands layout 
+                        pos (lineState "") 
         liftIO $ runTermOutput (terminal settings) $ nl (actions settings)
         return result
 
+-- todo: make sure >=2
+getLayout = fmap (Layout . fromEnum . winCols) getWindowSize
 
 
 repeatTillFinish :: MonadIO m => 
-        Settings -> Commands m -> LineState -> m LineState
-repeatTillFinish settings commands = f
-    where f ls = do
+        Settings -> Commands m -> Layout -> TermPos -> LineState -> m LineState
+repeatTillFinish settings commands layout = f
+    where f pos ls = do
                 k <- liftIO $ getKey (keys settings)
                 case Map.lookup k commands of
-                    Nothing -> f ls
-                    Just Finish -> return ls
+                    Nothing -> f pos ls
+                    Just Finish -> newlines settings layout pos ls >> return ls
                     Just (ChangeCmd g) -> do
                         let newLS = g ls
+                        let (_,newPos,act) = runRWS (diffLinesBreaking ls newLS)
+                                                layout pos
                         liftIO $ runTermOutput (terminal settings) 
-                            $ diffLineStates ls newLS (actions settings)
-                        repeatTillFinish settings commands newLS
+                                $ act (actions settings)
+                        f newPos newLS
                 
+newlines settings layout pos ls = liftIO $ runTermOutput (terminal settings) $ 
+                                    mreplicate (lsLinesLeft layout pos ls) nl
+                                    $ actions settings
