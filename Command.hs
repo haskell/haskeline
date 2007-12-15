@@ -61,6 +61,10 @@ getKey ms = do
  --}
 data Command (m :: * -> *) = Finish | ChangeCmd LineChange
 
+isFinish :: Command m -> Bool
+isFinish Finish = True
+isFinish _ = False
+
 type Commands m = Map.Map Key (Command m)
 
 simpleCommands :: Monad m => Commands m

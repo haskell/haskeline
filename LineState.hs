@@ -149,7 +149,7 @@ printText = mapM_ printChar
                         tell (text [x])
                 else do
                         put TermPos {termRow=r+1,termCol=0}
-                        tell $ mconcat [text [x],nl]
+                        tell $ mconcat [text [x]] -- TODO: Add nl if not am and/or xnel
 
 diffLinesBreaking :: LineState -> LineState -> Draw ()
 diffLinesBreaking (LS xs1 ys1) (LS xs2 ys2) = 
@@ -185,3 +185,16 @@ clearDeadText n
             tell $ up (numLinesToClear - 1)
             tell $ right (termCol pos)
             return ()
+
+posFromLength :: Layout -> Int -> TermPos
+posFromLength Layout {width = w} n = TermPos 
+                            {termRow = n `div` w, termCol = n `mod` w}
+
+posToLength :: Layout -> TermPos -> Int
+posToLength Layout {width = w} TermPos {termRow = r, termCol = c}
+    = r * w + c
+
+reposition :: Layout -> Layout -> TermPos -> TermPos
+reposition oldLayout newLayout oldPos = posFromLength newLayout $ 
+                                            posToLength oldLayout oldPos
+

@@ -11,6 +11,10 @@ import System.IO
 import Control.Exception
 import Data.Maybe (fromMaybe)
 import Control.Monad
+import Control.Concurrent.STM
+import Control.Concurrent
+
+import System.Posix.Signals.Exts
 
 main = do
     runHSLine ">:" emacsCommands >>= print
@@ -49,34 +53,68 @@ maybeOutput term cap = runTermOutput term $
 
 data Settings = Settings {prefix :: String,
                           terminal :: Terminal,
-                          actions :: Actions,
-                          keys :: [(String, SKey)]}
+                          actions :: Actions}
 
 
 makeSettings :: String -> IO Settings
 makeSettings pre = do
     t <- setupTermFromEnv
     let Just acts = getCapability t getActions
-    keySeqs <- getKeySequences t
-    return Settings {prefix = pre, terminal = t, actions = acts,
-                     keys = Map.toList keySeqs}
+    return Settings {prefix = pre, terminal = t, actions = acts}
 
+data EventState m = WindowResize Layout | CommandReceived (Command m) 
+                        | Waiting
 
+addNewEvent :: TVar (EventState m) -> EventState m -> STM ()
+addNewEvent tv event = do
+    old_es <- readTVar tv
+    case old_es of
+        Waiting -> writeTVar tv event
+        _ -> retry
 
+commandLoop :: Terminal -> Commands m -> TVar (EventState m) -> IO ()
+commandLoop term commands tv = do
+    keySeqs <- fmap Map.toList $ getKeySequences term
+    -- Loop until we receive a Finish command
+    let loop = do
+        k <- getKey keySeqs
+        case Map.lookup k commands of
+            -- If the key sequence is not set to a command, ignore it.
+            Nothing -> loop
+            Just cmd -> do
+                atomically $ addNewEvent tv (CommandReceived cmd)
+                when (not (isFinish cmd)) loop
+    loop
+
+-- fork a thread, then kill it after the computation is done
+withForked :: IO () -> IO a -> IO a
+withForked threadAct f = do
+    threadID <- forkIO threadAct
+    f `finally` killThread threadID
+
+withWindowHandler :: TVar (EventState m) -> IO a -> IO a
+withWindowHandler tv f = do
+    let handler = getLayout >>= atomically . addNewEvent tv . WindowResize
+    old_handler <- installHandler windowChange (Catch handler) Nothing
+    f `finally` installHandler windowChange old_handler Nothing
 
 
 runHSLine :: MonadIO1 m => String -> Commands m -> m LineState
 runHSLine prefix commands = do
     settings <- liftIO (makeSettings prefix) 
     wrapTerminalOps (terminal settings) $ do
-        let initLS = lineState ""
-        liftIO $ putStr prefix
-        layout <- liftIO $ getLayout
-        let prefixLen = length prefix
-        let pos = TermPos {termRow = prefixLen `div` width layout,
-                            termCol = prefixLen `rem` width layout}
-        result <- repeatTillFinish settings commands layout 
-                        pos (lineState "") 
+        let ls = lineState ""
+        layout <- liftIO getLayout
+        let pos = posFromLength layout (length prefix)
+
+        tv <- liftIO $ newTVarIO Waiting
+
+        result <- liftIO1 (withWindowHandler tv)
+                    $ liftIO1 (withForked 
+                                (commandLoop (terminal settings) 
+                                    commands tv))
+                    
+                    $ repeatTillFinish tv settings layout pos ls
         liftIO $ runTermOutput (terminal settings) $ nl (actions settings)
         return result
 
@@ -84,22 +122,42 @@ runHSLine prefix commands = do
 getLayout = fmap (Layout . fromEnum . winCols) getWindowSize
 
 
-repeatTillFinish :: MonadIO m => 
-        Settings -> Commands m -> Layout -> TermPos -> LineState -> m LineState
-repeatTillFinish settings commands layout = f
-    where f pos ls = do
-                k <- liftIO $ getKey (keys settings)
-                case Map.lookup k commands of
-                    Nothing -> f pos ls
-                    Just Finish -> newlines settings layout pos ls >> return ls
-                    Just (ChangeCmd g) -> do
-                        let newLS = g ls
-                        let (_,newPos,act) = runRWS (diffLinesBreaking ls newLS)
-                                                layout pos
-                        liftIO $ runTermOutput (terminal settings) 
-                                $ act (actions settings)
-                        f newPos newLS
+repeatTillFinish :: forall m . MonadIO m => TVar (EventState m) -> Settings
+        -> Layout -> TermPos -> LineState -> m LineState
+repeatTillFinish tv settings initLayout initPos initLS = do
+        liftIO $ putStr (prefix settings)
+        loop initLayout initPos initLS
+    where 
+        loop :: Layout -> TermPos -> LineState -> m LineState
+        loop layout pos ls = join $ liftIO $ atomically $ do
+                        event <- readTVar tv
+                        case event of
+                            Waiting -> retry
+                            WindowResize newLayout -> do
+                                writeTVar tv Waiting
+                                return $ actOnResize layout pos newLayout ls
+                            CommandReceived cmd -> do
+                                writeTVar tv Waiting
+                                return $ actOnCommand cmd layout pos ls
+        actOnResize :: Layout -> TermPos -> Layout -> LineState -> m LineState
+        actOnResize layout pos newLayout ls = do
+            let newPos = reposition layout newLayout pos
+            loop newLayout newPos ls
+
+        actOnCommand :: Command m -> Layout -> TermPos -> LineState 
+                            -> m LineState
+        actOnCommand Finish layout pos ls = do
+            newlines settings layout pos ls
+            return ls
+        actOnCommand (ChangeCmd g) layout pos ls = do
+            let newLS = g ls
+            let (_,newPos,act) = runRWS (diffLinesBreaking ls newLS)
+                                        layout pos
+            liftIO $ runTermOutput (terminal settings) 
+                    $ act (actions settings)
+            loop layout newPos newLS
                 
 newlines settings layout pos ls = liftIO $ runTermOutput (terminal settings) $ 
                                     mreplicate (lsLinesLeft layout pos ls) nl
                                     $ actions settings
+
