@@ -56,24 +56,6 @@ lineState :: String -> LineState
 lineState s = LS [] s
 
 
-diffLineStates :: LineState -> LineState -> Actions -> TermOutput
-diffLineStates (LS xs1 ys1) (LS xs2 ys2) = 
-    case matchInit (reverse xs1) (reverse xs2) of
-        ([],[])     | ys1 == ys2            -> mempty
-        (xs1',[])   | xs1' ++ ys1 == ys2    -> left (length xs1')
-        ([],xs2')   | ys1 == xs2' ++ ys2    -> right (length xs2')
-        (xs1',xs2')                         -> mconcat [left (length xs1'),
-                                                text xs2', textForward ys2]
--- TODO: if new length left of cursor is greater than before, no need to
--- clear to line end.
-textForward s = mconcat [clearToLineEnd,text s,left (length s)]
-
-matchInit :: Eq a => [a] -> [a] -> ([a],[a])
-matchInit (x:xs) (y:ys)  | x == y = matchInit xs ys
-matchInit xs ys = (xs,ys)
-
-
-
 type LineChange = LineState -> LineState
 
 moveToStart, moveToEnd, killLine :: LineChange
@@ -163,6 +145,11 @@ diffLinesBreaking (LS xs1 ys1) (LS xs2 ys2) =
             let m = length xs1' + length ys1 - (length xs2' + length ys2)
             clearDeadText m
             changeLeft (length ys2)
+
+matchInit :: Eq a => [a] -> [a] -> ([a],[a])
+matchInit (x:xs) (y:ys)  | x == y = matchInit xs ys
+matchInit xs ys = (xs,ys)
+
 
 linesLeft :: Layout -> TermPos -> Int -> Int
 linesLeft Layout {width=w} TermPos {termCol = c} n
