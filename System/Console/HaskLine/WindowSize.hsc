@@ -1,4 +1,4 @@
-module WindowSize(WindowSize(..),
+module System.Console.HaskLine.WindowSize(WindowSize(..),
                  getWindowSize) where
 
 import Foreign.Storable

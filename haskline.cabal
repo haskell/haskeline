@@ -1,0 +1,23 @@
+Name:           haskline
+Cabal-Version:  >=1.1.4
+Version:        0.0
+Category:       User Interfaces
+License:        BSD3
+License-File:   LICENSE
+Copyright:      (c) Judah Jacobson
+Author:         Judah Jacobson
+Maintainer:     Judah Jacobson <judah.jacobson@gmail.com>
+Category:       User Interfaces
+Synopsis:       An extensible library for reading a line of input from the user.
+Description:    This library provides an extensible, flexible interface for reading
+                a line of input from the user.  Its goal is to be useful enough to 
+                replace readline in the GHC compiler.
+Homepage:       http://code.haskell.org/haskline
+Stability:      Experimental
+Build-depends:  base, terminfo, unix, stm, mtl, containers
+Extensions:     ForeignFunctionInterface, Rank2Types
+Exposed-Modules:
+                System.Console.HaskLine
+                System.Console.HaskLine.LineState
+                System.Console.HaskLine.Command
+                System.Console.HaskLine.WindowSize

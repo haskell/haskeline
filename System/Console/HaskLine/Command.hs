@@ -1,6 +1,6 @@
-module Command where
+module System.Console.HaskLine.Command where
 
-import LineState
+import System.Console.HaskLine.LineState
 import System.Console.Terminfo
 import Data.Maybe
 
@@ -59,7 +59,7 @@ getKey ms = do
  a full refresh:
  data Command m = Change (LSCHANGE) | Refresh (Linestate -> m LineState)
  --}
-data Command (m :: * -> *) = Finish | ChangeCmd LineChange
+data Command m = Finish | ChangeCmd (LineState -> m LineState)
 
 isFinish :: Command m -> Bool
 isFinish Finish = True
@@ -70,15 +70,17 @@ type Commands m = Map.Map Key (Command m)
 simpleCommands :: Monad m => Commands m
 simpleCommands = Map.fromList $ [
                     (KeyChar '\n', Finish)
-                    ,(KeySpecial KeyLeft, ChangeCmd goLeft)
-                    ,(KeySpecial KeyRight, ChangeCmd goRight)
-                    ,(KeySpecial Backspace, ChangeCmd deletePrev)
-                    ,(KeySpecial DeleteForward, ChangeCmd deleteNext)
-                    ,(KeySpecial KillLine, ChangeCmd killLine)
+                    ,(KeySpecial KeyLeft, pureCommand goLeft)
+                    ,(KeySpecial KeyRight, pureCommand goRight)
+                    ,(KeySpecial Backspace, pureCommand deletePrev)
+                    ,(KeySpecial DeleteForward, pureCommand deleteNext)
+                    ,(KeySpecial KillLine, pureCommand killLine)
                     ] ++ map insertionCommand [' '..'~']
             
+pureCommand :: Monad m => LineChange -> Command m
+pureCommand f = ChangeCmd (return . f)
 
 insertionCommand :: Monad m => Char -> (Key,Command m)
-insertionCommand c = (KeyChar c, ChangeCmd $ insertChar c)
+insertionCommand c = (KeyChar c, pureCommand $ insertChar c)
 
                     

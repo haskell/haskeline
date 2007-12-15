@@ -1,4 +1,4 @@
-module LineState where
+module System.Console.HaskLine.LineState where
 
 import System.Console.Terminfo
 import Control.Monad

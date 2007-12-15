@@ -1,11 +1,11 @@
-module Main where
+module System.Console.HaskLine where
 
-import qualified Data.Map as Map
-import LineState
-import Command
-import WindowSize
+import System.Console.HaskLine.LineState
+import System.Console.HaskLine.Command
+import System.Console.HaskLine.WindowSize
 
 import System.Console.Terminfo
+import qualified Data.Map as Map
 import Control.Monad.RWS
 import System.IO
 import Control.Exception
@@ -16,12 +16,12 @@ import Control.Concurrent
 
 import System.Posix.Signals.Exts
 
-main = do
+test = do
     runHSLine ">:" emacsCommands >>= print
 
 emacsCommands = simpleCommands `Map.union` Map.fromList
-                    [(KeyChar '\SOH', ChangeCmd moveToStart)
-                    ,(KeyChar '\ENQ', ChangeCmd moveToEnd)]
+                    [(KeyChar '\SOH', pureCommand moveToStart)
+                    ,(KeyChar '\ENQ', pureCommand moveToEnd)]
 
 class MonadIO m => MonadIO1 m where
     liftIO1 :: (forall a . IO a -> IO a) -> m a -> m a
@@ -122,13 +122,12 @@ runHSLine prefix commands = do
 getLayout = fmap (Layout . fromEnum . winCols) getWindowSize
 
 
-repeatTillFinish :: forall m . MonadIO m => TVar (EventState m) -> Settings
+repeatTillFinish :: MonadIO m => TVar (EventState m) -> Settings
         -> Layout -> TermPos -> LineState -> m LineState
 repeatTillFinish tv settings initLayout initPos initLS = do
         liftIO $ putStr (prefix settings)
         loop initLayout initPos initLS
     where 
-        loop :: Layout -> TermPos -> LineState -> m LineState
         loop layout pos ls = join $ liftIO $ atomically $ do
                         event <- readTVar tv
                         case event of
@@ -139,18 +138,15 @@ repeatTillFinish tv settings initLayout initPos initLS = do
                             CommandReceived cmd -> do
                                 writeTVar tv Waiting
                                 return $ actOnCommand cmd layout pos ls
-        actOnResize :: Layout -> TermPos -> Layout -> LineState -> m LineState
         actOnResize layout pos newLayout ls = do
             let newPos = reposition layout newLayout pos
             loop newLayout newPos ls
 
-        actOnCommand :: Command m -> Layout -> TermPos -> LineState 
-                            -> m LineState
         actOnCommand Finish layout pos ls = do
             newlines settings layout pos ls
             return ls
         actOnCommand (ChangeCmd g) layout pos ls = do
-            let newLS = g ls
+            newLS <- g ls
             let (_,newPos,act) = runRWS (diffLinesBreaking ls newLS)
                                         layout pos
             liftIO $ runTermOutput (terminal settings) 
