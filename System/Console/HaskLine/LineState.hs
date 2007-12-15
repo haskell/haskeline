@@ -11,7 +11,8 @@ import Control.Monad.RWS
 data Actions = Actions {leftA, rightA, upA, downA :: Int -> TermOutput,
                         clearToLineEnd :: TermOutput,
                         nl :: TermOutput,
-                        cr :: TermOutput}
+                        cr :: TermOutput,
+                        wrapLine :: TermOutput}
 
 getActions :: Capability Actions
 getActions = do
@@ -22,18 +23,30 @@ getActions = do
     clearToLineEnd' <- clearEOL
     nl' <- newline
     cr' <- carriageReturn
+    wrapLine' <- getWrapLine nl' (leftA' 1)
     return Actions{leftA=leftA',rightA=rightA',upA=upA',downA=downA',
-                clearToLineEnd=clearToLineEnd',nl=nl',cr=cr'}
+                clearToLineEnd=clearToLineEnd',nl=nl',cr=cr',
+                 wrapLine=wrapLine'}
 
 text :: String -> Actions -> TermOutput
 text str _ = termText str
 
+getWrapLine :: TermOutput -> TermOutput -> Capability TermOutput
+getWrapLine nl left1 = (autoRightMargin >>= guard >> withAutoMargin)
+                    `mplus` return nl
+  where 
+    -- If the wraparound glitch is in effect, force a wrap by printing a space.
+    -- Otherwise, it'll wrap automatically.
+    withAutoMargin = (do
+                        wraparoundGlitch >>= guard
+                        return (termText " " `mappend` left1)
+                     )`mplus` return mempty
+    
 left,right,up,down :: Int -> Actions -> TermOutput
 left = flip leftA
 right = flip rightA
 up = flip upA
 down = flip downA
-
 
 
 
@@ -131,7 +144,7 @@ printText = mapM_ printChar
                         tell (text [x])
                 else do
                         put TermPos {termRow=r+1,termCol=0}
-                        tell $ mconcat [text [x]] -- TODO: Add nl if not am and/or xnel
+                        tell $ mconcat [text [x], wrapLine]
 
 diffLinesBreaking :: LineState -> LineState -> Draw ()
 diffLinesBreaking (LS xs1 ys1) (LS xs2 ys2) = 
