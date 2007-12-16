@@ -115,7 +115,6 @@ runHSLine prefix commands = do
                                     commands tv))
                     
                     $ repeatTillFinish tv settings layout pos ls
-        liftIO $ runTermOutput (terminal settings) $ nl (actions settings)
         return result
 
 -- todo: make sure >=2
