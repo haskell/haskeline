@@ -2,6 +2,10 @@ module System.Console.HaskLine where
 
 import System.Console.HaskLine.LineState
 import System.Console.HaskLine.Command
+import System.Console.HaskLine.Command.Undo
+import System.Console.HaskLine.Command.Paste
+import System.Console.HaskLine.Command.History
+import System.Console.HaskLine.Command.Completion
 import System.Console.HaskLine.WindowSize
 
 import System.Console.Terminfo
@@ -16,18 +20,27 @@ import Control.Concurrent
 
 import System.Posix.Signals.Exts
 
+import Debug.Trace
+
 test = do
-    runHSLine ">:" emacsCommands >>= print
+    ls <- runPaste $ runHistory ["foobar", "other", "more"] $ runUndo $ runHSLine ">:" emacsCommands
+    print ls
 
 emacsCommands = simpleCommands `Map.union` Map.fromList
-                    [(KeyChar '\SOH', pureCommand moveToStart)
-                    ,(KeyChar '\ENQ', pureCommand moveToEnd)]
+                    [(controlKey 'A', pureCommand moveToStart)
+                    ,(controlKey 'E', pureCommand moveToEnd)
+                    ,(KeySpecial KillLine, undoableKill)
+                    ,(KeySpecial KeyUp, historyBack)
+                    ,(KeySpecial KeyDown, historyForward)
+                    ,(controlKey 'R', pasteCommand) 
+                    ,(KeyChar '\t', fileCompletionCmd)
+                    ]
 
-class MonadIO m => MonadIO1 m where
-    liftIO1 :: (forall a . IO a -> IO a) -> m a -> m a
+undoableKill :: (MonadCmd Paste m, MonadCmd Undo m) => Command m
+undoableKill = withUndo $ \ls@(LS xs ys) -> do
+                    saveForPaste xs
+                    return (killLine ls)
 
-instance MonadIO1 IO where
-    liftIO1 = id
 
 
 wrapTerminalOps:: MonadIO1 m => Terminal -> m a -> m a

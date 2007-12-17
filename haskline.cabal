@@ -14,10 +14,16 @@ Description:    This library provides an extensible, flexible interface for read
                 replace readline in the GHC compiler.
 Homepage:       http://code.haskell.org/haskline
 Stability:      Experimental
-Build-depends:  base, terminfo, unix, stm, mtl, containers
-Extensions:     ForeignFunctionInterface, Rank2Types
+Build-depends:  base, terminfo, unix, stm, mtl, containers, filepath, directory
+Extensions:     ForeignFunctionInterface, Rank2Types, FlexibleInstances,
+                FlexibleContexts,
+                MultiParamTypeClasses, OverlappingInstances
 Exposed-Modules:
                 System.Console.HaskLine
                 System.Console.HaskLine.LineState
                 System.Console.HaskLine.Command
+                System.Console.HaskLine.Command.Completion
+                System.Console.HaskLine.Command.History
+                System.Console.HaskLine.Command.Paste
+                System.Console.HaskLine.Command.Undo
                 System.Console.HaskLine.WindowSize

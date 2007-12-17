@@ -74,7 +74,7 @@ type LineChange = LineState -> LineState
 moveToStart, moveToEnd, killLine :: LineChange
 moveToStart (LS xs ys) = LS [] (reverse xs ++ ys)
 moveToEnd (LS xs ys) = LS (reverse ys ++ xs) []
-killLine _ = LS [] []
+killLine (LS xs ys) = LS [] ys
 
 
 goLeft, goRight, deleteNext, deletePrev :: LineChange
@@ -87,6 +87,9 @@ goRight (LS ys (x:xs)) = LS (x:ys) xs
 -- add a character to the left of the cursor
 insertChar :: Char -> LineChange
 insertChar c (LS xs ys) =  LS (c:xs) ys
+
+insertText :: String -> LineChange
+insertText s (LS xs ys) = LS (reverse s ++ xs) ys
 
 deleteNext ls@(LS _ []) = ls
 deleteNext (LS xs (y:ys)) = LS xs ys
