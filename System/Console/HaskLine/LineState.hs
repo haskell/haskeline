@@ -10,8 +10,7 @@ import Control.Monad.RWS
 -- @Actions -> TermOutput@.
 data Actions = Actions {leftA, rightA, upA, downA :: Int -> TermOutput,
                         clearToLineEnd :: TermOutput,
-                        nl :: TermOutput,
-                        cr :: TermOutput,
+                        nl, cr, clearAll :: TermOutput,
                         wrapLine :: TermOutput}
 
 getActions :: Capability Actions
@@ -21,11 +20,13 @@ getActions = do
     upA' <- moveUp
     downA' <- moveDown
     clearToLineEnd' <- clearEOL
+    clearAll' <- clearScreen
     nl' <- newline
     cr' <- carriageReturn
     wrapLine' <- getWrapLine nl' (leftA' 1)
     return Actions{leftA=leftA',rightA=rightA',upA=upA',downA=downA',
                 clearToLineEnd=clearToLineEnd',nl=nl',cr=cr',
+                clearAll=clearAll' 1,
                  wrapLine=wrapLine'}
 
 text :: String -> Actions -> TermOutput
@@ -196,6 +197,24 @@ drawLine prefix (LS xs ys) = do
     printText (prefix ++ reverse xs ++ ys)
     changeLeft (length ys)
 
+redrawLine :: String -> LineState -> Draw ()
+redrawLine prefix ls = do
+    pos <- get
+    tell (left (termCol pos) `mappend` up (termRow pos))
+    drawLine prefix ls
+
+clearScreenAndRedraw :: String -> LineState -> Draw ()
+clearScreenAndRedraw prefix ls = do
+    tell clearAll
+    put initTermPos
+    drawLine prefix ls
+
+moveToNextLine :: LineState -> Draw ()
+moveToNextLine ls = do
+    pos <- get
+    layout <- ask
+    tell (mreplicate (lsLinesLeft layout pos ls) nl)
+    put initTermPos
 
 
 posFromLength :: Layout -> Int -> TermPos

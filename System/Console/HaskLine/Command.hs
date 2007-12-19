@@ -68,7 +68,13 @@ getKey ms = do
  a full refresh:
  data Command m = Change (LSCHANGE) | Refresh (Linestate -> m LineState)
  --}
-data Command m = Finish | ChangeCmd (LineState -> m LineState)
+
+data Command m = Finish | Command (LineState -> m Result)
+                | RedrawLine {shouldClearScreen :: Bool}
+
+data Result = Changed LineState | PrintLines [String] LineState
+                                   
+
 
 isFinish :: Command m -> Bool
 isFinish Finish = True
@@ -87,11 +93,13 @@ simpleCommands = Map.fromList $ [
                     ] ++ map insertionCommand [' '..'~']
             
 pureCommand :: Monad m => LineChange -> Command m
-pureCommand f = ChangeCmd (return . f)
+pureCommand f = Command (return . Changed . f)
 
 insertionCommand :: Monad m => Char -> (Key,Command m)
 insertionCommand c = (KeyChar c, pureCommand $ insertChar c)
 
+changeCommand :: Monad m => (LineState -> m LineState) -> Command m
+changeCommand f = Command $ \ls -> liftM Changed (f ls)
                     
 newtype CommandT s m a = CommandT {runCommandT :: s -> m (a,s)}
 

@@ -23,6 +23,6 @@ nextHistory ls History {pastHistory=past, futureHistory=ls':future}
             History {pastHistory=lineContents ls : past, futureHistory=future})
 
 historyBack, historyForward :: MonadCmd History m => Command m
-historyBack = ChangeCmd $ updateState . prevHistory
-historyForward = ChangeCmd $ updateState . nextHistory
+historyBack = changeCommand $ updateState . prevHistory
+historyForward = changeCommand $ updateState . nextHistory
 

@@ -60,13 +60,18 @@ type WordBreakFunc = String -> (String, String)
 
 -- | Create a 'Command' for word completion.
 completionCmd :: Monad m => WordBreakFunc -> CompletionFunc m -> Command m
-completionCmd breakWord complete = ChangeCmd $ \ls@(LS xs ys) -> do
-    let (word,rest) = breakWord xs
-    expansion <- complete (reverse word)
-    case expansion of
-        NoExpansion -> return ls
-        FullExpansion newWord -> return $ LS (reverse newWord ++ rest) ys
-        Partial newWord _ -> return $ LS (reverse newWord ++ rest) ys
+completionCmd breakWord complete = Command $ \ls@(LS xs ys) -> do
+    let (revWord,rest) = breakWord xs
+    let word = reverse revWord
+    expansion <- complete word
+    let addExpanded xs' = LS (reverse xs' ++ rest) ys
+    return $ case expansion of
+        NoExpansion -> Changed ls
+        FullExpansion newWord -> Changed $ addExpanded newWord
+        Partial partial words 
+            | length words > 1, partial == word 
+                                -> PrintLines words $ addExpanded partial
+            | otherwise         -> Changed $ addExpanded partial
 
 
 ----------------

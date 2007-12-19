@@ -34,7 +34,10 @@ emacsCommands = simpleCommands `Map.union` Map.fromList
                     ,(KeySpecial KeyDown, historyForward)
                     ,(controlKey 'R', pasteCommand) 
                     ,(KeyChar '\t', fileCompletionCmd)
+                    ,(controlKey 'L', RedrawLine True)
+                    ,(controlKey 'N', RedrawLine False)
                     ]
+
 
 undoableKill :: (MonadCmd Paste m, MonadCmd Undo m) => Command m
 undoableKill = withUndo $ \ls@(LS xs ys) -> do
@@ -153,17 +156,38 @@ repeatTillFinish tv settings = loop
             loop newLayout newPos ls
 
         actOnCommand Finish layout pos ls = do
-            newlines settings layout pos ls
+            runDraw settings layout pos $ moveToNextLine ls
             return ls
-        actOnCommand (ChangeCmd g) layout pos ls = do
-            newLS <- g ls
-            newPos <- runDraw settings layout pos 
-                            (diffLinesBreaking ls newLS)
-            loop layout newPos newLS
-                
-newlines settings layout pos ls = liftIO $ runTermOutput (terminal settings) $ 
-                                    mreplicate (lsLinesLeft layout pos ls) nl
-                                    $ actions settings
+        actOnCommand (RedrawLine shouldClear) layout pos ls
+            | shouldClear = do
+                                runDraw settings layout pos $
+                                        clearScreenAndRedraw
+                                                (prefix settings) ls
+                                loop layout pos ls
+
+            | otherwise = do
+                            runDraw settings layout pos 
+                                        $ redrawLine (prefix settings) ls
+                            loop layout pos ls
+        actOnCommand (Command g) layout pos ls = do
+            result <- g ls
+            case result of
+                Changed newLS -> do
+                            newPos <- runDraw settings layout pos 
+                                                (diffLinesBreaking ls newLS)
+                            loop layout newPos newLS
+                PrintLines lines newLS -> do 
+                            let printLines 
+                                    = map (\l -> text l `mappend` nl) lines
+                            newPos <- runDraw settings layout pos $ do
+                                            moveToNextLine ls
+                                            tell $ mconcat printLines
+                                            drawLine (prefix settings) newLS
+                            loop layout newPos newLS
+
+        -- TODO: RedrawLine
+                                    
+
 
 runDraw :: MonadIO m => Settings -> Layout -> TermPos -> Draw () -> m TermPos
 runDraw settings layout pos draw = do

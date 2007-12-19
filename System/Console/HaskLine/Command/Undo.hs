@@ -33,9 +33,9 @@ saveForUndo ls = modifyState $ addToPast ls
 
 withUndo :: MonadCmd Undo m => 
             (LineState -> m LineState) -> Command m
-withUndo f = ChangeCmd $ \ls -> saveForUndo ls >> f ls
+withUndo f = changeCommand $ \ls -> saveForUndo ls >> f ls
 
 commandUndo, commandRedo :: MonadCmd Undo m => Command m
-commandUndo = ChangeCmd $ updateState . undoPast
+commandUndo = changeCommand $ updateState . undoPast
 
-commandRedo = ChangeCmd $ updateState . redoFuture
+commandRedo = changeCommand $ updateState . redoFuture
