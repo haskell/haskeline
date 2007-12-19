@@ -118,7 +118,7 @@ runHSLine prefix commands = do
     wrapTerminalOps (terminal settings) $ do
         let ls = lineState ""
         layout <- liftIO getLayout
-        let pos = posFromLength layout (length prefix)
+        pos <- runDraw settings layout initTermPos (drawLine prefix ls)
 
         tv <- liftIO $ newTVarIO Waiting
 
@@ -136,9 +136,7 @@ getLayout = fmap (Layout . fromEnum . winCols) getWindowSize
 
 repeatTillFinish :: MonadIO m => TVar (EventState m) -> Settings
         -> Layout -> TermPos -> LineState -> m LineState
-repeatTillFinish tv settings initLayout initPos initLS = do
-        liftIO $ putStr (prefix settings)
-        loop initLayout initPos initLS
+repeatTillFinish tv settings = loop
     where 
         loop layout pos ls = join $ liftIO $ atomically $ do
                         event <- readTVar tv
@@ -159,13 +157,18 @@ repeatTillFinish tv settings initLayout initPos initLS = do
             return ls
         actOnCommand (ChangeCmd g) layout pos ls = do
             newLS <- g ls
-            let (_,newPos,act) = runRWS (diffLinesBreaking ls newLS)
-                                        layout pos
-            liftIO $ runTermOutput (terminal settings) 
-                    $ act (actions settings)
+            newPos <- runDraw settings layout pos 
+                            (diffLinesBreaking ls newLS)
             loop layout newPos newLS
                 
 newlines settings layout pos ls = liftIO $ runTermOutput (terminal settings) $ 
                                     mreplicate (lsLinesLeft layout pos ls) nl
                                     $ actions settings
+
+runDraw :: MonadIO m => Settings -> Layout -> TermPos -> Draw () -> m TermPos
+runDraw settings layout pos draw = do
+    let (_,newPos,act) = runRWS draw layout pos
+    liftIO $ runTermOutput (terminal settings) 
+                    $ act (actions settings)
+    return newPos
 

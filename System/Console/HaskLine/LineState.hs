@@ -111,6 +111,8 @@ mreplicate n m
 data TermPos = TermPos {termRow,termCol :: Int}
     deriving Show
 
+initTermPos = TermPos {termRow = 0, termCol = 0}
+
 type Draw = RWS Layout (Actions -> TermOutput) TermPos
 
 changeRight :: Int -> Draw ()
@@ -188,6 +190,13 @@ clearDeadText n
             tell $ up (numLinesToClear - 1)
             tell $ right (termCol pos)
             return ()
+
+drawLine :: String -> LineState -> Draw ()
+drawLine prefix (LS xs ys) = do
+    printText (prefix ++ reverse xs ++ ys)
+    changeLeft (length ys)
+
+
 
 posFromLength :: Layout -> Int -> TermPos
 posFromLength Layout {width = w} n = TermPos 
