@@ -2,7 +2,7 @@ module System.Console.HaskLine.LineState where
 
 import System.Console.Terminfo
 import Control.Monad
-import Control.Monad.RWS
+import Control.Monad.Trans
 
 -- | Keep track of all of the output capabilities we can use.
 -- 
@@ -114,45 +114,97 @@ data TermPos = TermPos {termRow,termCol :: Int}
 
 initTermPos = TermPos {termRow = 0, termCol = 0}
 
-type Draw = RWS Layout (Actions -> TermOutput) TermPos
 
-changeRight :: Int -> Draw ()
-changeRight n = RWS $ \Layout {width = w} TermPos {termRow=r,termCol=c} ->
+--------------
+
+newtype Draw m a = Draw (Actions -> Terminal -> Layout
+                          -> TermPos -> m (TermPos, a))
+
+runDraw :: Monad m => Actions -> Terminal -> Layout -> Draw m a -> m a
+runDraw actions term layout (Draw f) = do
+    (p,x) <- f actions term layout initTermPos
+    return x
+
+instance Monad m => Monad (Draw m) where
+    return x = Draw $ \_ _ _ pos -> return (pos,x)
+    Draw f >>= g = Draw $ \actions term layout pos1 -> do
+                                (pos2,y) <- f actions term layout pos1 
+                                let Draw g' = g y
+                                g' actions term layout pos2
+
+instance MonadTrans Draw where
+    lift f = Draw $ \_ _ _ pos -> do {x <- f; return (pos,x)}
+
+instance MonadIO m => MonadIO (Draw m) where
+    liftIO f = Draw $ \_ _ _ pos -> do {x <- liftIO f; return (pos,x)}
+
+getPos :: Monad m => Draw m TermPos
+getPos = Draw (\_ _ _ pos -> return (pos,pos))
+
+setPos :: Monad m => TermPos -> Draw m ()
+setPos pos = Draw (\_ _ _ _ -> return (pos,()))
+
+askLayout :: Monad m => Draw m Layout
+askLayout = Draw (\_ _ layout pos -> return (pos,layout))
+
+withLayout :: Monad m => Layout -> Draw m a -> Draw m a
+withLayout layout (Draw f) = Draw $ \actions term _ pos 
+                                    -> f actions term layout pos
+
+output :: MonadIO m => (Actions -> TermOutput) -> Draw m ()
+output f = Draw $ \actions term _ pos -> do
+    liftIO $ runTermOutput term (f actions)
+    return (pos,())
+
+
+
+changeRight :: MonadIO m => Int -> Draw m ()
+changeRight n = do
+    w <- liftM width askLayout
+    TermPos {termRow=r,termCol=c} <- getPos
     if c+n < w  
-        then ((),TermPos {termRow=r,termCol=c+n}, right n)
-        else      let m = c+n
-                      linesDown = m `div` w
-                      newCol = m `rem` w
-                  in ((),TermPos {termRow=r+linesDown, termCol=newCol},
-                        mconcat [mreplicate linesDown nl, right newCol])
+        then do
+                setPos TermPos {termRow=r,termCol=c+n}
+                output (right n)
+        else do
+              let m = c+n
+              let linesDown = m `div` w
+              let newCol = m `rem` w
+              setPos TermPos {termRow=r+linesDown, termCol=newCol}
+              output $ mconcat [mreplicate linesDown nl, right newCol]
                       
-changeLeft :: Int -> Draw ()
-changeLeft n = RWS $ \Layout {width = w} TermPos {termRow=r,termCol=c} ->
+changeLeft :: MonadIO m => Int -> Draw m ()
+changeLeft n = do
+    w <- liftM width askLayout
+    TermPos {termRow=r,termCol=c} <- getPos
     if c - n >= 0 
-        then ((),TermPos {termRow = r,termCol = c-n}, left n)
-        else      let m = n - c
-                      linesUp = 1 + (m `div` w)
-                      linesFromEnd = m `rem` w
-                      newCol = w - linesFromEnd
-                  in ((),TermPos {termRow = r - linesUp, termCol=newCol},
-                      mconcat [cr, up linesUp, right newCol])
+        then do 
+                setPos TermPos {termRow = r,termCol = c-n}
+                output (left n)
+        else do      
+                let m = n - c
+                let linesUp = 1 + (m `div` w)
+                let linesFromEnd = m `rem` w
+                let newCol = w - linesFromEnd
+                setPos TermPos {termRow = r - linesUp, termCol=newCol}
+                output $ mconcat [cr, up linesUp, right newCol]
                 
 -- todo: when dealing with a whole string, computations can be more efficient.
-printText :: String -> Draw ()
+printText :: MonadIO m => String -> Draw m ()
 printText = mapM_ printChar
     where
         printChar x = do
-            w <- asks width
-            p@TermPos {termRow=r,termCol=c} <- get
+            w <- liftM width askLayout
+            p@TermPos {termRow=r,termCol=c} <- getPos
             if c+1<w
                 then do
-                        put p{termCol=c+1}
-                        tell (text [x])
+                        setPos p{termCol=c+1}
+                        output (text [x])
                 else do
-                        put TermPos {termRow=r+1,termCol=0}
-                        tell $ mconcat [text [x], wrapLine]
+                        setPos TermPos {termRow=r+1,termCol=0}
+                        output $ mconcat [text [x], wrapLine]
 
-diffLinesBreaking :: LineState -> LineState -> Draw ()
+diffLinesBreaking :: MonadIO m => LineState -> LineState -> Draw m ()
 diffLinesBreaking (LS xs1 ys1) (LS xs2 ys2) = 
     case matchInit (reverse xs1) (reverse xs2) of
         ([],[])     | ys1 == ys2            -> return ()
@@ -178,43 +230,44 @@ linesLeft Layout {width=w} TermPos {termCol = c} n
 lsLinesLeft :: Layout -> TermPos -> LineState -> Int
 lsLinesLeft layout pos (LS _ ys) = linesLeft layout pos (length ys)
 
-clearDeadText :: Int -> Draw ()
+clearDeadText :: MonadIO m => Int -> Draw m ()
 clearDeadText n
     | n <= 0    = return ()
     | otherwise = do
-        layout <- ask
-        pos <- get
+        layout <- askLayout
+        pos <- getPos
         let numLinesToClear = linesLeft layout pos n
-        tell clearToLineEnd
-        when (numLinesToClear > 1) $ do
-            replicateM (numLinesToClear - 1) $ (tell nl >> tell clearToLineEnd)
-            tell $ up (numLinesToClear - 1)
-            tell $ right (termCol pos)
-            return ()
+        output clearToLineEnd
+        when (numLinesToClear > 1) $ output $ mconcat [
+                    mreplicate (numLinesToClear - 1) 
+                            $ nl `mappend` clearToLineEnd
+                    , up (numLinesToClear - 1)
+                    , right (termCol pos)]
 
-drawLine :: String -> LineState -> Draw ()
+drawLine :: MonadIO m => String -> LineState -> Draw m ()
 drawLine prefix (LS xs ys) = do
     printText (prefix ++ reverse xs ++ ys)
     changeLeft (length ys)
 
-redrawLine :: String -> LineState -> Draw ()
+redrawLine :: MonadIO m => String -> LineState -> Draw m ()
 redrawLine prefix ls = do
-    pos <- get
-    tell (left (termCol pos) `mappend` up (termRow pos))
+    pos <- getPos
+    output (left (termCol pos) `mappend` up (termRow pos))
+    setPos initTermPos
     drawLine prefix ls
 
-clearScreenAndRedraw :: String -> LineState -> Draw ()
+clearScreenAndRedraw :: MonadIO m => String -> LineState -> Draw m ()
 clearScreenAndRedraw prefix ls = do
-    tell clearAll
-    put initTermPos
+    output clearAll
+    setPos initTermPos
     drawLine prefix ls
 
-moveToNextLine :: LineState -> Draw ()
+moveToNextLine :: MonadIO m => LineState -> Draw m ()
 moveToNextLine ls = do
-    pos <- get
-    layout <- ask
-    tell (mreplicate (lsLinesLeft layout pos ls) nl)
-    put initTermPos
+    pos <- getPos
+    layout <- askLayout
+    output $ mreplicate (lsLinesLeft layout pos ls) nl
+    setPos initTermPos
 
 
 posFromLength :: Layout -> Int -> TermPos
@@ -229,3 +282,10 @@ reposition :: Layout -> Layout -> TermPos -> TermPos
 reposition oldLayout newLayout oldPos = posFromLength newLayout $ 
                                             posToLength oldLayout oldPos
 
+withReposition :: Monad m => Layout -> Draw m a -> Draw m a
+withReposition newLayout f = do
+    oldPos <- getPos
+    oldLayout <- askLayout
+    let newPos = reposition oldLayout newLayout oldPos
+    setPos newPos
+    withLayout newLayout f

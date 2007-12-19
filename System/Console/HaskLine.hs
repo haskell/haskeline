@@ -10,11 +10,11 @@ import System.Console.HaskLine.WindowSize
 
 import System.Console.Terminfo
 import qualified Data.Map as Map
-import Control.Monad.RWS
 import System.IO
 import Control.Exception
 import Data.Maybe (fromMaybe)
 import Control.Monad
+import Control.Monad.Trans
 import Control.Concurrent.STM
 import Control.Concurrent
 
@@ -121,7 +121,6 @@ runHSLine prefix commands = do
     wrapTerminalOps (terminal settings) $ do
         let ls = lineState ""
         layout <- liftIO getLayout
-        pos <- runDraw settings layout initTermPos (drawLine prefix ls)
 
         tv <- liftIO $ newTVarIO Waiting
 
@@ -130,69 +129,45 @@ runHSLine prefix commands = do
                                 (commandLoop (terminal settings) 
                                     commands tv))
                     
-                    $ repeatTillFinish tv settings layout pos ls
+                    $ runDraw (actions settings) (terminal settings) layout
+                    $ drawLine prefix ls >> repeatTillFinish tv settings ls
         return result
 
 -- todo: make sure >=2
 getLayout = fmap (Layout . fromEnum . winCols) getWindowSize
 
 
-repeatTillFinish :: MonadIO m => TVar (EventState m) -> Settings
-        -> Layout -> TermPos -> LineState -> m LineState
+repeatTillFinish :: forall m . MonadIO m => TVar (EventState m) -> Settings
+        -> LineState -> Draw m LineState
 repeatTillFinish tv settings = loop
     where 
-        loop layout pos ls = join $ liftIO $ atomically $ do
+        loop ls = join $ liftIO $ atomically $ do
                         event <- readTVar tv
                         case event of
                             Waiting -> retry
                             WindowResize newLayout -> do
                                 writeTVar tv Waiting
-                                return $ actOnResize layout pos newLayout ls
+                                return $ actOnResize newLayout ls
                             CommandReceived cmd -> do
                                 writeTVar tv Waiting
-                                return $ actOnCommand cmd layout pos ls
-        actOnResize layout pos newLayout ls = do
-            let newPos = reposition layout newLayout pos
-            loop newLayout newPos ls
+                                return $ actOnCommand cmd ls
+        actOnResize newLayout ls
+                = withReposition newLayout (loop ls)
 
-        actOnCommand Finish layout pos ls = do
-            runDraw settings layout pos $ moveToNextLine ls
-            return ls
-        actOnCommand (RedrawLine shouldClear) layout pos ls
-            | shouldClear = do
-                                runDraw settings layout pos $
-                                        clearScreenAndRedraw
-                                                (prefix settings) ls
-                                loop layout pos ls
+        actOnCommand Finish ls = moveToNextLine ls >> return ls
+        actOnCommand (RedrawLine shouldClear) ls
+            | shouldClear = do clearScreenAndRedraw (prefix settings) ls
+                               loop ls
 
-            | otherwise = do
-                            runDraw settings layout pos 
-                                        $ redrawLine (prefix settings) ls
-                            loop layout pos ls
-        actOnCommand (Command g) layout pos ls = do
-            result <- g ls
+            | otherwise = do redrawLine (prefix settings) ls
+                             loop ls
+        actOnCommand (Command g) ls = do
+            result <- lift (g ls)
             case result of
-                Changed newLS -> do
-                            newPos <- runDraw settings layout pos 
-                                                (diffLinesBreaking ls newLS)
-                            loop layout newPos newLS
+                Changed newLS -> diffLinesBreaking ls newLS >> loop newLS 
                 PrintLines lines newLS -> do 
-                            let printLines 
-                                    = map (\l -> text l `mappend` nl) lines
-                            newPos <- runDraw settings layout pos $ do
-                                            moveToNextLine ls
-                                            tell $ mconcat printLines
-                                            drawLine (prefix settings) newLS
-                            loop layout newPos newLS
-
-        -- TODO: RedrawLine
-                                    
-
-
-runDraw :: MonadIO m => Settings -> Layout -> TermPos -> Draw () -> m TermPos
-runDraw settings layout pos draw = do
-    let (_,newPos,act) = runRWS draw layout pos
-    liftIO $ runTermOutput (terminal settings) 
-                    $ act (actions settings)
-    return newPos
-
+                            let printLines = map (\l -> text l `mappend` nl) lines
+                            moveToNextLine ls 
+                            output $ mconcat printLines
+                            drawLine (prefix settings) newLS
+                            loop newLS
