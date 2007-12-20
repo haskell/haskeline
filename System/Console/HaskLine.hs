@@ -45,21 +45,20 @@ undoableKill = withUndo $ \ls@(LS xs ys) -> do
                     return (killLine ls)
 
 
-
+-- Note: Without buffering the output, there's a cursor flicker sometimes.
+-- We'll keep it buffered, and manually flush the buffer in 
+-- repeatTillFinish.
 wrapTerminalOps:: MonadIO1 m => Terminal -> m a -> m a
 wrapTerminalOps term = liftIO1 $ \f -> do
     oldInBuf <- hGetBuffering stdin
-    oldOutBuf <- hGetBuffering stdout
     oldEcho <- hGetEcho stdout
     bracket_ (do maybeOutput term keypadOn
-                 setTerm NoBuffering NoBuffering False)
-             (do setTerm oldInBuf oldOutBuf oldEcho
-                 maybeOutput term keypadOff)
+                 hSetBuffering stdin NoBuffering
+                 hSetEcho stdout False)
+             (do maybeOutput term keypadOff
+                 hSetBuffering stdin oldInBuf
+                 hSetEcho stdout oldEcho)
             f
-    where setTerm oldInBuf oldOutBuf oldEcho = do
-	         hSetBuffering stdin oldInBuf
-		 hSetBuffering stdout oldOutBuf
-		 hSetEcho stdout oldEcho
 
 maybeOutput :: Terminal -> Capability TermOutput -> IO ()
 maybeOutput term cap = runTermOutput term $ 
@@ -141,7 +140,9 @@ repeatTillFinish :: forall m . MonadIO m => TVar (EventState m) -> Settings
         -> LineState -> Draw m LineState
 repeatTillFinish tv settings = loop
     where 
-        loop ls = join $ liftIO $ atomically $ do
+        loop ls = do
+                    liftIO (hFlush stdout)
+                    join $ liftIO $ atomically $ do
                         event <- readTVar tv
                         case event of
                             Waiting -> retry
