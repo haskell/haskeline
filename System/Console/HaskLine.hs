@@ -133,7 +133,9 @@ runHSLine prefix commands = do
         return result
 
 -- todo: make sure >=2
-getLayout = fmap (Layout . fromEnum . winCols) getWindowSize
+getLayout = fmap mkLayout getWindowSize
+    where mkLayout ws = Layout {height = fromEnum (winRows ws),
+                                width = fromEnum (winCols ws)}
 
 
 repeatTillFinish :: forall m . MonadIO m => TVar (EventState m) -> Settings

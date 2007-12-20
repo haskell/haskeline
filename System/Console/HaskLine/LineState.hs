@@ -10,7 +10,8 @@ import Control.Monad.Trans
 -- @Actions -> TermOutput@.
 data Actions = Actions {leftA, rightA, upA, downA :: Int -> TermOutput,
                         clearToLineEnd :: TermOutput,
-                        nl, cr, clearAll :: TermOutput,
+                        nl, cr :: TermOutput,
+                        clearAll :: LinesAffected -> TermOutput,
                         wrapLine :: TermOutput}
 
 getActions :: Capability Actions
@@ -26,7 +27,7 @@ getActions = do
     wrapLine' <- getWrapLine nl' (leftA' 1)
     return Actions{leftA=leftA',rightA=rightA',upA=upA',downA=downA',
                 clearToLineEnd=clearToLineEnd',nl=nl',cr=cr',
-                clearAll=clearAll' 1,
+                clearAll=clearAll',
                  wrapLine=wrapLine'}
 
 text :: String -> Actions -> TermOutput
@@ -100,7 +101,8 @@ deletePrev (LS (x:xs) ys) = LS xs ys
 
 --------
 
-data Layout = Layout {width :: Int}
+data Layout = Layout {width, height :: Int}
+                    deriving Show
 
 mreplicate :: Monoid m => Int -> m -> m
 mreplicate n m
@@ -266,7 +268,8 @@ redrawLine prefix ls = do
 
 clearScreenAndRedraw :: MonadIO m => String -> LineState -> Draw m ()
 clearScreenAndRedraw prefix ls = do
-    output clearAll
+    h <- liftM height askLayout
+    output (flip clearAll h)
     setPos initTermPos
     drawLine prefix ls
 
