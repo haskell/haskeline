@@ -72,7 +72,7 @@ getKey ms = do
 data Command m = Finish | Command (LineState -> m Result)
                 | RedrawLine {shouldClearScreen :: Bool}
 
-data Result = Changed LineState | PrintLines [String] LineState
+data Result = Changed LineState | PrintLines (Layout -> [String]) LineState
                                    
 
 

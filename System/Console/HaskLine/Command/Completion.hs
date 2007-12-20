@@ -22,7 +22,7 @@ import System.Directory
 import System.FilePath
 import Control.Monad(liftM)
 import Control.Monad.Trans
-import Data.List(isPrefixOf)
+import Data.List(isPrefixOf, transpose, unfoldr)
 
 -- | An action which completes a word; for example, expanding the first few
 -- letters of a filename into the full filename.
@@ -69,10 +69,37 @@ completionCmd breakWord complete = Command $ \ls@(LS xs ys) -> do
         NoExpansion -> Changed ls
         FullExpansion newWord -> Changed $ addExpanded newWord
         Partial partial words 
-            | length words > 1, partial == word 
-                                -> PrintLines words $ addExpanded partial
+            | length words > 1 && partial == word
+                                -> PrintLines (makeLines words) $ addExpanded partial
             | otherwise         -> Changed $ addExpanded partial
 
+makeLines :: [String] -> Layout -> [String]
+makeLines words Layout {width = w} = let
+    maxLength = maximum (map length words) + 2
+    numCols = w `div` maxLength
+    lines = if (maxLength >= w)
+                    then map (\x -> [x]) words
+                    else splitIntoGroups numCols words
+    padToLength xs = xs ++ replicate (maxLength - length xs) ' '
+    in map (concatMap padToLength) lines
+
+-- Split xs into rows of length n,
+-- such that the list increases incrementally along the columns.
+-- e.g.: splitIntoGroups 4 [1..11] ==
+-- [[1,4,7,10]
+-- ,[2,5,8,11]
+-- ,[3,6,9]]
+splitIntoGroups :: Int -> [a] -> [[a]]
+splitIntoGroups n xs = transpose $ unfoldr f xs
+    where
+        f [] = Nothing
+        f ys = Just (splitAt k ys)
+        k = ceilDiv (length xs) n
+
+-- ceilDiv m n is the smallest k such that k * n >= m.
+ceilDiv :: Integral a => a -> a -> a
+ceilDiv m n | m `rem` n == 0    =  m `div` n
+            | otherwise         =  m `div` n + 1
 
 ----------------
 -- Word breaking

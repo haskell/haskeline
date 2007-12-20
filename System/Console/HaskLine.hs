@@ -167,8 +167,9 @@ repeatTillFinish tv settings = loop
             case result of
                 Changed newLS -> diffLinesBreaking ls newLS >> loop newLS 
                 PrintLines lines newLS -> do 
-                            let printLines = map (\l -> text l `mappend` nl) lines
+                            layout <- askLayout
                             moveToNextLine ls 
-                            output $ mconcat printLines
+                            output $ mconcat $ map (\l -> text l `mappend` nl)
+                                            $ lines layout
                             drawLine (prefix settings) newLS
                             loop newLS
