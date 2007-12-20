@@ -189,20 +189,28 @@ changeLeft n = do
                 setPos TermPos {termRow = r - linesUp, termCol=newCol}
                 output $ mconcat [cr, up linesUp, right newCol]
                 
--- todo: when dealing with a whole string, computations can be more efficient.
+-- TODO: I think if we wrap this all up in one call to output, it'll be faster...
 printText :: MonadIO m => String -> Draw m ()
-printText = mapM_ printChar
-    where
-        printChar x = do
-            w <- liftM width askLayout
-            p@TermPos {termRow=r,termCol=c} <- getPos
-            if c+1<w
-                then do
-                        setPos p{termCol=c+1}
-                        output (text [x])
-                else do
-                        setPos TermPos {termRow=r+1,termCol=0}
-                        output $ mconcat [text [x], wrapLine]
+printText "" = return ()
+printText xs = fillLine xs >>= printText
+
+-- Draws as much of the string as possible in the line, and returns the rest.
+-- If we fill up the line completely, wrap to the next row.
+fillLine :: MonadIO m => String -> Draw m String
+fillLine str = do
+    w <- liftM width askLayout
+    TermPos {termRow=r,termCol=c} <- getPos
+    let roomLeft = w - c
+    if length str < roomLeft
+        then do
+                output (text str)
+                setPos TermPos{termRow=r, termCol=c+length str}
+                return ""
+        else do
+                let (thisLine,rest) = splitAt roomLeft str
+                output (text thisLine `mappend` wrapLine)
+                setPos TermPos {termRow=r+1,termCol=0}
+                return rest
 
 diffLinesBreaking :: MonadIO m => LineState -> LineState -> Draw m ()
 diffLinesBreaking (LS xs1 ys1) (LS xs2 ys2) = 
