@@ -41,7 +41,7 @@ getWrapLine nl left1 = (autoRightMargin >>= guard >> withAutoMargin)
     -- Otherwise, it'll wrap automatically.
     withAutoMargin = (do
                         wraparoundGlitch >>= guard
-                        return (termText " " `mappend` left1)
+                        return (termText " " <#> left1)
                      )`mplus` return mempty
     
 left,right,up,down :: Int -> Actions -> TermOutput
@@ -173,7 +173,7 @@ changeRight n = do
               let linesDown = m `div` w
               let newCol = m `rem` w
               setPos TermPos {termRow=r+linesDown, termCol=newCol}
-              output $ mconcat [mreplicate linesDown nl, right newCol]
+              output $ mreplicate linesDown nl <#> right newCol
                       
 changeLeft :: MonadIO m => Int -> Draw m ()
 changeLeft n = do
@@ -189,7 +189,7 @@ changeLeft n = do
                 let linesFromEnd = m `rem` w
                 let newCol = w - linesFromEnd
                 setPos TermPos {termRow = r - linesUp, termCol=newCol}
-                output $ mconcat [cr, up linesUp, right newCol]
+                output $ cr <#> up linesUp <#> right newCol
                 
 -- TODO: I think if we wrap this all up in one call to output, it'll be faster...
 printText :: MonadIO m => String -> Draw m ()
@@ -210,7 +210,7 @@ fillLine str = do
                 return ""
         else do
                 let (thisLine,rest) = splitAt roomLeft str
-                output (text thisLine `mappend` wrapLine)
+                output (text thisLine <#> wrapLine)
                 setPos TermPos {termRow=r+1,termCol=0}
                 return rest
 
@@ -250,7 +250,7 @@ clearDeadText n
         output clearToLineEnd
         when (numLinesToClear > 1) $ output $ mconcat [
                     mreplicate (numLinesToClear - 1) 
-                            $ nl `mappend` clearToLineEnd
+                            $ nl <#> clearToLineEnd
                     , up (numLinesToClear - 1)
                     , right (termCol pos)]
 
@@ -262,7 +262,7 @@ drawLine prefix (LS xs ys) = do
 redrawLine :: MonadIO m => String -> LineState -> Draw m ()
 redrawLine prefix ls = do
     pos <- getPos
-    output (left (termCol pos) `mappend` up (termRow pos))
+    output $ left (termCol pos) <#> up (termRow pos)
     setPos initTermPos
     drawLine prefix ls
 

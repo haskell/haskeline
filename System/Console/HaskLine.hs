@@ -171,7 +171,7 @@ repeatTillFinish tv settings = loop
                 PrintLines lines newLS -> do 
                             layout <- askLayout
                             moveToNextLine ls 
-                            output $ mconcat $ map (\l -> text l `mappend` nl)
+                            output $ mconcat $ map (\l -> text l <#> nl)
                                             $ lines layout
                             drawLine (prefix settings) newLS
                             loop newLS
