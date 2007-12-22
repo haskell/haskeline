@@ -29,13 +29,14 @@ test = do
 emacsCommands = simpleCommands `Map.union` Map.fromList
                     [(controlKey 'A', pureCommand moveToStart)
                     ,(controlKey 'E', pureCommand moveToEnd)
-                    ,(KeySpecial KillLine, undoableKill)
-                    ,(KeySpecial KeyUp, historyBack)
-                    ,(KeySpecial KeyDown, historyForward)
+                    ,(KillLine, undoableKill)
+                    ,(KeyUp, historyBack)
+                    ,(KeyDown, historyForward)
                     ,(controlKey 'R', pasteCommand) 
                     ,(KeyChar '\t', fileCompletionCmd)
                     ,(controlKey 'L', RedrawLine True)
                     ,(controlKey 'N', RedrawLine False)
+                    ,(KeyChar '\ESC', RedrawLine True)
                     ]
 
 
@@ -89,7 +90,7 @@ addNewEvent tv event = do
 
 commandLoop :: Terminal -> Commands m -> TVar (EventState m) -> IO ()
 commandLoop term commands tv = do
-    keySeqs <- fmap Map.toList $ getKeySequences term
+    keySeqs <- getKeySequences term
     -- Loop until we receive a Finish command
     let loop = do
         k <- getKey keySeqs
