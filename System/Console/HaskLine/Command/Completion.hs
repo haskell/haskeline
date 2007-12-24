@@ -178,7 +178,7 @@ handleFolders :: Expansion -> IO Expansion
 handleFolders e@(FullExpansion file) = do
     dirExists <- doesDirectoryExist file
     return $ if dirExists 
-                then let dir = addTrailingPathSeparator file in Partial dir []
+                then let dir = addTrailingPathSeparator file in Partial dir [file]
                 else e
 handleFolders (Partial s ss) = return $ Partial s (map takeFileName ss)
 handleFolders NoExpansion = return NoExpansion
