@@ -6,9 +6,8 @@ import Data.Maybe
 import Data.List
 
 import qualified Data.Map as Map
-import Data.Maybe (catMaybes)
 import System.Console.Terminfo
-import System.Posix (Fd,stdOutput)
+import System.Posix (stdOutput)
 import System.Posix.Terminal
 import System.Timeout
 import Control.Monad
@@ -41,8 +40,8 @@ terminfoKeys term = catMaybes $ map getSequence keyCapabilities
         where getSequence (cap,x) = getCapability term $ do 
                             keys <- cap
                             return (keys,x)
-
-keyCapabilities = [(keyLeft,KeyLeft),
+              keyCapabilities = 
+                [(keyLeft,KeyLeft),
                 (keyRight,KeyRight),
                 (keyUp,KeyUp),
                 (keyDown,KeyDown),
@@ -173,7 +172,7 @@ instance MonadIO m => MonadIO (CommandT s m) where
     liftIO f = CommandT $ \s -> do {x <- liftIO f; return (x,s)}
 
 class MonadIO m => MonadIO1 m where
-    liftIO1 :: (forall a . IO a -> IO a) -> m a -> m a
+    liftIO1 :: (forall b . IO b -> IO b) -> m a -> m a
 
 instance MonadIO1 IO where
     liftIO1 = id

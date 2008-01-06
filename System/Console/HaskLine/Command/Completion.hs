@@ -31,7 +31,7 @@ type CompletionFunc m = String -> m Expansion
 
 -- The result of a word completion.
 data Expansion = NoExpansion | FullExpansion String 
-                    | Partial {commonPrefix :: String,
+                    | Partial {partialExpansion :: String,
                                 potentialCompletions :: [String]}
                     deriving Show
 
@@ -43,9 +43,9 @@ makeExpansion ss = Partial (commonPrefix ss) ss
     where
         commonPrefix :: [String] -> String
         commonPrefix [] = ""
-        commonPrefix (s:ss) = foldl common s ss
-        common s "" = ""
-        common "" s = ""
+        commonPrefix ts = foldl1 common ts
+        common _ "" = ""
+        common "" _ = ""
         common (c:cs) (d:ds)
             | c == d = c : common cs ds
             | otherwise = ""
@@ -72,20 +72,20 @@ completionCmd breakWord complete key = acceptKey key . KeyAction f
     return $ case expansion of
         NoExpansion -> Change s
         FullExpansion newWord -> Change $ addExpanded newWord
-        Partial partial words 
-            | length words > 1 && partial == word
-                                -> PrintLines (makeLines words) $ addExpanded partial
+        Partial partial ws 
+            | length ws > 1 && partial == word
+                                -> PrintLines (makeLines ws) $ addExpanded partial
             | otherwise         -> Change $ addExpanded partial
 
 makeLines :: [String] -> Layout -> [String]
-makeLines words Layout {width = w} = let
-    maxLength = maximum (map length words) + 2
-    numCols = w `div` maxLength
-    lines = if (maxLength >= w)
-                    then map (\x -> [x]) words
-                    else splitIntoGroups numCols words
+makeLines ws layout = let
+    maxLength = maximum (map length ws) + 2
+    numCols = width layout `div` maxLength
+    ls = if (maxLength >= width layout)
+                    then map (\x -> [x]) ws
+                    else splitIntoGroups numCols ws
     padToLength xs = xs ++ replicate (maxLength - length xs) ' '
-    in map (concatMap padToLength) lines
+    in map (concatMap padToLength) ls
 
 -- Split xs into rows of length n,
 -- such that the list increases incrementally along the columns.
@@ -129,6 +129,7 @@ simpleWordBreak (Just e) ws = escapedBreak
 -- Note: quote marks aren't included here; instead they're stripped by
 -- quoteCompletion.
 -- | A word break function for filenames.
+filenameWordBreak :: WordBreakFunc
 filenameWordBreak = simpleWordBreak (Just '\\') " \t\n\\`@$><=;|&{("
 
 
@@ -142,6 +143,7 @@ filenameWordBreak = simpleWordBreak (Just '\\') " \t\n\\`@$><=;|&{("
 basicCompletionFunc :: Monad m => (String -> m [String]) -> CompletionFunc m
 basicCompletionFunc f s = liftM (addSpaceIfDone . makeExpansion) (f s)
 
+addSpaceIfDone :: Expansion -> Expansion
 addSpaceIfDone (FullExpansion s) = FullExpansion (s ++ " ")
 addSpaceIfDone e = e
 
@@ -153,9 +155,9 @@ quoteCompletion :: Monad m => (Char -> Bool) -> CompletionFunc m -> CompletionFu
 quoteCompletion isQuote f = \s -> case s of
     (c:cs) | isQuote c -> f cs >>= \expansion -> return $ case expansion of
                             NoExpansion -> NoExpansion
-                            FullExpansion s -> FullExpansion (c : s ++ [c])
-                            Partial s ss -> Partial (c:s) ss
-    s -> f s
+                            FullExpansion e -> FullExpansion (c : e ++ [c])
+                            Partial p ss -> Partial (c:p) ss
+    cs -> f cs
 
 -- A completion function for file and folder names.
 completeFile :: MonadIO m => CompletionFunc m

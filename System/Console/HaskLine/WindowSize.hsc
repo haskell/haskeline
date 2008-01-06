@@ -1,7 +1,6 @@
 module System.Console.HaskLine.WindowSize(WindowSize(..),
                  getWindowSize) where
 
-import Foreign.Storable
 import Foreign
 import Foreign.C.Types
 

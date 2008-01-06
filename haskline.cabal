@@ -30,4 +30,4 @@ Exposed-Modules:
                 System.Console.HaskLine.Vi
                 System.Console.HaskLine.Modes
                 System.Console.HaskLine.WindowSize
-ghc-options: -fglasgow-exts
+ghc-options: -fglasgow-exts -Wall

@@ -38,10 +38,10 @@ insertString s (IMode xs ys) = IMode (reverse s ++ xs) ys
 
 deleteNext, deletePrev :: InsertMode -> InsertMode
 deleteNext im@(IMode _ []) = im
-deleteNext (IMode xs (y:ys)) = IMode xs ys
+deleteNext (IMode xs (_:ys)) = IMode xs ys
 
 deletePrev im@(IMode [] _) = im
-deletePrev (IMode (x:xs) ys) = IMode xs ys 
+deletePrev (IMode (_:xs) ys) = IMode xs ys 
 
 
 data CommandMode = CMode String Char String | CEmpty
@@ -74,12 +74,13 @@ instance FromString CommandMode where
                     (c:cs) -> CMode cs c []
 
 deleteChar :: CommandMode -> CommandMode
-deleteChar (CMode xs c (y:ys)) = CMode xs y ys
-deleteChar (CMode (x:xs) c []) = CMode xs x []
+deleteChar (CMode xs _ (y:ys)) = CMode xs y ys
+deleteChar (CMode (x:xs) _ []) = CMode xs x []
 deleteChar _ = CEmpty
 
 replaceChar :: Char -> CommandMode -> CommandMode
 replaceChar c (CMode xs _ ys) = CMode xs c ys
+replaceChar _ CEmpty = CEmpty
 
 
 

@@ -34,8 +34,8 @@ text :: String -> Actions -> TermOutput
 text str _ = termText str
 
 getWrapLine :: TermOutput -> TermOutput -> Capability TermOutput
-getWrapLine nl left1 = (autoRightMargin >>= guard >> withAutoMargin)
-                    `mplus` return nl
+getWrapLine nl' left1 = (autoRightMargin >>= guard >> withAutoMargin)
+                    `mplus` return nl'
   where 
     -- If the wraparound glitch is in effect, force a wrap by printing a space.
     -- Otherwise, it'll wrap automatically.
@@ -78,6 +78,7 @@ mreplicate n m
 data TermPos = TermPos {termRow,termCol :: Int}
     deriving Show
 
+initTermPos :: TermPos
 initTermPos = TermPos {termRow = 0, termCol = 0}
 
 
@@ -88,7 +89,7 @@ newtype Draw m a = Draw (Actions -> Terminal -> Layout
 
 runDraw :: Monad m => Actions -> Terminal -> Layout -> Draw m a -> m a
 runDraw actions term layout (Draw f) = do
-    (p,x) <- f actions term layout initTermPos
+    (_,x) <- f actions term layout initTermPos
     return x
 
 instance Monad m => Monad (Draw m) where

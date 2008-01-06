@@ -13,7 +13,6 @@ import System.Console.HaskLine.Modes
 import System.Console.HaskLine.Vi
 
 import System.Console.Terminfo
-import qualified Data.Map as Map
 import System.IO
 import Control.Exception
 import Data.Maybe (fromMaybe)
@@ -24,8 +23,7 @@ import Control.Concurrent
 
 import System.Posix.Signals.Exts
 
-import Debug.Trace
-
+test :: IO ()
 test = do
     s <- runHistory ["foobar", "other", "more"] $ runHSLine ">:" viActions
     print s
@@ -174,7 +172,8 @@ repeatTillFinish tv settings = loop
                 Effect t -> 
                 s -> KeyProcessor m t -> Draw m (Maybe String)
         actOnCommand Finish s _ = moveToNextLine s >> return (Just (toResult s))
-        actOnCommand (Redraw shouldClear t) s next = do
+        actOnCommand Fail _ _ = return Nothing
+        actOnCommand (Redraw shouldClear t) _ next = do
             if shouldClear
                 then clearScreenAndRedraw (prefix settings) t
                 else redrawLine (prefix settings) t
@@ -182,10 +181,10 @@ repeatTillFinish tv settings = loop
         actOnCommand (Change t) s next = do
             diffLinesBreaking (prefix settings) s t
             loop t next
-        actOnCommand (PrintLines lines t) s next = do
+        actOnCommand (PrintLines ls t) s next = do
                             layout <- askLayout
                             moveToNextLine s
                             output $ mconcat $ map (\l -> text l <#> nl)
-                                            $ lines layout
+                                            $ ls layout
                             drawLine (prefix settings) t
                             loop t next

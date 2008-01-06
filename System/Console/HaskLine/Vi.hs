@@ -5,8 +5,6 @@ import System.Console.HaskLine.Command.Completion
 import System.Console.HaskLine.Command.History
 import System.Console.HaskLine.Modes
 
-import Data.Function (fix)
-
 type VIMonad = CommandT History IO
 
 viActions :: KeyProcessor VIMonad InsertMode
