@@ -18,14 +18,16 @@ Build-depends:  base>=3.0, terminfo>=0.2, unix>=2.2,
                 stm>=2.1.1, mtl>=1.1, containers>=0.1,
                 filepath>=1.1, directory>=1.0
 Extensions:     ForeignFunctionInterface, Rank2Types, FlexibleInstances,
-                FlexibleContexts,
+                FlexibleContexts, ExistentialQuantification
+                ScopedTypeVariables
                 MultiParamTypeClasses, OverlappingInstances
 Exposed-Modules:
                 System.Console.HaskLine
-                System.Console.HaskLine.LineState
                 System.Console.HaskLine.Command
                 System.Console.HaskLine.Command.Completion
                 System.Console.HaskLine.Command.History
-                System.Console.HaskLine.Command.Paste
-                System.Console.HaskLine.Command.Undo
+                System.Console.HaskLine.LineState
+                System.Console.HaskLine.Vi
+                System.Console.HaskLine.Modes
                 System.Console.HaskLine.WindowSize
+ghc-options: -fglasgow-exts

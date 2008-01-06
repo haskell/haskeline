@@ -2,7 +2,7 @@ module System.Console.HaskLine.Command.History where
 
 import System.Console.HaskLine.LineState
 import System.Console.HaskLine.Command
-import System.Console.HaskLine.Command.Undo
+import Control.Monad (liftM)
 
 data History = History {pastHistory, futureHistory :: [String]}
 
@@ -11,18 +11,18 @@ data History = History {pastHistory, futureHistory :: [String]}
 runHistory :: Monad m => [String] -> CommandT History m a -> m a
 runHistory past = evalCommandT History {pastHistory=past, futureHistory=[]}
 
-prevHistory, nextHistory :: LineState -> History -> (LineState,History)
-prevHistory ls h@History {pastHistory = []} = (ls,h)
-prevHistory ls History {pastHistory=ls':past, futureHistory=future}
-        = (moveToEnd (lineState ls'), 
-            History {pastHistory=past, futureHistory=lineContents ls:future})
+prevHistory, nextHistory :: FromString s => s -> History -> (s, History)
+prevHistory s h@History {pastHistory = []} = (s,h)
+prevHistory s History {pastHistory=ls:past, futureHistory=future}
+        = (fromString ls, 
+            History {pastHistory=past, futureHistory= toResult s:future})
 
-nextHistory ls h@History {futureHistory = []} = (ls,h)
-nextHistory ls History {pastHistory=past, futureHistory=ls':future}
-        = (moveToEnd (lineState ls'), 
-            History {pastHistory=lineContents ls : past, futureHistory=future})
+nextHistory s h@History {futureHistory = []} = (s,h)
+nextHistory s History {pastHistory=past, futureHistory=ls:future}
+        = (fromString ls,
+            History {pastHistory=toResult s : past, futureHistory=future})
 
-historyBack, historyForward :: MonadCmd History m => Command m
-historyBack = changeCommand $ updateState . prevHistory
-historyForward = changeCommand $ updateState . nextHistory
+historyBack, historyForward :: (FromString s, MonadCmd History m) => Command m s s
+historyBack = simpleCommand $ liftM Change . updateState . prevHistory
+historyForward = simpleCommand $ liftM Change . updateState . nextHistory
 

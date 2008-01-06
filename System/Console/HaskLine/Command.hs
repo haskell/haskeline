@@ -104,44 +104,57 @@ escDelay :: Int
 escDelay = 100000 -- 0.1 seconds
 
 
-        
-{-- todo: some commands only change the linestate, don't require
- a full refresh:
- data Command m = Change (LSCHANGE) | Refresh (Linestate -> m LineState)
- --}
 
-data Command m = Finish | Command (LineState -> m Result)
-                | RedrawLine {shouldClearScreen :: Bool}
+--------------------------------
+data Effect s = Change s | PrintLines (Layout -> [String]) s
+                | Redraw {shouldClearScreen :: Bool, redrawState :: s}
+                | Fail | Finish
 
-data Result = Changed LineState | PrintLines (Layout -> [String]) LineState
-                                   
+newtype KeyProcessor m s = KP {runKP :: Key -> Maybe (KeyAction m s)}
 
+data KeyAction m s = forall t . LineState t => KeyAction (s -> m (Effect t)) (KeyProcessor m t)
 
-isFinish :: Command m -> Bool
-isFinish Finish = True
-isFinish _ = False
+nullKP :: KeyProcessor m s
+nullKP = KP $ const Nothing
 
-type Commands m = Map.Map Key (Command m)
+orKP :: KeyProcessor m s -> KeyProcessor m s -> KeyProcessor m s
+orKP (KP f) (KP g) = KP $ \k -> f k `mplus` g k
 
-simpleCommands :: Monad m => Commands m
-simpleCommands = Map.fromList $ [
-                    (KeyChar '\n', Finish)
-                    ,(KeyLeft, pureCommand goLeft)
-                    ,(KeyRight, pureCommand goRight)
-                    ,(Backspace, pureCommand deletePrev)
-                    ,(DeleteForward, pureCommand deleteNext)
-                    -- ,(KillLine, pureCommand killLine)
-                    ] ++ map insertionCommand [' '..'~']
-            
-pureCommand :: Monad m => LineChange -> Command m
-pureCommand f = Command (return . Changed . f)
+choiceKP :: [KeyProcessor m s] -> KeyProcessor m s
+choiceKP = foldl orKP nullKP
 
-insertionCommand :: Monad m => Char -> (Key,Command m)
-insertionCommand c = (KeyChar c, pureCommand $ insertChar c)
+nullAction :: (LineState s, Monad m) => KeyProcessor m s -> KeyAction m s
+nullAction = KeyAction (return . Change . id)
 
-changeCommand :: Monad m => (LineState -> m LineState) -> Command m
-changeCommand f = Command $ \ls -> liftM Changed (f ls)
-                    
+acceptKey :: (Monad m) => Key -> KeyAction m s -> KeyProcessor m s
+acceptKey k act = KP $ \k' -> if k==k' then Just act else Nothing
+
+acceptGraph :: (Char -> KeyAction m s) -> KeyProcessor m s
+acceptGraph f = KP $ \k -> case k of
+                            KeyChar c | c >= ' ' && c <= '~' -> Just (f c)
+                            _ -> Nothing
+                         
+
+type Command m s t = Key -> KeyProcessor m t -> KeyProcessor m s
+
+finishKP :: forall s m t . (LineState t, Monad m) => Command m s t
+finishKP k _ = acceptKey k $ KeyAction (\_ -> return (Finish :: Effect t)) nullKP
+
+simpleCommand :: (LineState t, Monad m) => (s -> m (Effect t)) -> Command m s t
+simpleCommand f = \k next -> acceptKey k $ KeyAction f next
+
+changeCommand :: (LineState t, Monad m) => (s -> t) -> Command m s t
+changeCommand f = simpleCommand (return . Change . f)
+
+(+>) :: Key -> Command m s t -> KeyProcessor m t -> KeyProcessor m s
+k +> f = f k
+
+choiceCmd :: [KeyProcessor m t -> KeyProcessor m s] -> KeyProcessor m t -> KeyProcessor m s
+choiceCmd cmds = \next -> choiceKP $ map ($ next) cmds
+
+graphCommand :: (Monad m, LineState t) => (Char -> s -> t) -> KeyProcessor m t -> KeyProcessor m s
+graphCommand f next = acceptGraph $ \c -> KeyAction (return . Change . f c) next
+
 newtype CommandT s m a = CommandT {runCommandT :: s -> m (a,s)}
 
 evalCommandT :: Monad m => s -> CommandT s m a -> m a

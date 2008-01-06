@@ -51,53 +51,17 @@ up = flip upA
 down = flip downA
 
 
+class LineState s where
+    beforeCursor :: String -> s -> String -- text to left of cursor
+    afterCursor :: s -> String -- text under and to right of cursor
+    toResult :: s -> String
 
+lengthToEnd :: LineState s => s -> Int
+lengthToEnd = length . afterCursor
 
+class LineState s => FromString s where
+    fromString :: String -> s
 
-data LineState = LS String -- characters to left of cursor, reversed
-                    String -- characters under and to right of cursor
-
-instance Show LineState where
-    show (LS xs ys) = show [reverse xs,ys]
-
-lineContents :: LineState -> String
-lineContents (LS xs ys) = reverse xs ++ ys
-
-lengths :: LineState -> (Int,Int)
-lengths (LS xs ys) = (length xs, length ys)
-
--- start before first character
-lineState :: String -> LineState
-lineState s = LS [] s
-
-
-type LineChange = LineState -> LineState
-
-moveToStart, moveToEnd, killLine :: LineChange
-moveToStart (LS xs ys) = LS [] (reverse xs ++ ys)
-moveToEnd (LS xs ys) = LS (reverse ys ++ xs) []
-killLine (LS xs ys) = LS [] ys
-
-
-goLeft, goRight, deleteNext, deletePrev :: LineChange
-goLeft ls@(LS [] _) = ls 
-goLeft (LS (x:xs) ys) = LS xs (x:ys)
-
-goRight ls@(LS _ []) = ls
-goRight (LS ys (x:xs)) = LS (x:ys) xs
-
--- add a character to the left of the cursor
-insertChar :: Char -> LineChange
-insertChar c (LS xs ys) =  LS (c:xs) ys
-
-insertText :: String -> LineChange
-insertText s (LS xs ys) = LS (reverse s ++ xs) ys
-
-deleteNext ls@(LS _ []) = ls
-deleteNext (LS xs (y:ys)) = LS xs ys
-
-deletePrev ls@(LS [] _) = ls
-deletePrev (LS (x:xs) ys) = LS xs ys 
 
 --------
 
@@ -214,9 +178,14 @@ fillLine str = do
                 setPos TermPos {termRow=r+1,termCol=0}
                 return rest
 
-diffLinesBreaking :: MonadIO m => LineState -> LineState -> Draw m ()
-diffLinesBreaking (LS xs1 ys1) (LS xs2 ys2) = 
-    case matchInit (reverse xs1) (reverse xs2) of
+diffLinesBreaking :: (LineState s, LineState t, MonadIO m) 
+                        => String -> s -> t -> Draw m ()
+diffLinesBreaking prefix s1 s2 = let 
+    xs1 = beforeCursor prefix s1
+    ys1 = afterCursor s1
+    xs2 = beforeCursor prefix s2
+    ys2 = afterCursor s2
+    in case matchInit xs1 xs2 of
         ([],[])     | ys1 == ys2            -> return ()
         (xs1',[])   | xs1' ++ ys1 == ys2    -> changeLeft (length xs1')
         ([],xs2')   | ys1 == xs2' ++ ys2    -> changeRight (length xs2')
@@ -237,8 +206,8 @@ linesLeft Layout {width=w} TermPos {termCol = c} n
     | c + n < w = 1
     | otherwise = 1 + div (c+n) w
 
-lsLinesLeft :: Layout -> TermPos -> LineState -> Int
-lsLinesLeft layout pos (LS _ ys) = linesLeft layout pos (length ys)
+lsLinesLeft :: LineState s => Layout -> TermPos -> s -> Int
+lsLinesLeft layout pos s = linesLeft layout pos (lengthToEnd s)
 
 clearDeadText :: MonadIO m => Int -> Draw m ()
 clearDeadText n
@@ -254,30 +223,30 @@ clearDeadText n
                     , up (numLinesToClear - 1)
                     , right (termCol pos)]
 
-drawLine :: MonadIO m => String -> LineState -> Draw m ()
-drawLine prefix (LS xs ys) = do
-    printText (prefix ++ reverse xs ++ ys)
-    changeLeft (length ys)
+drawLine :: (LineState s, MonadIO m) => String -> s -> Draw m ()
+drawLine prefix s = do
+    printText (beforeCursor prefix s ++ afterCursor s)
+    changeLeft (lengthToEnd s)
 
-redrawLine :: MonadIO m => String -> LineState -> Draw m ()
-redrawLine prefix ls = do
+redrawLine :: (LineState s, MonadIO m) => String -> s -> Draw m ()
+redrawLine prefix s = do
     pos <- getPos
     output $ left (termCol pos) <#> up (termRow pos)
     setPos initTermPos
-    drawLine prefix ls
+    drawLine prefix s
 
-clearScreenAndRedraw :: MonadIO m => String -> LineState -> Draw m ()
-clearScreenAndRedraw prefix ls = do
+clearScreenAndRedraw :: (LineState s, MonadIO m) => String -> s -> Draw m ()
+clearScreenAndRedraw prefix s = do
     h <- liftM height askLayout
     output (flip clearAll h)
     setPos initTermPos
-    drawLine prefix ls
+    drawLine prefix s
 
-moveToNextLine :: MonadIO m => LineState -> Draw m ()
-moveToNextLine ls = do
+moveToNextLine :: (LineState s, MonadIO m) => s -> Draw m ()
+moveToNextLine s = do
     pos <- getPos
     layout <- askLayout
-    output $ mreplicate (lsLinesLeft layout pos ls) nl
+    output $ mreplicate (lsLinesLeft layout pos s) nl
     setPos initTermPos
 
 

@@ -16,6 +16,7 @@ module System.Console.HaskLine.Command.Completion(
                             ) where
 
 import System.Console.HaskLine.Command
+import System.Console.HaskLine.Modes
 import System.Console.HaskLine.LineState
 
 import System.Directory
@@ -59,19 +60,22 @@ makeExpansion ss = Partial (commonPrefix ss) ss
 type WordBreakFunc = String -> (String, String)
 
 -- | Create a 'Command' for word completion.
-completionCmd :: Monad m => WordBreakFunc -> CompletionFunc m -> Command m
-completionCmd breakWord complete = Command $ \ls@(LS xs ys) -> do
+completionCmd :: Monad m => WordBreakFunc -> CompletionFunc m 
+    -> Command m InsertMode InsertMode
+completionCmd breakWord complete key = acceptKey key . KeyAction f 
+  where 
+   f s@(IMode xs ys) = do
     let (revWord,rest) = breakWord xs
     let word = reverse revWord
     expansion <- complete word
-    let addExpanded xs' = LS (reverse xs' ++ rest) ys
+    let addExpanded xs' = IMode (reverse xs' ++ rest) ys
     return $ case expansion of
-        NoExpansion -> Changed ls
-        FullExpansion newWord -> Changed $ addExpanded newWord
+        NoExpansion -> Change s
+        FullExpansion newWord -> Change $ addExpanded newWord
         Partial partial words 
             | length words > 1 && partial == word
                                 -> PrintLines (makeLines words) $ addExpanded partial
-            | otherwise         -> Changed $ addExpanded partial
+            | otherwise         -> Change $ addExpanded partial
 
 makeLines :: [String] -> Layout -> [String]
 makeLines words Layout {width = w} = let
@@ -164,8 +168,9 @@ completeFile  = liftM addSpaceIfDone . quoteCompletion isQuote fileExpansion
         isQuote c = c == '\"' || c == '\''
 
 -- A completion command for file and folder names.
-fileCompletionCmd :: MonadIO m => Command m
+fileCompletionCmd :: MonadIO m => Command m InsertMode InsertMode
 fileCompletionCmd = completionCmd filenameWordBreak completeFile
+
 
 --------
 -- Helper funcs for file completion
