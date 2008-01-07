@@ -116,7 +116,7 @@ withWindowHandler tv f = do
     f `finally` installHandler windowChange old_handler Nothing
 
 
-runHSLine :: MonadIO1 m => String -> KeyProcessor m InsertMode -> m (Maybe String)
+runHSLine :: MonadIO1 m => String -> KeyMap m InsertMode -> m (Maybe String)
 runHSLine prefix process = do
     settings <- liftIO (makeSettings prefix) 
     wrapTerminalOps (terminal settings) $ do
@@ -142,11 +142,11 @@ getLayout = fmap mkLayout getWindowSize
 
 repeatTillFinish :: forall m s . (MonadIO m, LineState s) 
             => TVar EventState -> Settings
-                -> s -> KeyProcessor m s -> Draw m (Maybe String)
+                -> s -> KeyMap m s -> Draw m (Maybe String)
 repeatTillFinish tv settings = loop
     where 
         loop :: forall m s . (MonadIO m, LineState s) => 
-                s -> KeyProcessor m s -> Draw m (Maybe String)
+                s -> KeyMap m s -> Draw m (Maybe String)
         loop s processor = do
                     liftIO (hFlush stdout)
                     join $ liftIO $ atomically $ do
@@ -158,7 +158,7 @@ repeatTillFinish tv settings = loop
                                 return $ actOnResize newLayout s processor
                             KeyInput k -> do
                                 writeTVar tv Waiting 
-                                return $ case runKP processor k of
+                                return $ case lookupKM processor k of
                                     Nothing -> loop s processor
                                     Just (KeyAction f next) -> do
                                                     cmd <- lift (f s)
@@ -170,7 +170,7 @@ repeatTillFinish tv settings = loop
 
         actOnCommand :: forall m s t . (MonadIO m, LineState s, LineState t) => 
                 Effect t -> 
-                s -> KeyProcessor m t -> Draw m (Maybe String)
+                s -> KeyMap m t -> Draw m (Maybe String)
         actOnCommand Finish s _ = moveToNextLine s >> return (Just (toResult s))
         actOnCommand Fail _ _ = return Nothing
         actOnCommand (Redraw shouldClear t) _ next = do

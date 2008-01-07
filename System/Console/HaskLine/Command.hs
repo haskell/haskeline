@@ -109,49 +109,53 @@ data Effect s = Change s | PrintLines (Layout -> [String]) s
                 | Redraw {shouldClearScreen :: Bool, redrawState :: s}
                 | Fail | Finish
 
-newtype KeyProcessor m s = KP {runKP :: Key -> Maybe (KeyAction m s)}
+newtype KeyMap m s = KeyMap {keyMap :: Map.Map Key (KeyAction m s)}
 
-data KeyAction m s = forall t . LineState t => KeyAction (s -> m (Effect t)) (KeyProcessor m t)
+data KeyAction m s = forall t . LineState t 
+                    => KeyAction (s -> m (Effect t)) (KeyMap m t)
 
-nullKP :: KeyProcessor m s
-nullKP = KP $ const Nothing
+lookupKM :: KeyMap m s -> Key -> Maybe (KeyAction m s)
+lookupKM km k = Map.lookup k (keyMap km)
 
-orKP :: KeyProcessor m s -> KeyProcessor m s -> KeyProcessor m s
-orKP (KP f) (KP g) = KP $ \k -> f k `mplus` g k
+nullKM :: KeyMap m s
+nullKM = KeyMap $ Map.empty
 
-choiceKP :: [KeyProcessor m s] -> KeyProcessor m s
-choiceKP = foldl orKP nullKP
+orKM :: KeyMap m s -> KeyMap m s -> KeyMap m s
+orKM (KeyMap m) (KeyMap n) = KeyMap $ m `Map.union` n
 
-nullAction :: (LineState s, Monad m) => KeyProcessor m s -> KeyAction m s
+choiceKM :: [KeyMap m s] -> KeyMap m s
+choiceKM = foldl orKM nullKM
+
+nullAction :: (LineState s, Monad m) => KeyMap m s -> KeyAction m s
 nullAction = KeyAction (return . Change . id)
 
-acceptKey :: (Monad m) => Key -> KeyAction m s -> KeyProcessor m s
-acceptKey k act = KP $ \k' -> if k==k' then Just act else Nothing
+acceptKey :: (Monad m) => Key -> KeyAction m s -> KeyMap m s
+acceptKey k act = KeyMap $ Map.singleton k act
 
-acceptGraph :: (Char -> KeyAction m s) -> KeyProcessor m s
-acceptGraph f = KP $ \k -> case k of
-                            KeyChar c | c >= ' ' && c <= '~' -> Just (f c)
-                            _ -> Nothing
+acceptGraph :: (Char -> KeyAction m s) -> KeyMap m s
+acceptGraph f = KeyMap $ Map.fromList 
+                $ map (\c -> (KeyChar c, f c)) [' '..'~']
                          
 
-type Command m s t = Key -> KeyProcessor m t -> KeyProcessor m s
+type Command m s t = KeyMap m t -> KeyMap m s
 
-finishKP :: forall s m t . (LineState t, Monad m) => Command m s t
-finishKP k _ = acceptKey k $ KeyAction (\_ -> return (Finish :: Effect t)) nullKP
+finish :: forall s m t . (LineState t, Monad m) => Key -> Command m s t
+finish k _ = acceptKey k $ KeyAction (\_ -> return (Finish :: Effect t)) nullKM
 
-simpleCommand :: (LineState t, Monad m) => (s -> m (Effect t)) -> Command m s t
+simpleCommand :: (LineState t, Monad m) => (s -> m (Effect t)) 
+                    -> Key -> Command m s t
 simpleCommand f = \k next -> acceptKey k $ KeyAction f next
 
-changeCommand :: (LineState t, Monad m) => (s -> t) -> Command m s t
+changeCommand :: (LineState t, Monad m) => (s -> t) -> Key -> Command m s t
 changeCommand f = simpleCommand (return . Change . f)
 
-(+>) :: Key -> Command m s t -> KeyProcessor m t -> KeyProcessor m s
+(+>) :: Key -> (Key -> a) -> a 
 k +> f = f k
 
-choiceCmd :: [KeyProcessor m t -> KeyProcessor m s] -> KeyProcessor m t -> KeyProcessor m s
-choiceCmd cmds = \next -> choiceKP $ map ($ next) cmds
+choiceCmd :: KeyMap m t -> [Command m s t] -> KeyMap m s
+choiceCmd next cmds = choiceKM $ map ($ next) cmds
 
-graphCommand :: (Monad m, LineState t) => (Char -> s -> t) -> KeyProcessor m t -> KeyProcessor m s
+graphCommand :: (Monad m, LineState t) => (Char -> s -> t) -> Command m s t
 graphCommand f next = acceptGraph $ \c -> KeyAction (return . Change . f c) next
 
 newtype CommandT s m a = CommandT {runCommandT :: s -> m (a,s)}

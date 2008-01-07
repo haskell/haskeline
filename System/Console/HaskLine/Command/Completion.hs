@@ -61,7 +61,7 @@ type WordBreakFunc = String -> (String, String)
 
 -- | Create a 'Command' for word completion.
 completionCmd :: Monad m => WordBreakFunc -> CompletionFunc m 
-    -> Command m InsertMode InsertMode
+    -> Key -> Command m InsertMode InsertMode
 completionCmd breakWord complete key = acceptKey key . KeyAction f 
   where 
    f s@(IMode xs ys) = do
@@ -170,7 +170,7 @@ completeFile  = liftM addSpaceIfDone . quoteCompletion isQuote fileExpansion
         isQuote c = c == '\"' || c == '\''
 
 -- A completion command for file and folder names.
-fileCompletionCmd :: MonadIO m => Command m InsertMode InsertMode
+fileCompletionCmd :: MonadIO m => Key -> Command m InsertMode InsertMode
 fileCompletionCmd = completionCmd filenameWordBreak completeFile
 
 

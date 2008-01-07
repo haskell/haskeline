@@ -22,7 +22,8 @@ nextHistory s History {pastHistory=past, futureHistory=ls:future}
         = (fromString ls,
             History {pastHistory=toResult s : past, futureHistory=future})
 
-historyBack, historyForward :: (FromString s, MonadCmd History m) => Command m s s
+historyBack, historyForward :: (FromString s, MonadCmd History m) => 
+                        Key -> Command m s s
 historyBack = simpleCommand $ liftM Change . updateState . prevHistory
 historyForward = simpleCommand $ liftM Change . updateState . nextHistory
 

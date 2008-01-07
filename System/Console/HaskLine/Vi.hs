@@ -5,30 +5,39 @@ import System.Console.HaskLine.Command.Completion
 import System.Console.HaskLine.Command.History
 import System.Console.HaskLine.Modes
 
-type VIMonad = CommandT History IO
+import Control.Monad.Trans
 
-viActions :: KeyProcessor VIMonad InsertMode
-viActions = startCommand `orKP` simpleInsertions
+type VI = CommandT History
+
+viActions :: MonadIO m => KeyMap (VI m) InsertMode
+viActions = let actions = startCommand actions
+                    `orKM` choiceCmd actions simpleInsertions
+            in actions
                             
-simpleInsertions = choiceKP $ map ($ viActions)
-                   [ KeyChar '\n' +> finishKP 
-                     , KeyLeft +> changeCommand goLeft 
-                     , KeyRight +> changeCommand goRight
-                     , Backspace +> changeCommand deletePrev 
-                     , DeleteForward +> changeCommand deleteNext 
-                     , graphCommand insertChar
-                     , KeyChar '\t' +> fileCompletionCmd
-                     , KeyUp +> historyBack
-                     , KeyDown +> historyForward
+simpleInsertions :: MonadIO m => [Command (VI m) InsertMode InsertMode]
+simpleInsertions = [ KeyChar '\n' +> finish
+                   , KeyLeft +> changeCommand goLeft 
+                   , KeyRight +> changeCommand goRight
+                   , Backspace +> changeCommand deletePrev 
+                   , DeleteForward +> changeCommand deleteNext 
+                   , graphCommand insertChar
+                   , KeyChar '\t' +> fileCompletionCmd
+                   , KeyUp +> historyBack
+                   , KeyDown +> historyForward
                    ]
 
-startCommand = changeCommand enterCommandMode (KeyChar '\ESC') viCommandActions
+startCommand :: MonadIO m => Command (VI m) InsertMode InsertMode
+startCommand actions = changeCommand enterCommandMode (KeyChar '\ESC') 
+                        (viCommandActions actions)
 
-viCommandActions :: KeyProcessor VIMonad CommandMode
-viCommandActions =  exitingCommands `orKP` simpleCmdActions
+viCommandActions :: MonadIO m => Command (VI m) CommandMode InsertMode
+viCommandActions actions = let 
+        cmdActions = choiceCmd actions exitingCommands
+                        `orKM` choiceCmd cmdActions simpleCmdActions
+        in cmdActions
 
-exitingCommands = choiceKP $ map ($ viActions) 
-                    [ KeyChar 'i' +> changeCommand insertFromCommandMode
+exitingCommands :: MonadIO m => [Command (VI m) CommandMode InsertMode]
+exitingCommands =   [ KeyChar 'i' +> changeCommand insertFromCommandMode
                     , KeyChar 'I' +> changeCommand (moveToStart . insertFromCommandMode)
                     , KeyChar 'a' +> changeCommand appendFromCommandMode
                     , KeyChar 'A' +> changeCommand (moveToEnd . appendFromCommandMode)
@@ -36,8 +45,8 @@ exitingCommands = choiceKP $ map ($ viActions)
                     , KeyChar 'S' +> changeCommand (const emptyIM)
                     ]
 
-simpleCmdActions = choiceKP $ map ($ viCommandActions)
-                    [ KeyChar '\n'  +> finishKP
+simpleCmdActions :: MonadIO m => [Command (VI m) CommandMode CommandMode]
+simpleCmdActions = [ KeyChar '\n'  +> finish
                     , KeyChar '0'   +> changeCommand moveToStart
                     , KeyChar '$'   +> changeCommand moveToEnd
                     , KeyChar 'r'   +> replaceOnce 
@@ -50,4 +59,4 @@ simpleCmdActions = choiceKP $ map ($ viCommandActions)
                     ]
 
 replaceOnce k next = acceptKey k $ nullAction $
-                orKP (graphCommand replaceChar next) next
+                orKM (graphCommand replaceChar next) next
