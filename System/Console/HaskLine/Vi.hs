@@ -8,14 +8,16 @@ import System.Console.HaskLine.Modes
 import Control.Monad.Trans
 
 type VI = CommandT History
+type VICommand s t = forall m . MonadIO m => Command (VI m) s t
 
 viActions :: MonadIO m => KeyMap (VI m) InsertMode
 viActions = let actions = startCommand actions
-                    `orKM` choiceCmd actions simpleInsertions
+                    `orKM` simpleInsertions actions
             in actions
                             
-simpleInsertions :: MonadIO m => [Command (VI m) InsertMode InsertMode]
-simpleInsertions = [ KeyChar '\n' +> finish
+simpleInsertions :: VICommand InsertMode InsertMode
+simpleInsertions = choiceCmd
+                [ KeyChar '\n' +> finish
                    , KeyLeft +> changeCommand goLeft 
                    , KeyRight +> changeCommand goRight
                    , Backspace +> changeCommand deletePrev 
@@ -26,18 +28,18 @@ simpleInsertions = [ KeyChar '\n' +> finish
                    , KeyDown +> historyForward
                    ]
 
-startCommand :: MonadIO m => Command (VI m) InsertMode InsertMode
+startCommand :: VICommand InsertMode InsertMode
 startCommand actions = changeCommand enterCommandMode (KeyChar '\ESC') 
                         (viCommandActions actions)
 
-viCommandActions :: MonadIO m => Command (VI m) CommandMode InsertMode
+viCommandActions :: VICommand CommandMode InsertMode
 viCommandActions actions = let 
-        cmdActions = choiceCmd actions exitingCommands
-                        `orKM` choiceCmd cmdActions simpleCmdActions
+        cmdActions = exitingCommands actions 
+                        `orKM` simpleCmdActions cmdActions 
         in cmdActions
 
-exitingCommands :: MonadIO m => [Command (VI m) CommandMode InsertMode]
-exitingCommands =   [ KeyChar 'i' +> changeCommand insertFromCommandMode
+exitingCommands :: VICommand CommandMode InsertMode
+exitingCommands =  choiceCmd [ KeyChar 'i' +> changeCommand insertFromCommandMode
                     , KeyChar 'I' +> changeCommand (moveToStart . insertFromCommandMode)
                     , KeyChar 'a' +> changeCommand appendFromCommandMode
                     , KeyChar 'A' +> changeCommand (moveToEnd . appendFromCommandMode)
@@ -45,8 +47,8 @@ exitingCommands =   [ KeyChar 'i' +> changeCommand insertFromCommandMode
                     , KeyChar 'S' +> changeCommand (const emptyIM)
                     ]
 
-simpleCmdActions :: MonadIO m => [Command (VI m) CommandMode CommandMode]
-simpleCmdActions = [ KeyChar '\n'  +> finish
+simpleCmdActions :: VICommand CommandMode CommandMode
+simpleCmdActions = choiceCmd [ KeyChar '\n'  +> finish
                     , KeyChar '0'   +> changeCommand moveToStart
                     , KeyChar '$'   +> changeCommand moveToEnd
                     , KeyChar 'r'   +> replaceOnce 

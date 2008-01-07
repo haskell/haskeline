@@ -152,8 +152,8 @@ changeCommand f = simpleCommand (return . Change . f)
 (+>) :: Key -> (Key -> a) -> a 
 k +> f = f k
 
-choiceCmd :: KeyMap m t -> [Command m s t] -> KeyMap m s
-choiceCmd next cmds = choiceKM $ map ($ next) cmds
+choiceCmd :: [Command m s t] -> Command m s t
+choiceCmd cmds next = choiceKM $ map ($ next) cmds
 
 graphCommand :: (Monad m, LineState t) => (Char -> s -> t) -> Command m s t
 graphCommand f next = acceptGraph $ \c -> KeyAction (return . Change . f c) next
