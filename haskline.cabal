@@ -26,6 +26,7 @@ Exposed-Modules:
                 System.Console.HaskLine.Command
                 System.Console.HaskLine.Command.Completion
                 System.Console.HaskLine.Command.History
+                System.Console.HaskLine.Emacs
                 System.Console.HaskLine.LineState
                 System.Console.HaskLine.Vi
                 System.Console.HaskLine.Modes

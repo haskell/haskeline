@@ -11,6 +11,7 @@ import System.Console.HaskLine.Command.History
 import System.Console.HaskLine.WindowSize
 import System.Console.HaskLine.Modes
 import System.Console.HaskLine.Vi
+import System.Console.HaskLine.Emacs
 
 import System.Console.Terminfo
 import System.IO
@@ -25,32 +26,8 @@ import System.Posix.Signals.Exts
 
 test :: IO ()
 test = do
-    s <- runHistory ["foobar", "other", "more"] $ runHSLine ">:" viActions
+    s <- runHistory ["foobar", "other", "more"] $ runHSLine ">:" emacsCommands
     print s
-{--
-test = do
-    ls <- runPaste $ runHistory ["foobar", "other", "more"] $ runUndo $ runHSLine ">:" emacsCommands
-    print ls
-
-emacsCommands = simpleCommands `Map.union` Map.fromList
-                    [(controlKey 'A', pureCommand moveToStart)
-                    ,(controlKey 'E', pureCommand moveToEnd)
-                    ,(KillLine, undoableKill)
-                    ,(KeyUp, historyBack)
-                    ,(KeyDown, historyForward)
-                    ,(controlKey 'R', pasteCommand) 
-                    ,(KeyChar '\t', fileCompletionCmd)
-                    ,(controlKey 'L', RedrawLine True)
-                    ,(controlKey 'N', RedrawLine False)
-                    ,(KeyChar '\ESC', RedrawLine True)
-                    ]
-
-
-undoableKill :: (MonadCmd Paste m, MonadCmd Undo m) => Command m
-undoableKill = withUndo $ \ls@(LS xs ys) -> do
-                    saveForPaste xs
-                    return (killLine ls)
---}
 
 -- Note: Without buffering the output, there's a cursor flicker sometimes.
 -- We'll keep it buffered, and manually flush the buffer in 

@@ -146,8 +146,11 @@ simpleCommand :: (LineState t, Monad m) => (s -> m (Effect t))
                     -> Key -> Command m s t
 simpleCommand f = \k next -> acceptKey k $ KeyAction f next
 
-changeCommand :: (LineState t, Monad m) => (s -> t) -> Key -> Command m s t
-changeCommand f = simpleCommand (return . Change . f)
+change :: (LineState t, Monad m) => (s -> t) -> Key -> Command m s t
+change f = simpleCommand (return . Change . f)
+
+clearScreen :: (LineState s, Monad m) => Key -> Command m s s
+clearScreen k = acceptKey k . KeyAction (\s -> return (Redraw True s))
 
 (+>) :: Key -> (Key -> a) -> a 
 k +> f = f k

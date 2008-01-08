@@ -7,7 +7,7 @@ class Move s where
     
 
 data InsertMode = IMode String String 
-                    deriving Show
+                    deriving (Show, Eq)
 
 instance LineState InsertMode where
     beforeCursor prefix (IMode xs _) = prefix ++ reverse xs

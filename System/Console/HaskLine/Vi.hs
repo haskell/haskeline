@@ -18,10 +18,10 @@ viActions = let actions = startCommand actions
 simpleInsertions :: VICommand InsertMode InsertMode
 simpleInsertions = choiceCmd
                 [ KeyChar '\n' +> finish
-                   , KeyLeft +> changeCommand goLeft 
-                   , KeyRight +> changeCommand goRight
-                   , Backspace +> changeCommand deletePrev 
-                   , DeleteForward +> changeCommand deleteNext 
+                   , KeyLeft +> change goLeft 
+                   , KeyRight +> change goRight
+                   , Backspace +> change deletePrev 
+                   , DeleteForward +> change deleteNext 
                    , graphCommand insertChar
                    , KeyChar '\t' +> fileCompletionCmd
                    , KeyUp +> historyBack
@@ -29,7 +29,7 @@ simpleInsertions = choiceCmd
                    ]
 
 startCommand :: VICommand InsertMode InsertMode
-startCommand actions = changeCommand enterCommandMode (KeyChar '\ESC') 
+startCommand actions = change enterCommandMode (KeyChar '\ESC') 
                         (viCommandActions actions)
 
 viCommandActions :: VICommand CommandMode InsertMode
@@ -39,23 +39,23 @@ viCommandActions actions = let
         in cmdActions
 
 exitingCommands :: VICommand CommandMode InsertMode
-exitingCommands =  choiceCmd [ KeyChar 'i' +> changeCommand insertFromCommandMode
-                    , KeyChar 'I' +> changeCommand (moveToStart . insertFromCommandMode)
-                    , KeyChar 'a' +> changeCommand appendFromCommandMode
-                    , KeyChar 'A' +> changeCommand (moveToEnd . appendFromCommandMode)
-                    , KeyChar 's' +> changeCommand (insertFromCommandMode . deleteChar)
-                    , KeyChar 'S' +> changeCommand (const emptyIM)
+exitingCommands =  choiceCmd [ KeyChar 'i' +> change insertFromCommandMode
+                    , KeyChar 'I' +> change (moveToStart . insertFromCommandMode)
+                    , KeyChar 'a' +> change appendFromCommandMode
+                    , KeyChar 'A' +> change (moveToEnd . appendFromCommandMode)
+                    , KeyChar 's' +> change (insertFromCommandMode . deleteChar)
+                    , KeyChar 'S' +> change (const emptyIM)
                     ]
 
 simpleCmdActions :: VICommand CommandMode CommandMode
 simpleCmdActions = choiceCmd [ KeyChar '\n'  +> finish
-                    , KeyChar '0'   +> changeCommand moveToStart
-                    , KeyChar '$'   +> changeCommand moveToEnd
+                    , KeyChar '0'   +> change moveToStart
+                    , KeyChar '$'   +> change moveToEnd
                     , KeyChar 'r'   +> replaceOnce 
-                    , KeyLeft       +> changeCommand goLeft
-                    , KeyRight      +> changeCommand goRight
-                    , KeyChar ' '   +> changeCommand goRight
-                    , KeyChar 'x'   +> changeCommand deleteChar
+                    , KeyLeft       +> change goLeft
+                    , KeyRight      +> change goRight
+                    , KeyChar ' '   +> change goRight
+                    , KeyChar 'x'   +> change deleteChar
                     , KeyUp +> historyBack
                     , KeyDown +> historyForward
                     ]
