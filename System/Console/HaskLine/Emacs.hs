@@ -6,6 +6,7 @@ import System.Console.HaskLine.Command.History
 import System.Console.HaskLine.Modes
 
 import Control.Monad.Trans
+import Data.Char
 
 type Emacs= CommandT History
 type EmacsCommand s t = forall m . MonadIO m => Command (Emacs m) s t
@@ -34,6 +35,10 @@ controlActions = choiceCmd
             , controlKey 'c' +> change goRight
             , controlKey 'd' +> deleteCharOrEOF
             , controlKey 'l' +> clearScreen
+            , KeyMeta 'f' +> change (skipRight isAlphaNum
+                                     . skipRight (not . isAlphaNum))
+            , KeyMeta 'b' +> change (skipLeft isAlphaNum
+                                     . skipLeft (not . isAlphaNum))
             ]
 
 
@@ -43,3 +48,4 @@ deleteCharOrEOF k next = acceptKey k $ KeyAction deleteOrFail justDelete
     deleteOrFail s = return $ if s == emptyIM then Fail else Change (deleteNext s)
     justDelete = (acceptKey k $ KeyAction (return . Change . deleteNext) justDelete)
                     `orKM` next
+

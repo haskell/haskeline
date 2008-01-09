@@ -43,6 +43,12 @@ deleteNext (IMode xs (_:ys)) = IMode xs ys
 deletePrev im@(IMode [] _) = im
 deletePrev (IMode (_:xs) ys) = IMode xs ys 
 
+skipLeft, skipRight :: (Char -> Bool) -> InsertMode -> InsertMode
+skipLeft f (IMode xs ys) = let (ws,zs) = span f xs 
+                           in IMode zs (reverse ws ++ ys)
+skipRight f (IMode xs ys) = let (ws,zs) = span f ys 
+                            in IMode (reverse ws ++ xs) zs
+
 
 data CommandMode = CMode String Char String | CEmpty
                     deriving Show
