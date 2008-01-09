@@ -95,6 +95,7 @@ replaceChar _ CEmpty = CEmpty
 
 enterCommandMode :: InsertMode -> CommandMode
 enterCommandMode (IMode (x:xs) ys) = CMode xs x ys
+enterCommandMode (IMode [] (y:ys)) = CMode [] y ys
 enterCommandMode _ = CEmpty
 
 insertFromCommandMode, appendFromCommandMode :: CommandMode -> InsertMode
