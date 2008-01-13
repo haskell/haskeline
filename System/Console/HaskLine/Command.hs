@@ -126,37 +126,59 @@ orKM (KeyMap m) (KeyMap n) = KeyMap $ m `Map.union` n
 choiceKM :: [KeyMap m s] -> KeyMap m s
 choiceKM = foldl orKM nullKM
 
-nullAction :: (LineState s, Monad m) => KeyMap m s -> KeyAction m s
-nullAction = KeyAction (return . Change . id)
+nullAction :: (LineState s, Monad m) => s -> m (Effect s)
+nullAction = return . Change
 
-acceptKey :: (Monad m) => Key -> KeyAction m s -> KeyMap m s
-acceptKey k act = KeyMap $ Map.singleton k act
+type Command m s t = KeyMap m t -> KeyMap m s
+
+runCommand :: Command m s s -> KeyMap m s
+runCommand f = let m = f m in m
+
+acceptKey :: (Monad m, LineState t) => 
+                Key -> (s -> m (Effect t)) -> Command m s t
+acceptKey k act next = KeyMap $ Map.singleton k $ KeyAction act next
 
 acceptGraph :: (Char -> KeyAction m s) -> KeyMap m s
 acceptGraph f = KeyMap $ Map.fromList 
                 $ map (\c -> (KeyChar c, f c)) [' '..'~']
                          
+loopUntil :: Command m s s -> Command m s t -> Command m s t
+loopUntil f g = \next -> let loop = g next `orKM` f loop
+                         in loop
 
-type Command m s t = KeyMap m t -> KeyMap m s
+loopWithBreak :: Command m s s -> Command m s t -> (s -> t) -> Command m s t
+loopWithBreak cmd end f = \next -> 
+    let loop = choiceKM [cmd loop, end next, changeWithoutKey f next]
+    in loop
+
+try :: Command m s s -> Command m s s
+try f = \next -> (f next) `orKM` next
 
 finish :: forall s m t . (LineState t, Monad m) => Key -> Command m s t
-finish k _ = acceptKey k $ KeyAction (\_ -> return (Finish :: Effect t)) nullKM
+finish k = acceptKey k $ const (return Finish)
 
 simpleCommand :: (LineState t, Monad m) => (s -> m (Effect t)) 
                     -> Key -> Command m s t
-simpleCommand f = \k next -> acceptKey k $ KeyAction f next
+simpleCommand f k = acceptKey k f
 
 change :: (LineState t, Monad m) => (s -> t) -> Key -> Command m s t
 change f = simpleCommand (return . Change . f)
 
+changeWithoutKey :: (s -> t) -> Command m s t
+changeWithoutKey f (KeyMap next) = KeyMap $ fmap
+    (\(KeyAction g next') -> KeyAction (g . f) next') next
+
 clearScreen :: (LineState s, Monad m) => Key -> Command m s s
-clearScreen k = acceptKey k . KeyAction (\s -> return (Redraw True s))
+clearScreen k = acceptKey k $ \s -> return (Redraw True s)
 
 (+>) :: Key -> (Key -> a) -> a 
 k +> f = f k
 
 choiceCmd :: [Command m s t] -> Command m s t
 choiceCmd cmds next = choiceKM $ map ($ next) cmds
+
+spliceCmd :: KeyMap m t -> Command m s t -> Command m s u
+spliceCmd alternate f = \next -> f alternate
 
 graphCommand :: (Monad m, LineState t) => (Char -> s -> t) -> Command m s t
 graphCommand f next = acceptGraph $ \c -> KeyAction (return . Change . f c) next

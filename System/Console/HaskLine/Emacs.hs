@@ -43,9 +43,9 @@ controlActions = choiceCmd
 
 
 deleteCharOrEOF :: Key -> EmacsCommand InsertMode InsertMode
-deleteCharOrEOF k next = acceptKey k $ KeyAction deleteOrFail justDelete
+deleteCharOrEOF k next = acceptKey k deleteOrFail justDelete
   where
     deleteOrFail s = return $ if s == emptyIM then Fail else Change (deleteNext s)
-    justDelete = (acceptKey k $ KeyAction (return . Change . deleteNext) justDelete)
+    justDelete = (acceptKey k (return . Change . deleteNext) justDelete)
                     `orKM` next
 

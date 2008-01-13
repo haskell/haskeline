@@ -62,9 +62,7 @@ type WordBreakFunc = String -> (String, String)
 -- | Create a 'Command' for word completion.
 completionCmd :: Monad m => WordBreakFunc -> CompletionFunc m 
     -> Key -> Command m InsertMode InsertMode
-completionCmd breakWord complete key = acceptKey key . KeyAction f 
-  where 
-   f s@(IMode xs ys) = do
+completionCmd breakWord complete key = acceptKey key $ \s@(IMode xs ys) -> do
     let (revWord,rest) = breakWord xs
     let word = reverse revWord
     expansion <- complete word

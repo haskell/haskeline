@@ -107,4 +107,29 @@ appendFromCommandMode CEmpty = emptyIM
 appendFromCommandMode (CMode xs c ys) = IMode (c:xs) ys
 
 
+----------------------
+-- Supplementary modes
+
+data ArgMode s = ArgMode {arg :: Int, argState :: s}
+
+instance LineState s => LineState (ArgMode s) where
+    beforeCursor _ am = beforeCursor ("(arg: " ++ show (arg am) ++ ") ")
+                            (argState am)
+    afterCursor = afterCursor . argState
+    toResult = toResult . argState
+
+startArg :: Int -> s -> ArgMode s
+startArg = ArgMode
+
+addNum :: Int -> ArgMode s -> ArgMode s
+addNum n am
+    | arg am >= 1000 = am -- shouldn't ever need more than 4 digits
+    | otherwise = am {arg = arg am * 10 + n} 
+
+-- todo: negatives
+applyArg :: (s -> s) -> ArgMode s -> s
+applyArg f am = repeatN f (arg am) (argState am)
+
+repeatN f n | n <= 1 = f
+    | otherwise = f . repeatN f (n-1)
 

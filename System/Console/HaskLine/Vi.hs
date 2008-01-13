@@ -4,6 +4,7 @@ import System.Console.HaskLine.Command
 import System.Console.HaskLine.Command.Completion
 import System.Console.HaskLine.Command.History
 import System.Console.HaskLine.Modes
+import System.Console.HaskLine.LineState
 
 import Control.Monad.Trans
 
@@ -11,9 +12,7 @@ type VI = CommandT History
 type VICommand s t = forall m . MonadIO m => Command (VI m) s t
 
 viActions :: MonadIO m => KeyMap (VI m) InsertMode
-viActions = let actions = startCommand actions
-                    `orKM` simpleInsertions actions
-            in actions
+viActions = runCommand $ choiceCmd [startCommand, simpleInsertions]
                             
 simpleInsertions :: VICommand InsertMode InsertMode
 simpleInsertions = choiceCmd
@@ -29,14 +28,11 @@ simpleInsertions = choiceCmd
                    ]
 
 startCommand :: VICommand InsertMode InsertMode
-startCommand actions = change enterCommandMode (KeyChar '\ESC') 
-                        (viCommandActions actions)
+startCommand = change enterCommandMode (KeyChar '\ESC') 
+                    . viCommandActions
 
 viCommandActions :: VICommand CommandMode InsertMode
-viCommandActions actions = let 
-        cmdActions = exitingCommands actions 
-                        `orKM` simpleCmdActions cmdActions 
-        in cmdActions
+viCommandActions = simpleCmdActions `loopUntil` exitingCommands
 
 exitingCommands :: VICommand CommandMode InsertMode
 exitingCommands =  choiceCmd [ KeyChar 'i' +> change insertFromCommandMode
@@ -45,20 +41,98 @@ exitingCommands =  choiceCmd [ KeyChar 'i' +> change insertFromCommandMode
                     , KeyChar 'A' +> change (moveToEnd . appendFromCommandMode)
                     , KeyChar 's' +> change (insertFromCommandMode . deleteChar)
                     , KeyChar 'S' +> change (const emptyIM)
+                    , deleteIOnce
                     ]
 
 simpleCmdActions :: VICommand CommandMode CommandMode
 simpleCmdActions = choiceCmd [ KeyChar '\n'  +> finish
-                    , KeyChar '0'   +> change moveToStart
-                    , KeyChar '$'   +> change moveToEnd
+                    , KeyChar '\ESC' +> change id -- helps break out of loops
                     , KeyChar 'r'   +> replaceOnce 
-                    , KeyLeft       +> change goLeft
-                    , KeyRight      +> change goRight
-                    , KeyChar ' '   +> change goRight
-                    , KeyChar 'x'   +> change deleteChar
+                    , KeyChar 'R'   +> loopReplace
+                    , KeyChar 'x' +> change deleteChar
                     , KeyUp +> historyBack
                     , KeyDown +> historyForward
+                    , repeated
+                    , deleteOnce
+                    , useMovements id
                     ]
 
-replaceOnce k next = acceptKey k $ nullAction $
-                orKM (graphCommand replaceChar next) next
+replaceOnce k = acceptKey k nullAction .
+                try (graphCommand replaceChar)
+
+loopReplace k = acceptKey k nullAction . loop
+    where
+        loop :: VICommand CommandMode CommandMode
+        loop = loopWithBreak (graphCommand (\c -> goRight . replaceChar c))
+                    (const nullKM) id
+
+
+repeated :: VICommand CommandMode CommandMode
+repeated = let
+    start = foreachDigit startArg ['1'..'9']
+    addDigit = foreachDigit addNum ['0'..'9']
+    deleteR = acceptKey (KeyChar 'd') nullAction
+                . choiceCmd [useMovements (deleteFromRepeatedMove),
+                             KeyChar 'd' +> change (const CEmpty)]
+    deleteIR = acceptKey (KeyChar 'c') nullAction
+                . choiceCmd [useMovements deleteAndInsertR,
+                             KeyChar 'c' +> change (const emptyIM)]
+    in start . loopWithBreak addDigit 
+                    (choiceCmd [ useMovements applyArg
+                    , deleteR
+                    , spliceCmd viActions deleteIR
+                    , KeyChar 'x' +> change (applyArg deleteChar)
+                    ])
+                    argState
+
+movements :: [(Key,CommandMode -> CommandMode)]
+movements = [ (KeyChar 'h', goLeft)
+            , (KeyChar 'l', goRight)
+            , (KeyChar ' ', goRight)
+            , (KeyLeft, goLeft)
+            , (KeyRight, goRight)
+            , (KeyChar '0', moveToStart)
+            , (KeyChar '$', moveToEnd)
+            ]
+
+useMovements :: LineState t => ((CommandMode -> CommandMode) -> s -> t) 
+                -> VICommand s t
+useMovements f = choiceCmd $ map (\(k,g) -> k +> change (f g))
+                                movements
+
+deleteOnce :: VICommand CommandMode CommandMode
+deleteOnce = acceptKey (KeyChar 'd') nullAction
+            . choiceCmd [useMovements deleteFromMove,
+                         KeyChar 'd' +> change (const CEmpty)]
+
+deleteIOnce :: VICommand CommandMode InsertMode
+deleteIOnce = acceptKey (KeyChar 'c') nullAction
+              . choiceCmd [useMovements deleteAndInsert,
+                            KeyChar 'c' +> change (const emptyIM)]
+
+deleteAndInsert f = insertFromCommandMode . deleteFromMove f
+
+deleteAndInsertR :: (CommandMode -> CommandMode) 
+                -> ArgMode CommandMode -> InsertMode
+deleteAndInsertR f = insertFromCommandMode . deleteFromRepeatedMove f
+
+
+foreachDigit :: (Monad m, LineState t) => (Int -> s -> t) -> [Char] 
+                -> Command m s t
+foreachDigit f ds = choiceCmd $ map digitCmd ds
+    where digitCmd d = KeyChar d +> change (f (toDigit d))
+          toDigit d = fromEnum d - fromEnum '0'
+
+
+deleteFromMove :: (CommandMode -> CommandMode) -> CommandMode -> CommandMode
+deleteFromMove f = \x -> deleteFromDiff x (f x)
+
+deleteFromRepeatedMove :: (CommandMode -> CommandMode)
+            -> ArgMode CommandMode -> CommandMode
+deleteFromRepeatedMove f am = deleteFromDiff (argState am) (applyArg f am)
+
+deleteFromDiff :: CommandMode -> CommandMode -> CommandMode
+deleteFromDiff (CMode xs1 c1 ys1) (CMode xs2 c2 ys2)
+    | length xs1 < length xs2 = enterCommandMode (IMode xs1 ys2)
+    | otherwise = CMode xs2 c1 ys1
+deleteFromDiff _ after = after
