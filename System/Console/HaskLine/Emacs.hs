@@ -12,8 +12,7 @@ type Emacs= CommandT History
 type EmacsCommand s t = forall m . MonadIO m => Command (Emacs m) s t
 
 emacsCommands :: MonadIO m => KeyMap (Emacs m) InsertMode
-emacsCommands = let actions = simpleActions actions `orKM` controlActions actions
-                in actions
+emacsCommands = runCommand $ choiceCmd [simpleActions, controlActions]
 
 simpleActions, controlActions :: EmacsCommand InsertMode InsertMode
 simpleActions = choiceCmd 
@@ -34,7 +33,7 @@ controlActions = choiceCmd
             , controlKey 'b' +> change goLeft
             , controlKey 'c' +> change goRight
             , controlKey 'd' +> deleteCharOrEOF
-            , controlKey 'l' +> clearScreen
+            , controlKey 'l' +> clearScreenCmd
             , KeyMeta 'f' +> change (skipRight isAlphaNum
                                      . skipRight (not . isAlphaNum))
             , KeyMeta 'b' +> change (skipLeft isAlphaNum
@@ -43,9 +42,8 @@ controlActions = choiceCmd
 
 
 deleteCharOrEOF :: Key -> EmacsCommand InsertMode InsertMode
-deleteCharOrEOF k next = acceptKey k deleteOrFail justDelete
+deleteCharOrEOF k = acceptKey k deleteOrFail >|> justDelete
   where
     deleteOrFail s = return $ if s == emptyIM then Fail else Change (deleteNext s)
-    justDelete = (acceptKey k (return . Change . deleteNext) justDelete)
-                    `orKM` next
+    justDelete = try (change deleteNext k >|> justDelete)
 

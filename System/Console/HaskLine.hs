@@ -27,7 +27,8 @@ import System.Posix.Signals.Exts
 test :: IO ()
 test = do
     s <- runHistory ["foobar", "other", "more"] $ runHSLine ">:"
-                viActions
+                -- viActions
+                emacsCommands
     print s
 
 -- Note: Without buffering the output, there's a cursor flicker sometimes.

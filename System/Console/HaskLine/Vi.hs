@@ -28,8 +28,8 @@ simpleInsertions = choiceCmd
                    ]
 
 startCommand :: VICommand InsertMode InsertMode
-startCommand = change enterCommandMode (KeyChar '\ESC') 
-                    . viCommandActions
+startCommand = KeyChar '\ESC' +> change enterCommandMode
+                    >|> viCommandActions
 
 viCommandActions :: VICommand CommandMode InsertMode
 viCommandActions = simpleCmdActions `loopUntil` exitingCommands
@@ -57,27 +57,26 @@ simpleCmdActions = choiceCmd [ KeyChar '\n'  +> finish
                     , useMovements id
                     ]
 
-replaceOnce k = acceptKey k nullAction .
-                try (graphCommand replaceChar)
+replaceOnce k = k >+> try (graphCommand replaceChar)
 
-loopReplace k = acceptKey k nullAction . loop
+loopReplace k = k >+> loop
     where
         loop :: VICommand CommandMode CommandMode
         loop = loopWithBreak (graphCommand (\c -> goRight . replaceChar c))
-                    (const nullKM) id
+                    (choiceCmd []) id
 
 
 repeated :: VICommand CommandMode CommandMode
 repeated = let
     start = foreachDigit startArg ['1'..'9']
     addDigit = foreachDigit addNum ['0'..'9']
-    deleteR = acceptKey (KeyChar 'd') nullAction
-                . choiceCmd [useMovements (deleteFromRepeatedMove),
+    deleteR = KeyChar 'd' 
+                >+> choiceCmd [useMovements (deleteFromRepeatedMove),
                              KeyChar 'd' +> change (const CEmpty)]
-    deleteIR = acceptKey (KeyChar 'c') nullAction
-                . choiceCmd [useMovements deleteAndInsertR,
+    deleteIR = KeyChar 'c'
+                >+> choiceCmd [useMovements deleteAndInsertR,
                              KeyChar 'c' +> change (const emptyIM)]
-    in start . loopWithBreak addDigit 
+    in start >|> loopWithBreak addDigit 
                     (choiceCmd [ useMovements applyArg
                     , deleteR
                     , spliceCmd viActions deleteIR
@@ -101,13 +100,13 @@ useMovements f = choiceCmd $ map (\(k,g) -> k +> change (f g))
                                 movements
 
 deleteOnce :: VICommand CommandMode CommandMode
-deleteOnce = acceptKey (KeyChar 'd') nullAction
-            . choiceCmd [useMovements deleteFromMove,
+deleteOnce = KeyChar 'd'
+            >+> choiceCmd [useMovements deleteFromMove,
                          KeyChar 'd' +> change (const CEmpty)]
 
 deleteIOnce :: VICommand CommandMode InsertMode
-deleteIOnce = acceptKey (KeyChar 'c') nullAction
-              . choiceCmd [useMovements deleteAndInsert,
+deleteIOnce = KeyChar 'c'
+              >+> choiceCmd [useMovements deleteAndInsert,
                             KeyChar 'c' +> change (const emptyIM)]
 
 deleteAndInsert f = insertFromCommandMode . deleteFromMove f
