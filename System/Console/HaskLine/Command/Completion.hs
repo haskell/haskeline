@@ -5,6 +5,7 @@ module System.Console.HaskLine.Command.Completion(
                             WordBreakFunc,
                             simpleWordBreak,
                             completionCmd,
+                            menuCompleteCmd,
                             -- * Filename completion
                             completeFile,
                             filenameWordBreak,
@@ -59,21 +60,34 @@ makeExpansion ss = Partial (commonPrefix ss) ss
 -- 
 type WordBreakFunc = String -> (String, String)
 
--- | Create a 'Command' for word completion.
-completionCmd :: Monad m => WordBreakFunc -> CompletionFunc m 
-    -> Key -> Command m InsertMode InsertMode
-completionCmd breakWord complete key = acceptKey key $ \s@(IMode xs ys) -> do
+type MakeCompletion m = InsertMode -> m (InsertMode,Expansion)
+
+makeCompletion :: Monad m => WordBreakFunc -> CompletionFunc m -> MakeCompletion m
+makeCompletion breakWord complete (IMode xs ys) = do
     let (revWord,rest) = breakWord xs
     let word = reverse revWord
     expansion <- complete word
-    let addExpanded xs' = IMode (reverse xs' ++ rest) ys
+    return (IMode rest ys,expansion)
+
+-- | Create a 'Command' for word completion.
+completionCmd :: Monad m => WordBreakFunc -> CompletionFunc m 
+    -> Key -> Command m InsertMode InsertMode
+completionCmd breakWord complete = simpleCommand $ \s -> do
+    (s',expansion) <- makeCompletion breakWord complete s
     return $ case expansion of
         NoExpansion -> Change s
-        FullExpansion newWord -> Change $ addExpanded newWord
+        FullExpansion newWord -> Change $ insertString newWord s'
         Partial partial ws 
-            | length ws > 1 && partial == word
-                                -> PrintLines (makeLines ws) $ addExpanded partial
-            | otherwise         -> Change $ addExpanded partial
+            | length ws > 1 && s == withPartial
+                                -> PrintLines (makeLines ws) withPartial
+            | otherwise         -> Change withPartial
+           where
+            withPartial = insertString partial s'
+
+{- TODO: perhaps
+ - InsertMode -> (InsertMode, Expansion)
+ - where Expansion = NoExpansion | FullExpansion | Partial [String]
+ -}
 
 makeLines :: [String] -> Layout -> [String]
 makeLines ws layout = let
@@ -103,6 +117,86 @@ ceilDiv :: Integral a => a -> a -> a
 ceilDiv m n | m `rem` n == 0    =  m `div` n
             | otherwise         =  m `div` n + 1
 
+
+data DoCompletions = PrefixCompletion {
+                        allCompletions :: [String],
+                        thisCompletion :: String,
+                        remainingCompletions :: [String],
+                        completionState :: InsertMode
+                       }
+                      | FullCompletion {completionState :: InsertMode}
+
+completionFullState :: DoCompletions -> InsertMode
+completionFullState (FullCompletion im) = im
+completionFullState PrefixCompletion {thisCompletion = this,
+                        completionState = s}
+                    = insertString this s
+
+instance LineState DoCompletions where
+    beforeCursor prefix = beforeCursor prefix . completionFullState
+    afterCursor = afterCursor . completionFullState
+    toResult = toResult . completionFullState
+
+continueCompletion :: Monad m => MakeCompletion m 
+                        -> DoCompletions -> m (Effect DoCompletions)
+continueCompletion f fc@(FullCompletion im) = startCompletion f im
+continueCompletion f p@PrefixCompletion {} = return $ Change $ 
+    case remainingCompletions p of
+        [] -> p {thisCompletion = head (allCompletions p), 
+                    remainingCompletions = tail (allCompletions p)}
+        (w:ws) -> p{thisCompletion=w,remainingCompletions=ws}
+
+startCompletion :: Monad m => MakeCompletion m -> InsertMode
+                        -> m (Effect DoCompletions)
+startCompletion f im = do
+    (im',expansion) <- f im
+    return $ Change $ case expansion of
+        NoExpansion -> FullCompletion  im
+        FullExpansion w -> FullCompletion $ insertString w im'
+        Partial partial ws
+            | length ws <= 1 -> FullCompletion (insertString partial im')
+            | otherwise -> PrefixCompletion {
+                            allCompletions = ws,
+                            thisCompletion = head ws,
+                            remainingCompletions = tail ws,
+                            completionState = im'
+                            }
+
+
+menuCompleteCmd :: Monad m => WordBreakFunc -> CompletionFunc m
+    -> Key -> Command m InsertMode InsertMode
+menuCompleteCmd breakWord complete k = let
+    mkComplete = makeCompletion breakWord complete
+    continueComplete = loopWithBreak 
+                            (k +> simpleCommand (continueCompletion mkComplete))
+                            (choiceCmd [])
+                            completionFullState
+    in k +> simpleCommand (startCompletion mkComplete) >|> continueComplete
+
+{--
+menuCompletCmd :: Monad m => WordBreakFunc -> CompletionFunc m
+    -> Key -> Command m InsertMode InsertMode
+menuCompleteCmd breakWord complete key = key +> 
+{-- can i do this?
+ -
+ --}
+
+-- NOTE: input string can't be empty!
+withCompletions :: [String] -> InsertMode -> WithCompletions
+
+instance LineState WithCompletions where
+    beforeCursor prefix wc = beforeCursor (prefix ++ thisCompletion wc) 
+                                $ completionState wc
+    afterCursor = afterCursor . completionState
+
+continueCompletion :: WithCompletions -> WithCompletions
+continueCompletion wc = case remainingCompletions wc of
+    [] -> withCompletions (reverse (thisCompletion wc : usedCompletions wc))
+                (completionState wc)
+    (c:cs') -> wc {thisCompletion = c, remainingCompletions=cs'}
+
+--}
+--
 ----------------
 -- Word breaking
 
@@ -169,7 +263,8 @@ completeFile  = liftM addSpaceIfDone . quoteCompletion isQuote fileExpansion
 
 -- A completion command for file and folder names.
 fileCompletionCmd :: MonadIO m => Key -> Command m InsertMode InsertMode
-fileCompletionCmd = completionCmd filenameWordBreak completeFile
+fileCompletionCmd = completionCmd-- menuCompleteCmd 
+                    filenameWordBreak completeFile
 
 
 --------
@@ -185,7 +280,7 @@ handleFolders e@(FullExpansion file) = do
     return $ if dirExists 
                 then let dir = addTrailingPathSeparator file in Partial dir [file]
                 else e
-handleFolders (Partial s ss) = return $ Partial s (map takeFileName ss)
+handleFolders (Partial s ss) = return $ Partial s ss-- (map takeFileName ss)
 handleFolders NoExpansion = return NoExpansion
 
 -- get a list of files in the current directory which are prefixed by this
