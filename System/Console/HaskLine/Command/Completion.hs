@@ -1,19 +1,16 @@
 module System.Console.HaskLine.Command.Completion(
                             CompletionFunc,
-                            Expansion(..),
-                            makeExpansion,
+                            Completion,
                             WordBreakFunc,
                             simpleWordBreak,
                             completionCmd,
                             menuCompleteCmd,
                             -- * Filename completion
-                            completeFile,
                             filenameWordBreak,
                             fileCompletionCmd,
+                            quotedFilenames,
                             -- * Helper functions
-                            basicCompletionFunc,
-                            addSpaceIfDone,
-                            quoteCompletion
+                            simpleCompletionFunc,
                             ) where
 
 import System.Console.HaskLine.Command
@@ -26,32 +23,6 @@ import Control.Monad(liftM)
 import Control.Monad.Trans
 import Data.List(isPrefixOf, transpose, unfoldr)
 
--- | An action which completes a word; for example, expanding the first few
--- letters of a filename into the full filename.
-type CompletionFunc m = String -> m Expansion
-
--- The result of a word completion.
-data Expansion = NoExpansion | FullExpansion String 
-                    | Partial {partialExpansion :: String,
-                                potentialCompletions :: [String]}
-                    deriving Show
-
--- | Convert a list of potential word expansions into an 'Expansion'.
-makeExpansion :: [String] -> Expansion
-makeExpansion [] = NoExpansion
-makeExpansion [s] = FullExpansion s
-makeExpansion ss = Partial (commonPrefix ss) ss
-    where
-        commonPrefix :: [String] -> String
-        commonPrefix [] = ""
-        commonPrefix ts = foldl1 common ts
-        common _ "" = ""
-        common "" _ = ""
-        common (c:cs) (d:ds)
-            | c == d = c : common cs ds
-            | otherwise = ""
-
-
 -- | Break off a reversed word from a reversed string.  The input and output 'String's are reversed.
 -- 
 -- For example, @break (==' ')@ is a 'WordBreakFunc':
@@ -60,34 +31,32 @@ makeExpansion ss = Partial (commonPrefix ss) ss
 -- 
 type WordBreakFunc = String -> (String, String)
 
-type MakeCompletion m = InsertMode -> m (InsertMode,Expansion)
-
-makeCompletion :: Monad m => WordBreakFunc -> CompletionFunc m -> MakeCompletion m
+type MakeCompletion m = InsertMode -> m (InsertMode,[Completion])
+makeCompletion :: Monad m => WordBreakFunc -> CompletionFunc m 
+                    -> MakeCompletion m
 makeCompletion breakWord complete (IMode xs ys) = do
     let (revWord,rest) = breakWord xs
     let word = reverse revWord
-    expansion <- complete word
-    return (IMode rest ys,expansion)
+    completions <- complete word
+    return (IMode rest ys,completions)
 
 -- | Create a 'Command' for word completion.
 completionCmd :: Monad m => WordBreakFunc -> CompletionFunc m 
     -> Key -> Command m InsertMode InsertMode
-completionCmd breakWord complete = simpleCommand $ \s -> do
-    (s',expansion) <- makeCompletion breakWord complete s
-    return $ case expansion of
-        NoExpansion -> Change s
-        FullExpansion newWord -> Change $ insertString newWord s'
-        Partial partial ws 
-            | length ws > 1 && s == withPartial
-                                -> PrintLines (makeLines ws) withPartial
-            | otherwise         -> Change withPartial
-           where
-            withPartial = insertString partial s'
-
-{- TODO: perhaps
- - InsertMode -> (InsertMode, Expansion)
- - where Expansion = NoExpansion | FullExpansion | Partial [String]
- -}
+completionCmd breakWord complete = simpleCommand $ \im -> do
+    (im',completions) <- makeCompletion breakWord complete im
+    return $ case completions of
+        [] -> Change im
+        [newWord] -> Change $ insertString (replacement newWord) im'
+        _
+            | im /= withPartial -> Change withPartial
+            | otherwise -> PrintLines (makeLines $ map display completions)
+                            withPartial
+          where
+            partial = foldl1 commonPrefix (map replacement completions)
+            withPartial = insertString partial im'
+            commonPrefix (c:cs) (d:ds) | c == d = c : commonPrefix cs ds
+            commonPrefix _ _ = ""
 
 makeLines :: [String] -> Layout -> [String]
 makeLines ws layout = let
@@ -149,13 +118,11 @@ continueCompletion f p@PrefixCompletion {} = return $ Change $
 startCompletion :: Monad m => MakeCompletion m -> InsertMode
                         -> m (Effect DoCompletions)
 startCompletion f im = do
-    (im',expansion) <- f im
-    return $ Change $ case expansion of
-        NoExpansion -> FullCompletion  im
-        FullExpansion w -> FullCompletion $ insertString w im'
-        Partial partial ws
-            | length ws <= 1 -> FullCompletion (insertString partial im')
-            | otherwise -> PrefixCompletion {
+    (im',completions) <- f im
+    return $ Change $ case map replacement completions of
+        [] -> FullCompletion  im
+        [w] -> FullCompletion $ insertString w im'
+        ws -> PrefixCompletion {
                             allCompletions = ws,
                             thisCompletion = head ws,
                             remainingCompletions = tail ws,
@@ -173,29 +140,6 @@ menuCompleteCmd breakWord complete k = let
                             completionFullState
     in k +> simpleCommand (startCompletion mkComplete) >|> continueComplete
 
-{--
-menuCompletCmd :: Monad m => WordBreakFunc -> CompletionFunc m
-    -> Key -> Command m InsertMode InsertMode
-menuCompleteCmd breakWord complete key = key +> 
-{-- can i do this?
- -
- --}
-
--- NOTE: input string can't be empty!
-withCompletions :: [String] -> InsertMode -> WithCompletions
-
-instance LineState WithCompletions where
-    beforeCursor prefix wc = beforeCursor (prefix ++ thisCompletion wc) 
-                                $ completionState wc
-    afterCursor = afterCursor . completionState
-
-continueCompletion :: WithCompletions -> WithCompletions
-continueCompletion wc = case remainingCompletions wc of
-    [] -> withCompletions (reverse (thisCompletion wc : usedCompletions wc))
-                (completionState wc)
-    (c:cs') -> wc {thisCompletion = c, remainingCompletions=cs'}
-
---}
 --
 ----------------
 -- Word breaking
@@ -230,70 +174,70 @@ filenameWordBreak = simpleWordBreak (Just '\\') " \t\n\\`@$><=;|&{("
 
 -- Auxiliary functions
 
--- Simple completion.  If full completion, adds a space.
--- | Make a simple completion function.  If the word is fully expanded, add a space at the end.
-basicCompletionFunc :: Monad m => (String -> m [String]) -> CompletionFunc m
-basicCompletionFunc f s = liftM (addSpaceIfDone . makeExpansion) (f s)
-
-addSpaceIfDone :: Expansion -> Expansion
-addSpaceIfDone (FullExpansion s) = FullExpansion (s ++ " ")
-addSpaceIfDone e = e
-
-
--- | Ignore quotes when running the completion function, but match any inital quotes if the word is fully
--- expanded.
---
-quoteCompletion :: Monad m => (Char -> Bool) -> CompletionFunc m -> CompletionFunc m
-quoteCompletion isQuote f = \s -> case s of
-    (c:cs) | isQuote c -> f cs >>= \expansion -> return $ case expansion of
-                            NoExpansion -> NoExpansion
-                            FullExpansion e -> FullExpansion (c : e ++ [c])
-                            Partial p ss -> Partial (c:p) ss
-    cs -> f cs
-
--- A completion function for file and folder names.
-completeFile :: MonadIO m => CompletionFunc m
-completeFile  = liftM addSpaceIfDone . quoteCompletion isQuote fileExpansion
-    where 
-        fileExpansion word = do
-            files <- liftIO (findFiles word)
-            let expansion = makeExpansion files
-            liftIO (handleFolders expansion)
-        isQuote c = c == '\"' || c == '\''
-
 -- A completion command for file and folder names.
 fileCompletionCmd :: MonadIO m => Key -> Command m InsertMode InsertMode
-fileCompletionCmd = completionCmd-- menuCompleteCmd 
-                    filenameWordBreak completeFile
+fileCompletionCmd = completionCmd
+                    -- menuCompleteCmd 
+                    filenameWordBreak (liftIO . quotedFilenames isQuote)
+    where
+        isQuote c = c == '\"' || c == '\''
 
+
+data Completion = Completion {replacement, display :: String}
+                    deriving Show
+
+completion :: String -> Completion
+completion str = Completion str str
+
+setReplacement, setDisplay :: (String -> String) -> Completion -> Completion
+setReplacement f c = c {replacement = f $ replacement c}
+setDisplay f c = c {display = f $ display c}
+
+
+type CompletionFunc m = String -> m [Completion]
+
+-- | Puts a space after word when completed.
+simpleCompletionFunc :: MonadIO m => (String -> IO [String]) 
+        -> String -> m [Completion]
+simpleCompletionFunc f = liftIO 
+                            . fmap (map (setReplacement (++ " ") . completion)) 
+                            . f
 
 --------
 -- Helper funcs for file completion
 
--- Make some changes specific to folders:
--- A FullExpansion of a folder gets '/' added after it, and is Partial (so no quotes or 
--- spaces added after it)
--- the partial results returned for a subfolder get stripped of their directory parts.
-handleFolders :: Expansion -> IO Expansion
-handleFolders e@(FullExpansion file) = do
-    dirExists <- doesDirectoryExist file
-    return $ if dirExists 
-                then let dir = addTrailingPathSeparator file in Partial dir [file]
-                else e
-handleFolders (Partial s ss) = return $ Partial s ss-- (map takeFileName ss)
-handleFolders NoExpansion = return NoExpansion
+quotedFilenames :: (Char -> Bool) -> String -> IO [Completion]
+quotedFilenames isQuote (q:file) | isQuote q = do
+    files <- findFiles file
+    return $ map (setReplacement ((q:) . appendIfNotDir [q,' '])) files
+quotedFilenames _ file = do
+    files <- findFiles file
+    return $ map (setReplacement (appendIfNotDir " ")) files
+
+appendIfNotDir str file | null (takeFileName file) = file
+                        | otherwise = file ++ str
 
 -- get a list of files in the current directory which are prefixed by this
 -- partial path.
-findFiles :: FilePath -> IO [FilePath]
+findFiles :: FilePath -> IO [Completion]
 findFiles path = do
-    let (dir, file) = splitFileName path
-    let filterPrefix = filter (\f -> file `isPrefixOf` f
-                                        && f /= "." && f /= "..")
-    let dirPath = if null dir then "." else dir
     dirExists <- doesDirectoryExist dirPath
-    if not dirExists
+    allFiles <- if not dirExists
         then return []
-        else fmap ( map (dir ++) . filterPrefix) (getDirectoryContents dirPath)
+        else fmap filterPrefix $ getDirectoryContents dirPath
+    let results = map (setReplacement (dir </>) . setDisplay takeFileName)
+                    $ map completion $ filterPrefix allFiles
+    mapM addSlashToDir results
+  where
+    (dir, file) = splitFileName path
+    dirPath = if null dir then "." else dir
+    filterPrefix = filter (\f -> not (f `elem` [".",".."])
+                                        && file `isPrefixOf` f)
 
+addSlashToDir :: Completion -> IO Completion
+addSlashToDir c@Completion{replacement=file} = do
+    dirExists <- doesDirectoryExist file
+    return $ if dirExists 
+                then c {replacement = addTrailingPathSeparator file}
+                else c
 

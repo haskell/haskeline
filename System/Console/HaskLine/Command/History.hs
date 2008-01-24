@@ -1,8 +1,10 @@
 module System.Console.HaskLine.Command.History where
 
 import System.Console.HaskLine.LineState
+import System.Console.HaskLine.Modes
 import System.Console.HaskLine.Command
 import Control.Monad (liftM)
+import Data.List
 
 data History = History {pastHistory, futureHistory :: [String]}
 
@@ -27,3 +29,21 @@ historyBack, historyForward :: (FromString s, MonadCmd History m) =>
 historyBack = simpleCommand $ liftM Change . updateState . prevHistory
 historyForward = simpleCommand $ liftM Change . updateState . nextHistory
 
+
+data SearchMode = SearchMode {searchTerm :: String,
+                              foundHistory :: InsertMode}
+
+instance LineState SearchMode where
+    beforeCursor _ sm = beforeCursor prefix (foundHistory sm)
+        where prefix = "(reverse-i-search)`" ++ searchTerm sm ++ "'"
+    afterCursor = afterCursor . foundHistory
+    toResult = toResult . foundHistory
+
+find :: String -> [String] -> Maybe ([String], String, [String])
+find = undefined
+
+findInLine :: String -> String -> Maybe InsertMode
+findInLine text "" = Nothing
+findInLine text ccs@(c:cs)
+    | text `isPrefixOf` ccs = Just (IMode [] ccs)
+    | otherwise = fmap (insertChar c) $ findInLine text cs
