@@ -8,13 +8,13 @@ import System.Console.HaskLine.LineState
 
 import Control.Monad.Trans
 
-type VI = CommandT History
-type VICommand s t = forall m . MonadIO m => Command (VI m) s t
+type HaskLineT m = CommandT HistLog m
+type HaskLineCmd s t = forall m . MonadIO m => Command (HaskLineT m) s t
 
-viActions :: MonadIO m => KeyMap (VI m) InsertMode
+viActions :: MonadIO m => KeyMap (HaskLineT m) InsertMode
 viActions = runCommand $ choiceCmd [startCommand, simpleInsertions]
                             
-simpleInsertions :: VICommand InsertMode InsertMode
+simpleInsertions :: HaskLineCmd InsertMode InsertMode
 simpleInsertions = choiceCmd
                 [ KeyChar '\n' +> finish
                    , KeyLeft +> change goLeft 
@@ -27,14 +27,14 @@ simpleInsertions = choiceCmd
                    , KeyDown +> historyForward
                    ]
 
-startCommand :: VICommand InsertMode InsertMode
+startCommand :: HaskLineCmd InsertMode InsertMode
 startCommand = KeyChar '\ESC' +> change enterCommandMode
                     >|> viCommandActions
 
-viCommandActions :: VICommand CommandMode InsertMode
+viCommandActions :: HaskLineCmd CommandMode InsertMode
 viCommandActions = simpleCmdActions `loopUntil` exitingCommands
 
-exitingCommands :: VICommand CommandMode InsertMode
+exitingCommands :: HaskLineCmd CommandMode InsertMode
 exitingCommands =  choiceCmd [ KeyChar 'i' +> change insertFromCommandMode
                     , KeyChar 'I' +> change (moveToStart . insertFromCommandMode)
                     , KeyChar 'a' +> change appendFromCommandMode
@@ -44,7 +44,7 @@ exitingCommands =  choiceCmd [ KeyChar 'i' +> change insertFromCommandMode
                     , deleteIOnce
                     ]
 
-simpleCmdActions :: VICommand CommandMode CommandMode
+simpleCmdActions :: HaskLineCmd CommandMode CommandMode
 simpleCmdActions = choiceCmd [ KeyChar '\n'  +> finish
                     , KeyChar '\ESC' +> change id -- helps break out of loops
                     , KeyChar 'r'   +> replaceOnce 
@@ -61,12 +61,12 @@ replaceOnce k = k >+> try (graphCommand replaceChar)
 
 loopReplace k = k >+> loop
     where
-        loop :: VICommand CommandMode CommandMode
+        loop :: HaskLineCmd CommandMode CommandMode
         loop = loopWithBreak (graphCommand (\c -> goRight . replaceChar c))
                     (choiceCmd []) id
 
 
-repeated :: VICommand CommandMode CommandMode
+repeated :: HaskLineCmd CommandMode CommandMode
 repeated = let
     start = foreachDigit startArg ['1'..'9']
     addDigit = foreachDigit addNum ['0'..'9']
@@ -95,16 +95,16 @@ movements = [ (KeyChar 'h', goLeft)
             ]
 
 useMovements :: LineState t => ((CommandMode -> CommandMode) -> s -> t) 
-                -> VICommand s t
+                -> HaskLineCmd s t
 useMovements f = choiceCmd $ map (\(k,g) -> k +> change (f g))
                                 movements
 
-deleteOnce :: VICommand CommandMode CommandMode
+deleteOnce :: HaskLineCmd CommandMode CommandMode
 deleteOnce = KeyChar 'd'
             >+> choiceCmd [useMovements deleteFromMove,
                          KeyChar 'd' +> change (const CEmpty)]
 
-deleteIOnce :: VICommand CommandMode InsertMode
+deleteIOnce :: HaskLineCmd CommandMode InsertMode
 deleteIOnce = KeyChar 'c'
               >+> choiceCmd [useMovements deleteAndInsert,
                             KeyChar 'c' +> change (const emptyIM)]

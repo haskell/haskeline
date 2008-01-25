@@ -8,13 +8,12 @@ import System.Console.HaskLine.Modes
 import Control.Monad.Trans
 import Data.Char
 
-type Emacs= CommandT History
-type EmacsCommand s t = forall m . MonadIO m => Command (Emacs m) s t
+import System.Console.HaskLine.Vi(HaskLineT, HaskLineCmd)
 
-emacsCommands :: MonadIO m => KeyMap (Emacs m) InsertMode
+emacsCommands :: MonadIO m => KeyMap (HaskLineT m) InsertMode
 emacsCommands = runCommand $ choiceCmd [simpleActions, controlActions]
 
-simpleActions, controlActions :: EmacsCommand InsertMode InsertMode
+simpleActions, controlActions :: HaskLineCmd InsertMode InsertMode
 simpleActions = choiceCmd 
             [ KeyChar '\n' +> finish
             , KeyLeft +> change goLeft
@@ -41,7 +40,7 @@ controlActions = choiceCmd
             ]
 
 
-deleteCharOrEOF :: Key -> EmacsCommand InsertMode InsertMode
+deleteCharOrEOF :: Key -> HaskLineCmd InsertMode InsertMode
 deleteCharOrEOF k = acceptKey k deleteOrFail >|> justDelete
   where
     deleteOrFail s = return $ if s == emptyIM then Fail else Change (deleteNext s)

@@ -26,9 +26,9 @@ import System.Posix.Signals.Exts
 
 test :: IO ()
 test = do
-    s <- runHistory ["foobar", "other", "more"] $ runHSLine ">:"
-                -- viActions
-                emacsCommands
+    s <- runHistoryFromFile "hist.txt" $ runHSLine ">:"
+                viActions
+                -- emacsCommands
     print s
 
 -- Note: Without buffering the output, there's a cursor flicker sometimes.
@@ -94,8 +94,9 @@ withWindowHandler tv f = do
     old_handler <- installHandler windowChange (Catch handler) Nothing
     f `finally` installHandler windowChange old_handler Nothing
 
-
-runHSLine :: MonadIO1 m => String -> KeyMap m InsertMode -> m (Maybe String)
+-- TODO: Cache the terminal, actions
+runHSLine :: MonadIO1 m => String -> KeyMap (HaskLineT m) InsertMode 
+                -> CommandT History m (Maybe String)
 runHSLine prefix process = do
     settings <- liftIO (makeSettings prefix) 
     wrapTerminalOps (terminal settings) $ do
@@ -104,13 +105,14 @@ runHSLine prefix process = do
 
         tv <- liftIO $ newTVarIO Waiting
 
-        result <- liftIO1 (withWindowHandler tv)
+        result <- runHistLog $ liftIO1 (withWindowHandler tv)
                     $ liftIO1 (withForked 
                                 (commandLoop (terminal settings) tv))
                     
                     $ runDraw (actions settings) (terminal settings) layout
                     $ drawLine prefix ls >> repeatTillFinish tv settings ls
                                                 process
+        maybe (return ()) addHistory result
         return result
 
 -- todo: make sure >=2
