@@ -1,10 +1,10 @@
 module System.Console.HaskLine.Command.History where
 
 import System.Console.HaskLine.LineState
-import System.Console.HaskLine.Modes
 import System.Console.HaskLine.Command
 import Control.Monad(liftM)
-import Control.Monad.Trans
+import System.Console.HaskLine.Monads
+import System.Console.HaskLine.Settings
 import Data.List
 import Control.Exception(evaluate)
 
@@ -17,8 +17,9 @@ data HistLog = HistLog {pastHistory, futureHistory :: [String]}
 histLog :: History -> HistLog
 histLog hist = HistLog {pastHistory = historyLines hist, futureHistory = []}
 
-runHistoryFromFile :: MonadIO m => FilePath -> CommandT History m a -> m a
-runHistoryFromFile file f = do
+runHistoryFromFile :: MonadIO m => Maybe FilePath -> StateT History m a -> m a
+runHistoryFromFile Nothing f = evalStateT (History []) f
+runHistoryFromFile (Just file) f = do
     contents <- liftIO $ do
                 exists <- doesFileExist file
                 if exists
@@ -26,17 +27,17 @@ runHistoryFromFile file f = do
                     else return ""
     liftIO $ evaluate (length contents) -- force file closed
     let oldHistory = History (lines contents)
-    (x,newHistory) <- runCommandT f oldHistory
+    (x,newHistory) <- runStateT f oldHistory
     liftIO $ writeFile file (unlines $ historyLines newHistory)
     return x
 
-addHistory :: Monad m => String -> CommandT History m ()
-addHistory l = modifyState $ \(History ls) -> History (l:ls)
+addHistory :: MonadState History m => String -> m ()
+addHistory l = modify $ \(History ls) -> History (l:ls)
 
-runHistLog :: Monad m => CommandT HistLog m a -> CommandT History m a
+runHistLog :: Monad m => StateT HistLog m a -> StateT History m a
 runHistLog f = do
-    history <- getState
-    lift (evalCommandT (histLog history) f)
+    history <- get
+    lift (evalStateT (histLog history) f)
 
 
 prevHistory, nextHistory :: FromString s => s -> HistLog -> (s, HistLog)
@@ -50,10 +51,10 @@ nextHistory s HistLog {pastHistory=past, futureHistory=ls:future}
         = (fromString ls,
             HistLog {pastHistory=toResult s : past, futureHistory=future})
 
-historyBack, historyForward :: (FromString s, MonadCmd HistLog m) => 
+historyBack, historyForward :: (FromString s, MonadState HistLog m) => 
                         Key -> Command m s s
-historyBack = simpleCommand $ liftM Change . updateState . prevHistory
-historyForward = simpleCommand $ liftM Change . updateState . nextHistory
+historyBack = simpleCommand $ liftM Change . update . prevHistory
+historyForward = simpleCommand $ liftM Change . update . nextHistory
 
 
 data SearchMode = SearchMode {searchTerm :: String,

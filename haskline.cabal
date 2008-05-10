@@ -19,16 +19,22 @@ Build-depends:  base>=3.0, terminfo>=0.2, unix>=2.2,
                 filepath>=1.1, directory>=1.0
 Extensions:     ForeignFunctionInterface, Rank2Types, FlexibleInstances,
                 FlexibleContexts, ExistentialQuantification
-                ScopedTypeVariables
+                ScopedTypeVariables, GeneralizedNewtypeDeriving
                 MultiParamTypeClasses, OverlappingInstances
+                -- Note: GADTs are needed to allow contexts of different
+                -- lengths (see code of HaskLine.repeatTillFinish)
+                GADTs
 Exposed-Modules:
                 System.Console.HaskLine
                 System.Console.HaskLine.Command
                 System.Console.HaskLine.Command.Completion
                 System.Console.HaskLine.Command.History
+                System.Console.HaskLine.Draw
                 System.Console.HaskLine.Emacs
+                System.Console.HaskLine.HaskLineT
                 System.Console.HaskLine.LineState
+                System.Console.HaskLine.Monads
+                System.Console.HaskLine.Settings
                 System.Console.HaskLine.Vi
-                System.Console.HaskLine.Modes
                 System.Console.HaskLine.WindowSize
-ghc-options: -fglasgow-exts -Wall
+ghc-options: -Wall

@@ -10,15 +10,16 @@ module System.Console.HaskLine.Command(
                         listToTree,
                         -- * Commands
                         Effect(..),
-                        KeyMap(),
+                        Layout(..),
+                        KeyMap(..), -- TODO: no export of constructors
                         lookupKM,
                         KeyAction(..),
-                        Command(),
+                        Command(..), -- TODO: no export of constructors
                         runCommand,
                         (>|>),
                         (>+>),
                         acceptKey,
-                        acceptGraph,
+                        acceptChar,
                         loopUntil,
                         loopWithBreak,
                         try,
@@ -29,19 +30,11 @@ module System.Console.HaskLine.Command(
                         clearScreenCmd,
                         (+>),
                         choiceCmd,
-                        spliceCmd,
-                        graphCommand,
-                        -- * CommandT
-                        MonadCmd(..),
-                        MonadIO1(..),
-                        CommandT(..),
-                        evalCommandT,
-                        updateState,
-                        modifyState
-                        
+                        spliceCmd
                         ) where
 
 import System.Console.HaskLine.LineState
+import System.Console.HaskLine.Draw
 import System.Console.Terminfo
 import Data.Maybe
 import Data.List
@@ -150,12 +143,11 @@ data Effect s = Change s | PrintLines (Layout -> [String]) s
                 | Redraw {shouldClearScreen :: Bool, redrawState :: s}
                 | Fail | Finish
 
-newtype KeyMap m s = KeyMap {keyMap :: Map.Map Key (KeyAction m s)}
+newtype KeyMap m s = KeyMap {keyMap :: Map.Map Key (s -> m (KeyAction m))}
 
-data KeyAction m s = forall t . LineState t 
-                    => KeyAction (s -> m (Effect t)) (KeyMap m t)
+data KeyAction m = forall t . LineState t => KeyAction (Effect t) (KeyMap m t)
 
-lookupKM :: KeyMap m s -> Key -> Maybe (KeyAction m s)
+lookupKM :: KeyMap m s -> Key -> Maybe (s -> m (KeyAction m))
 lookupKM km k = Map.lookup k (keyMap km)
 
 nullKM :: KeyMap m s
@@ -185,12 +177,14 @@ k >+> f = k +> change id >|> f
 
 acceptKey :: (Monad m, LineState t) => 
                 Key -> (s -> m (Effect t)) -> Command m s t
-acceptKey k act = Command $ \next -> KeyMap $ Map.singleton k 
-                                        $ KeyAction act next
+acceptKey k act = Command $ \next -> KeyMap $ Map.singleton k $ \s -> do 
+                                                t <- act s
+                                                return (KeyAction t next)
 
-acceptGraph :: (Char -> KeyAction m s) -> KeyMap m s
-acceptGraph f = KeyMap $ Map.fromList 
-                $ map (\c -> (KeyChar c, f c)) [' '..'~']
+acceptChar :: (Monad m, LineState t) => (Char -> s -> t) -> Command m s t
+acceptChar f = Command $ \next -> KeyMap $ Map.fromList 
+                $ map (\c -> (KeyChar c,\s -> return (KeyAction (Change (f c s)) next)))
+                    [' '..'~']
                          
 loopUntil :: Command m s s -> Command m s t -> Command m s t
 loopUntil (Command f) (Command g) 
@@ -208,6 +202,7 @@ try (Command f) = Command $ \next -> (f next) `orKM` next
 finish :: forall s m t . (LineState t, Monad m) => Key -> Command m s t
 finish k = acceptKey k $ const (return Finish)
 
+-- NOTE: SAME AS ACCEPTKEY
 simpleCommand :: (LineState t, Monad m) => (s -> m (Effect t)) 
                     -> Key -> Command m s t
 simpleCommand f k = acceptKey k f
@@ -216,8 +211,8 @@ change :: (LineState t, Monad m) => (s -> t) -> Key -> Command m s t
 change f = simpleCommand (return . Change . f)
 
 changeWithoutKey :: (s -> t) -> Command m s t
-changeWithoutKey f = Command $ \(KeyMap next) -> KeyMap $ fmap
-    (\(KeyAction g next') -> KeyAction (g . f) next') next
+changeWithoutKey f = Command $ \(KeyMap next) -> KeyMap $ fmap (\g -> g . f) next
+    -- (\(KeyAction g next') -> KeyAction (g . f) next') next
 
 clearScreenCmd :: (LineState s, Monad m) => Key -> Command m s s
 clearScreenCmd k = acceptKey k $ \s -> return (Redraw True s)
@@ -233,55 +228,4 @@ choiceCmd cmds = Command $ \next ->
 spliceCmd :: KeyMap m t -> Command m s t -> Command m s u
 spliceCmd alternate (Command f) = Command $ \next -> f alternate
 
-graphCommand :: (Monad m, LineState t) => (Char -> s -> t) -> Command m s t
-graphCommand f = Command $ \next -> acceptGraph $ \c -> KeyAction (return . Change . f c) next
-
-newtype CommandT s m a = CommandT {runCommandT :: s -> m (a,s)}
-
-evalCommandT :: Monad m => s -> CommandT s m a -> m a
-evalCommandT s f = liftM fst $ runCommandT f s
-
-instance Monad m => Monad (CommandT s m) where
-    return x = CommandT $ \s -> return (x,s)
-    CommandT f >>= g = CommandT $ \s -> do
-                                (x,s') <- f s
-                                runCommandT (g x) s'
-
-instance MonadTrans (CommandT s) where
-    lift f = CommandT $ \s -> do {x <- f; return (x,s)}
-
-instance MonadIO m => MonadIO (CommandT s m) where
-    liftIO f = CommandT $ \s -> do {x <- liftIO f; return (x,s)}
-
-class MonadIO m => MonadIO1 m where
-    liftIO1 :: (forall b . IO b -> IO b) -> m a -> m a
-
-instance MonadIO1 IO where
-    liftIO1 = id
-
-instance MonadIO1 m => MonadIO1 (CommandT s m) where
-    liftIO1 f (CommandT g) = CommandT $ liftIO1 f . g
-    
-class Monad m => MonadCmd s m where
-    getState :: m s
-    putState :: s -> m ()
-
-instance Monad m => MonadCmd s (CommandT s m) where
-    getState = CommandT $ \s -> return (s,s)
-    putState s = CommandT $ \_ -> return ((),s)
-
-instance MonadCmd s m => MonadCmd s (CommandT t m) where
-    getState = lift getState
-    putState s = lift (putState s)
-
--- A useful combinator
-updateState :: MonadCmd s m => (s -> (a,s)) -> m a
-updateState f = do
-    s <- getState
-    let (x,s') = f s
-    putState s'
-    return x
-
-modifyState :: MonadCmd s m => (s -> s) -> m ()
-modifyState f = getState >>= putState . f
 

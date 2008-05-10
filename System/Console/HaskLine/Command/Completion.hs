@@ -2,61 +2,58 @@ module System.Console.HaskLine.Command.Completion(
                             CompletionFunc,
                             Completion,
                             WordBreakFunc,
+                            CompletionType(..),
                             simpleWordBreak,
                             completionCmd,
-                            menuCompleteCmd,
                             -- * Filename completion
-                            filenameWordBreak,
-                            fileCompletionCmd,
+                            completeFilename,
                             quotedFilenames,
                             -- * Helper functions
                             simpleCompletionFunc,
                             ) where
 
 import System.Console.HaskLine.Command
-import System.Console.HaskLine.Modes
 import System.Console.HaskLine.LineState
+import System.Console.HaskLine.Monads
+import System.Console.HaskLine.HaskLineT
+import System.Console.HaskLine.Settings
 
 import System.Directory
 import System.FilePath
 import Control.Monad(liftM)
-import Control.Monad.Trans
 import Data.List(isPrefixOf, transpose, unfoldr)
+import qualified Data.Map as Map
 
--- | Break off a reversed word from a reversed string.  The input and output 'String's are reversed.
--- 
--- For example, @break (==' ')@ is a 'WordBreakFunc':
---
--- >  break (==' ') (reverse "This is a sentence") == ("ecnetnes"," a si sihT")
--- 
-type WordBreakFunc = String -> (String, String)
-
-type MakeCompletion m = InsertMode -> m (InsertMode,[Completion])
-makeCompletion :: Monad m => WordBreakFunc -> CompletionFunc m 
-                    -> MakeCompletion m
-makeCompletion breakWord complete (IMode xs ys) = do
-    let (revWord,rest) = breakWord xs
-    let word = reverse revWord
-    completions <- complete word
+makeCompletion :: Monad m => CompletionFunc m -> InsertMode -> m (InsertMode, [Completion])
+makeCompletion f (IMode xs ys) = do
+    (rest,completions) <- f xs
     return (IMode rest ys,completions)
 
 -- | Create a 'Command' for word completion.
-completionCmd :: Monad m => WordBreakFunc -> CompletionFunc m 
-    -> Key -> Command m InsertMode InsertMode
-completionCmd breakWord complete = simpleCommand $ \im -> do
-    (im',completions) <- makeCompletion breakWord complete im
-    return $ case completions of
-        [] -> Change im
-        [newWord] -> Change $ insertString (replacement newWord) im'
-        _
-            | im /= withPartial -> Change withPartial
-            | otherwise -> PrintLines (makeLines $ map display completions)
-                            withPartial
-          where
-            partial = foldl1 commonPrefix (map replacement completions)
-            withPartial = insertString partial im'
-            commonPrefix (c:cs) (d:ds) | c == d = c : commonPrefix cs ds
-            commonPrefix _ _ = ""
+completionCmd :: Monad m => Key -> Command (HaskLineCmdT m) InsertMode InsertMode
+completionCmd k = Command $ \next -> KeyMap $ Map.singleton k $ \s -> do
+    ctype <- asks completionType
+    f <- asks complete
+    let g = liftCmdT . f
+    case ctype of
+        MenuCompletion -> menuCompletion k g s next
+        _ -> do
+                (rest,completions) <- makeCompletion g s
+                return $ KeyAction (simpleCompletion s rest completions) next
+
+
+simpleCompletion :: InsertMode -> InsertMode -> [Completion] -> Effect InsertMode
+simpleCompletion oldIM _ [] = Change oldIM
+simpleCompletion _ im [newWord] = Change $ insertString (replacement newWord) im
+simpleCompletion oldIM im completions
+    | oldIM /= withPartial = Change (insertString partial im)
+    | otherwise = PrintLines (makeLines $ map display completions) 
+                        (insertString partial im)
+  where
+    withPartial = insertString partial im
+    partial = foldl1 commonPrefix (map replacement completions)
+    commonPrefix (c:cs) (d:ds) | c == d = c : commonPrefix cs ds
+    commonPrefix _ _ = ""
 
 makeLines :: [String] -> Layout -> [String]
 makeLines ws layout = let
@@ -86,7 +83,11 @@ ceilDiv :: Integral a => a -> a -> a
 ceilDiv m n | m `rem` n == 0    =  m `div` n
             | otherwise         =  m `div` n + 1
 
+menuCompletion :: Monad m => Key -> CompletionFunc m -> InsertMode -> 
+                                KeyMap m InsertMode -> m (KeyAction m)
+menuCompletion k f s next = undefined
 
+{--
 data DoCompletions = PrefixCompletion {
                         allCompletions :: [String],
                         thisCompletion :: String,
@@ -130,19 +131,31 @@ startCompletion f im = do
                             }
 
 
-menuCompleteCmd :: Monad m => WordBreakFunc -> CompletionFunc m
+menuCompleteCmd :: Monad m => CompletionFunc m
     -> Key -> Command m InsertMode InsertMode
-menuCompleteCmd breakWord complete k = let
-    mkComplete = makeCompletion breakWord complete
+menuCompleteCmd settings k = let
+    mkComplete = makeCompletion settings
     continueComplete = loopWithBreak 
                             (k +> simpleCommand (continueCompletion mkComplete))
                             (choiceCmd [])
                             completionFullState
     in k +> simpleCommand (startCompletion mkComplete) >|> continueComplete
 
+--}
+
 --
 ----------------
 -- Word breaking
+
+-- | Break off a reversed word from a reversed string.  The input and output 'String's are reversed.
+-- 
+-- For example, @return . break (==' ')@ is a 'WordBreakFunc':
+--
+-- >  break (==' ') (reverse "This is a sentence") == ("ecnetnes"," a si sihT")
+-- 
+type WordBreakFunc = String -> (String, String)
+
+
 
 -- | Break a word at a given set of spaces.  Does not break at a space if it is immediately preceded by
 -- the escape character.
@@ -168,23 +181,17 @@ simpleWordBreak (Just e) ws = escapedBreak
 filenameWordBreak :: WordBreakFunc
 filenameWordBreak = simpleWordBreak (Just '\\') " \t\n\\`@$><=;|&{("
 
-
 -------
 -- Expansion
 
 -- Auxiliary functions
 
 -- A completion command for file and folder names.
-fileCompletionCmd :: MonadIO m => Key -> Command m InsertMode InsertMode
-fileCompletionCmd = completionCmd
-                    -- menuCompleteCmd 
-                    filenameWordBreak (liftIO . quotedFilenames isQuote)
-    where
-        isQuote c = c == '\"' || c == '\''
-
-
-data Completion = Completion {replacement, display :: String}
-                    deriving Show
+completeFilename :: MonadIO m => CompletionFunc m
+completeFilename line = do
+                    let (word,rest) = filenameWordBreak line
+                    completions <- liftIO $ quotedFilenames (`elem` "\"\'") (reverse word)
+                    return (rest,completions)
 
 completion :: String -> Completion
 completion str = Completion str str
@@ -193,8 +200,6 @@ setReplacement, setDisplay :: (String -> String) -> Completion -> Completion
 setReplacement f c = c {replacement = f $ replacement c}
 setDisplay f c = c {display = f $ display c}
 
-
-type CompletionFunc m = String -> m [Completion]
 
 -- | Puts a space after word when completed.
 simpleCompletionFunc :: MonadIO m => (String -> IO [String]) 

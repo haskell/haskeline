@@ -3,26 +3,26 @@ module System.Console.HaskLine.Vi where
 import System.Console.HaskLine.Command
 import System.Console.HaskLine.Command.Completion
 import System.Console.HaskLine.Command.History
-import System.Console.HaskLine.Modes
 import System.Console.HaskLine.LineState
+import System.Console.HaskLine.HaskLineT
+import System.Console.HaskLine.Settings
+import System.Console.HaskLine.Monads
 
-import Control.Monad.Trans
 
-type HaskLineT m = CommandT HistLog m
-type HaskLineCmd s t = forall m . MonadIO m => Command (HaskLineT m) s t
+type HaskLineCmd s t = forall m . MonadIO m => Command (HaskLineCmdT m) s t
 
-viActions :: MonadIO m => KeyMap (HaskLineT m) InsertMode
+viActions :: MonadIO m => KeyMap (HaskLineCmdT m) InsertMode
 viActions = runCommand $ choiceCmd [startCommand, simpleInsertions]
                             
-simpleInsertions :: HaskLineCmd InsertMode InsertMode
+simpleInsertions :: MonadIO m => Command (HaskLineCmdT m) InsertMode InsertMode
 simpleInsertions = choiceCmd
                 [ KeyChar '\n' +> finish
                    , KeyLeft +> change goLeft 
                    , KeyRight +> change goRight
                    , Backspace +> change deletePrev 
                    , DeleteForward +> change deleteNext 
-                   , graphCommand insertChar
-                   , KeyChar '\t' +> fileCompletionCmd
+                   , acceptChar insertChar
+                   , KeyChar '\t' +> completionCmd
                    , KeyUp +> historyBack
                    , KeyDown +> historyForward
                    ]
@@ -57,12 +57,12 @@ simpleCmdActions = choiceCmd [ KeyChar '\n'  +> finish
                     , useMovements id
                     ]
 
-replaceOnce k = k >+> try (graphCommand replaceChar)
+replaceOnce k = k >+> try (acceptChar replaceChar)
 
 loopReplace k = k >+> loop
     where
         loop :: HaskLineCmd CommandMode CommandMode
-        loop = loopWithBreak (graphCommand (\c -> goRight . replaceChar c))
+        loop = loopWithBreak (acceptChar (\c -> goRight . replaceChar c))
                     (choiceCmd []) id
 
 
