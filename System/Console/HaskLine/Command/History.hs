@@ -4,7 +4,6 @@ import System.Console.HaskLine.LineState
 import System.Console.HaskLine.Command
 import Control.Monad(liftM)
 import System.Console.HaskLine.Monads
-import System.Console.HaskLine.Settings
 import Data.List
 import Control.Exception(evaluate)
 
