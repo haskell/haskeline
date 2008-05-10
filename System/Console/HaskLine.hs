@@ -21,6 +21,7 @@ import System.Console.Terminfo
 import System.IO
 import Control.Exception
 import Data.Maybe (fromMaybe)
+import Data.Char (isSpace)
 import Control.Monad
 import Control.Concurrent.STM
 import Control.Concurrent
@@ -115,7 +116,9 @@ getHaskLine prefix = do
                     $ runDraw (actions settings) (terminal settings) layout
                     $ drawLine prefix ls >> repeatTillFinish tv settings ls
                                                 emode
-        maybe (return ()) addHistory result
+        case result of 
+            Just line | not (all isSpace line) -> addHistory line
+            _ -> return ()
         return result
 
 -- todo: make sure >=2
