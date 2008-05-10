@@ -12,14 +12,16 @@ module System.Console.HaskLine.Command(
                         -- * Commands
                         Effect(..),
                         Layout(..),
-                        KeyMap(..), -- TODO: no export of constructors
+                        KeyMap(), 
                         lookupKM,
                         KeyAction(..),
-                        Command(..), -- TODO: no export of constructors
+                        Command(),
                         runCommand,
+                        continue,
                         (>|>),
                         (>+>),
                         acceptKey,
+                        acceptKeyM,
                         acceptChar,
                         loopUntil,
                         loopWithBreak,
@@ -168,6 +170,9 @@ newtype Command m s t = Command (KeyMap m t -> KeyMap m s)
 runCommand :: Command m s s -> KeyMap m s
 runCommand (Command f) = let m = f m in m
 
+continue :: Command m s s
+continue = Command id
+
 infixl 6 >|>
 (>|>) :: Command m s t -> Command m t u -> Command m s u
 Command f >|> Command g = Command (f . g)
@@ -186,6 +191,12 @@ acceptChar :: (Monad m, LineState t) => (Char -> s -> t) -> Command m s t
 acceptChar f = Command $ \next -> KeyMap $ Map.fromList 
                 $ map (\c -> (KeyChar c,\s -> return (KeyAction (Change (f c s)) next)))
                     [' '..'~']
+
+acceptKeyM :: (Monad m, LineState s) => Key -> (s -> m (Effect s, Command m s s))
+                            -> Command m s s
+acceptKeyM k f = Command $ \next -> KeyMap $ Map.singleton k $ \s -> do
+                (effect,Command g) <- f s
+                return (KeyAction effect (g next))
                          
 loopUntil :: Command m s s -> Command m s t -> Command m s t
 loopUntil (Command f) (Command g) 

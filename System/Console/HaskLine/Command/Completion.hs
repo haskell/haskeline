@@ -20,7 +20,6 @@ import System.Console.HaskLine.Settings
 
 import System.Directory
 import System.FilePath
-import Control.Monad(liftM)
 import Data.List(isPrefixOf, transpose, unfoldr)
 import qualified Data.Map as Map
 
@@ -31,16 +30,15 @@ makeCompletion f (IMode xs ys) = do
 
 -- | Create a 'Command' for word completion.
 completionCmd :: Monad m => Key -> Command (HaskLineCmdT m) InsertMode InsertMode
-completionCmd k = Command $ \next -> KeyMap $ Map.singleton k $ \s -> do
+completionCmd k = acceptKeyM k $ \s -> do
     ctype <- asks completionType
     f <- asks complete
     let g = liftCmdT . f
-    case ctype of
-        MenuCompletion -> menuCompletion k g s next
-        _ -> do
-                (rest,completions) <- makeCompletion g s
-                return $ KeyAction (simpleCompletion s rest completions) next
-
+    (rest,completions) <- makeCompletion g s
+    return $ case ctype of
+        MenuCompletion -> menuCompletion k s
+                        (map (\c -> insertString (replacement c) rest) completions)
+        _ -> (simpleCompletion s rest completions, continue)
 
 simpleCompletion :: InsertMode -> InsertMode -> [Completion] -> Effect InsertMode
 simpleCompletion oldIM _ [] = Change oldIM
@@ -83,65 +81,14 @@ ceilDiv :: Integral a => a -> a -> a
 ceilDiv m n | m `rem` n == 0    =  m `div` n
             | otherwise         =  m `div` n + 1
 
-menuCompletion :: Monad m => Key -> CompletionFunc m -> InsertMode -> 
-                                KeyMap m InsertMode -> m (KeyAction m)
-menuCompletion k f s next = undefined
-
-{--
-data DoCompletions = PrefixCompletion {
-                        allCompletions :: [String],
-                        thisCompletion :: String,
-                        remainingCompletions :: [String],
-                        completionState :: InsertMode
-                       }
-                      | FullCompletion {completionState :: InsertMode}
-
-completionFullState :: DoCompletions -> InsertMode
-completionFullState (FullCompletion im) = im
-completionFullState PrefixCompletion {thisCompletion = this,
-                        completionState = s}
-                    = insertString this s
-
-instance LineState DoCompletions where
-    beforeCursor prefix = beforeCursor prefix . completionFullState
-    afterCursor = afterCursor . completionFullState
-    toResult = toResult . completionFullState
-
-continueCompletion :: Monad m => MakeCompletion m 
-                        -> DoCompletions -> m (Effect DoCompletions)
-continueCompletion f fc@(FullCompletion im) = startCompletion f im
-continueCompletion f p@PrefixCompletion {} = return $ Change $ 
-    case remainingCompletions p of
-        [] -> p {thisCompletion = head (allCompletions p), 
-                    remainingCompletions = tail (allCompletions p)}
-        (w:ws) -> p{thisCompletion=w,remainingCompletions=ws}
-
-startCompletion :: Monad m => MakeCompletion m -> InsertMode
-                        -> m (Effect DoCompletions)
-startCompletion f im = do
-    (im',completions) <- f im
-    return $ Change $ case map replacement completions of
-        [] -> FullCompletion  im
-        [w] -> FullCompletion $ insertString w im'
-        ws -> PrefixCompletion {
-                            allCompletions = ws,
-                            thisCompletion = head ws,
-                            remainingCompletions = tail ws,
-                            completionState = im'
-                            }
-
-
-menuCompleteCmd :: Monad m => CompletionFunc m
-    -> Key -> Command m InsertMode InsertMode
-menuCompleteCmd settings k = let
-    mkComplete = makeCompletion settings
-    continueComplete = loopWithBreak 
-                            (k +> simpleCommand (continueCompletion mkComplete))
-                            (choiceCmd [])
-                            completionFullState
-    in k +> simpleCommand (startCompletion mkComplete) >|> continueComplete
-
---}
+menuCompletion :: forall m . Monad m => Key -> InsertMode -> [InsertMode] 
+                    -> (Effect InsertMode, Command m InsertMode InsertMode)
+menuCompletion _ oldState [] = (Change oldState,continue)
+menuCompletion _ _ [c] = (Change c, continue)
+menuCompletion k oldState ccs@(c:cs) = (Change c, loop cs)
+    where
+        loop [] = choiceCmd [change (const oldState) k,continue]
+        loop (d:ds) = choiceCmd [change (const d) k >|> loop ds,continue]
 
 --
 ----------------
