@@ -135,8 +135,8 @@ addNum n am
 
 -- todo: negatives
 applyArg :: (s -> s) -> ArgMode s -> s
-applyArg f am = repeatN f (arg am) (argState am)
-
-repeatN f n | n <= 1 = f
-    | otherwise = f . repeatN f (n-1)
+applyArg f am = repeatN (arg am) (argState am)
+    where
+        repeatN n | n <= 1 = f
+                    | otherwise = f . repeatN (n-1)
 
