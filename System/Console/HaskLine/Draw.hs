@@ -80,6 +80,7 @@ newtype Draw m a = Draw (ReaderT Actions (ReaderT Terminal (ReaderT Layout (Stat
 
 instance MonadTrans Draw where
     lift = Draw . lift . lift . lift . lift
+    lift2 f (Draw m) = Draw $ lift2 (lift2 (lift2 (lift2 f))) m
     
 
 runDraw :: Monad m => Actions -> Terminal -> Layout -> Draw m a -> m a
@@ -91,9 +92,9 @@ runDraw actions term layout (Draw f) =
 
 output :: MonadIO m => (Actions -> TermOutput) -> Draw m ()
 output f = do
-    output <- asks f
+    toutput <- asks f
     term <- ask
-    liftIO $ runTermOutput term output
+    liftIO $ runTermOutput term toutput
 
 
 
