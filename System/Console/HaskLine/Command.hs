@@ -8,6 +8,7 @@ module System.Console.HaskLine.Command(
                         emptyTreeMap,
                         insertIntoTree,
                         listToTree,
+                        mapLines,
                         -- * Commands
                         Effect(..),
                         Layout(..),
@@ -45,7 +46,6 @@ import System.Posix (stdOutput)
 import System.Posix.Terminal
 import System.Timeout
 import Control.Monad
-import Control.Monad.Trans
 
 import Data.Bits
 
@@ -125,6 +125,7 @@ insertIntoTree ((c:cs),k) (TreeMap m) = TreeMap (Map.alter f c m)
 listToTree :: Ord a => [([a],b)] -> TreeMap a b
 listToTree = foldl' (flip insertIntoTree) emptyTreeMap
 
+-- for debugging
 mapLines :: (Show a, Show b) => TreeMap a b -> [String]
 mapLines (TreeMap m) = let
     m2 = Map.map (\(k,t) -> show k : mapLines t) m
@@ -226,6 +227,6 @@ choiceCmd cmds = Command $ \next ->
     choiceKM $ map (\(Command f) -> f next) cmds
 
 spliceCmd :: KeyMap m t -> Command m s t -> Command m s u
-spliceCmd alternate (Command f) = Command $ \next -> f alternate
+spliceCmd alternate (Command f) = Command $ \_-> f alternate
 
 
