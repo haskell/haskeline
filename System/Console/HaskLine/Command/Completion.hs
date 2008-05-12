@@ -21,7 +21,6 @@ import System.Console.HaskLine.Settings
 import System.Directory
 import System.FilePath
 import Data.List(isPrefixOf, transpose, unfoldr)
-import qualified Data.Map as Map
 
 makeCompletion :: Monad m => CompletionFunc m -> InsertMode -> m (InsertMode, [Completion])
 makeCompletion f (IMode xs ys) = do
@@ -85,7 +84,7 @@ menuCompletion :: forall m . Monad m => Key -> InsertMode -> [InsertMode]
                     -> (Effect InsertMode, Command m InsertMode InsertMode)
 menuCompletion _ oldState [] = (Change oldState,continue)
 menuCompletion _ _ [c] = (Change c, continue)
-menuCompletion k oldState ccs@(c:cs) = (Change c, loop cs)
+menuCompletion k oldState (c:cs) = (Change c, loop cs)
     where
         loop [] = choiceCmd [change (const oldState) k,continue]
         loop (d:ds) = choiceCmd [change (const d) k >|> loop ds,continue]
@@ -166,6 +165,7 @@ quotedFilenames _ file = do
     files <- findFiles file
     return $ map (setReplacement (appendIfNotDir " ")) files
 
+appendIfNotDir :: String -> FilePath -> FilePath
 appendIfNotDir str file | null (takeFileName file) = file
                         | otherwise = file ++ str
 
