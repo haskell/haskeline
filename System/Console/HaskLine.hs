@@ -67,22 +67,14 @@ makeSettings pre = do
     let Just acts = getCapability t getActions
     return TermSettings {prefix = pre, terminal = t, actions = acts}
 
-data EventState = WindowResize Layout | KeyInput Key
-                        | Waiting
+data Event = WindowResize Layout | KeyInput Key
 
-addNewEvent :: TVar EventState -> EventState -> STM ()
-addNewEvent tv event = do
-    old_es <- readTVar tv
-    case old_es of
-        Waiting -> writeTVar tv event
-        _ -> retry
-
-commandLoop :: Terminal -> TVar EventState -> IO ()
+commandLoop :: Terminal -> TChan Event -> IO ()
 commandLoop term tv = do
     keySeqs <- getKeySequences term
     let loop = do
         k <- getKey keySeqs
-        atomically $ addNewEvent tv (KeyInput k) 
+        atomically $ writeTChan tv (KeyInput k) 
         loop
     loop
 
@@ -92,9 +84,9 @@ withForked threadAct f = do
     threadID <- liftIO $ forkIO threadAct
     f `finallyIO` killThread threadID
 
-withWindowHandler :: MonadIO m => TVar EventState -> m a -> m a
+withWindowHandler :: MonadIO m => TChan Event -> m a -> m a
 withWindowHandler tv f = do
-    let handler = getLayout >>= atomically . addNewEvent tv . WindowResize
+    let handler = getLayout >>= atomically . writeTChan tv . WindowResize
     old_handler <- liftIO $ installHandler windowChange (Catch handler) Nothing
     f `finallyIO` installHandler windowChange old_handler Nothing
 
@@ -109,7 +101,7 @@ getHaskLine prefix = do
         let ls = emptyIM
         layout <- liftIO getLayout
 
-        tv <- liftIO $ newTVarIO Waiting
+        tv <- liftIO $ atomically $ newTChan
 
         result <- runHaskLineCmdT $ withWindowHandler tv
                     $ withForked (commandLoop (terminal settings) tv)
@@ -128,7 +120,7 @@ getLayout = fmap mkLayout getWindowSize
 
 
 repeatTillFinish :: forall m s . (MonadIO m, LineState s) 
-            => TVar EventState ->TermSettings
+            => TChan Event ->TermSettings
                 -> s -> KeyMap m s -> Draw m (Maybe String)
 repeatTillFinish tv settings = loop
     where 
@@ -137,17 +129,12 @@ repeatTillFinish tv settings = loop
         loop :: forall m s . (MonadIO m, LineState s) => 
                 s -> KeyMap m s -> Draw m (Maybe String)
         loop s processor = do
-                    liftIO (hFlush stdout)
-                    join $ liftIO $ atomically $ do
-                        event <- readTVar tv
+                        liftIO (hFlush stdout)
+                        event <- liftIO $ atomically $ readTChan tv
                         case event of
-                            Waiting -> retry
-                            WindowResize newLayout -> do
-                                writeTVar tv Waiting
-                                return $ actOnResize newLayout s processor
-                            KeyInput k -> do
-                                writeTVar tv Waiting 
-                                return $ case lookupKM processor k of
+                            WindowResize newLayout -> 
+                                actOnResize newLayout s processor
+                            KeyInput k -> case lookupKM processor k of
                                     Nothing -> loop s processor
                                     Just f -> do
                                         KeyAction effect next <- lift (f s)
