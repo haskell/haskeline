@@ -5,7 +5,6 @@ import System.Console.HaskLine.Command.Completion
 import System.Console.HaskLine.Command.History
 import System.Console.HaskLine.LineState
 import System.Console.HaskLine.HaskLineT
-import System.Console.HaskLine.Settings
 import System.Console.HaskLine.Monads
 
 
@@ -131,7 +130,7 @@ deleteFromRepeatedMove :: (CommandMode -> CommandMode)
 deleteFromRepeatedMove f am = deleteFromDiff (argState am) (applyArg f am)
 
 deleteFromDiff :: CommandMode -> CommandMode -> CommandMode
-deleteFromDiff (CMode xs1 c1 ys1) (CMode xs2 c2 ys2)
+deleteFromDiff (CMode xs1 c1 ys1) (CMode xs2 _ ys2)
     | length xs1 < length xs2 = enterCommandMode (IMode xs1 ys2)
     | otherwise = CMode xs2 c1 ys1
 deleteFromDiff _ after = after
