@@ -162,9 +162,6 @@ orKM (KeyMap m) (KeyMap n) = KeyMap $ m `Map.union` n
 choiceKM :: [KeyMap m s] -> KeyMap m s
 choiceKM = foldl orKM nullKM
 
-nullAction :: (LineState s, Monad m) => s -> m (Effect s)
-nullAction = return . Change
-
 newtype Command m s t = Command (KeyMap m t -> KeyMap m s)
 
 runCommand :: Command m s s -> KeyMap m s
