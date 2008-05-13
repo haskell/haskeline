@@ -21,6 +21,7 @@ Extensions:     ForeignFunctionInterface, Rank2Types, FlexibleInstances,
                 FlexibleContexts, ExistentialQuantification
                 ScopedTypeVariables, GeneralizedNewtypeDeriving
                 MultiParamTypeClasses, OverlappingInstances
+                PatternSignatures
                 -- Note: GADTs are needed to allow contexts of different
                 -- lengths (see code of HaskLine.repeatTillFinish)
                 GADTs
@@ -34,7 +35,7 @@ Exposed-Modules:
                 System.Console.HaskLine.HaskLineT
                 System.Console.HaskLine.LineState
                 System.Console.HaskLine.Monads
+                System.Console.HaskLine.Posix
                 System.Console.HaskLine.Settings
                 System.Console.HaskLine.Vi
-                System.Console.HaskLine.WindowSize
 ghc-options: -Wall

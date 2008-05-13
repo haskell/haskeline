@@ -2,6 +2,7 @@ module System.Console.HaskLine where
 
 import System.Console.HaskLine.LineState
 import System.Console.HaskLine.Command
+import System.Console.HaskLine.Posix
 {--
 import System.Console.HaskLine.Command.Undo
 import System.Console.HaskLine.Command.Paste
@@ -26,7 +27,6 @@ import Control.Monad
 import Control.Concurrent.STM
 import Control.Concurrent
 
-import System.Posix.Signals.Exts
 
 test :: IO ()
 test = runHaskLineT defaultSettings $ do
@@ -80,28 +80,6 @@ makeSettings pre = do
     let Just acts = getCapability t getActions
     return TermSettings {prefix = pre, terminal = t, actions = acts}
 
-data Event = WindowResize Layout | KeyInput Key
-
-commandLoop :: Terminal -> TChan Event -> IO ()
-commandLoop term tv = do
-    keySeqs <- getKeySequences term
-    let loop = do
-        k <- getKey keySeqs
-        atomically $ writeTChan tv (KeyInput k) 
-        loop
-    loop
-
--- fork a thread, then kill it after the computation is done
-withForked :: MonadIO m => IO () -> m a -> m a
-withForked threadAct f = do
-    threadID <- liftIO $ forkIO threadAct
-    f `finallyIO` killThread threadID
-
-withWindowHandler :: MonadIO m => TChan Event -> m a -> m a
-withWindowHandler tv f = do
-    let handler = getLayout >>= atomically . writeTChan tv . WindowResize
-    old_handler <- liftIO $ installHandler windowChange (Catch handler) Nothing
-    f `finallyIO` installHandler windowChange old_handler Nothing
 
 getHaskLine :: MonadIO m => String -> HaskLineT m (Maybe String)
 getHaskLine prefix = do
@@ -116,10 +94,10 @@ getHaskLine prefix = do
 
         tv <- liftIO $ atomically $ newTChan
 
-        result <- runHaskLineCmdT $ withWindowHandler tv
-                    $ withForked (commandLoop (terminal settings) tv)
+        result <- runHaskLineCmdT
                     $ runDraw (actions settings) (terminal settings) layout
-                    $ drawLine prefix ls >> repeatTillFinish tv settings ls
+                    $ withGetEvent (terminal settings) $ \getEvent -> 
+                        drawLine prefix ls >> repeatTillFinish getEvent settings ls
                                                 emode
         case result of 
             Just line | not (all isSpace line) -> addHistory line
@@ -133,17 +111,17 @@ getLayout = fmap mkLayout getWindowSize
 
 
 repeatTillFinish :: forall m s . (MonadIO m, LineState s) 
-            => TChan Event ->TermSettings
+            => Draw m Event -> TermSettings
                 -> s -> KeyMap m s -> Draw m (Maybe String)
-repeatTillFinish tv settings = loop
+repeatTillFinish getEvent settings = loop
     where 
         -- NOTE: since the functions in this mutually recursive binding group do not have the 
         -- same contexts, we need the -XGADTs flag (or -fglasgow-exts)
-        loop :: forall m s . (MonadIO m, LineState s) => 
+        loop :: forall s . (MonadIO m, LineState s) => 
                 s -> KeyMap m s -> Draw m (Maybe String)
         loop s processor = do
                         liftIO (hFlush stdout)
-                        event <- liftIO $ atomically $ readTChan tv
+                        event <- getEvent
                         case event of
                             WindowResize newLayout -> 
                                 actOnResize newLayout s processor
@@ -157,7 +135,7 @@ repeatTillFinish tv settings = loop
                 = withReposition newLayout (loop s next)
 
 
-        actOnCommand :: forall m s t . (MonadIO m, LineState s, LineState t) => 
+        actOnCommand :: forall s t . (MonadIO m, LineState s, LineState t) => 
                 Effect t -> 
                 s -> KeyMap m t -> Draw m (Maybe String)
         actOnCommand Finish s _ = moveToNextLine s >> return (Just (toResult s))

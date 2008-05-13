@@ -1,14 +1,6 @@
 module System.Console.HaskLine.Command(
-                        -- * Key Sequences
                         Key(..),
                         controlKey,
-                        getKeySequences,
-                        getKey,
-                        TreeMap(),
-                        emptyTreeMap,
-                        insertIntoTree,
-                        listToTree,
-                        mapLines,
                         -- * Commands
                         Effect(..),
                         Layout(..),
@@ -36,112 +28,20 @@ module System.Console.HaskLine.Command(
                         spliceCmd
                         ) where
 
+import qualified Data.Map as Map
+import Data.Bits
 import System.Console.HaskLine.LineState
 import System.Console.HaskLine.Draw
 import System.Console.Terminfo
-import Data.Maybe
-import Data.List
+import System.Console.HaskLine.Posix
 
-import qualified Data.Map as Map
-import System.Console.Terminfo
-import System.Posix (stdOutput)
-import System.Posix.Terminal
-import System.Timeout
-import Control.Monad
-
-import Data.Bits
-
-data Key = KeyChar Char | KeyMeta Char
-            | KeyLeft | KeyRight | KeyUp | KeyDown
-            | Backspace | DeleteForward | KillLine
-                deriving (Eq,Ord,Show)
 
 -- Easy translation of control characters; e.g., Ctrl-G or Ctrl-g or ^G
 controlKey :: Char -> Key
 controlKey '?' = KeyChar (toEnum 127)
 controlKey c = KeyChar $ toEnum $ fromEnum c .&. complement (bit 5 .|. bit 6)
 
-getKeySequences :: Terminal -> IO (TreeMap Char Key)
-getKeySequences term = do
-    sttys <- sttyKeys
-    let tinfos = terminfoKeys term
-    let chars = map (\c -> ([c],KeyChar c)) $ map toEnum [0..127]
-    let metas = map (\c -> (['\ESC',c],KeyMeta c)) $ map toEnum [0..127]
-    -- note ++ acts as a union; so the below favors sttys over chars
-    return $ listToTree $ chars ++ metas ++ tinfos ++ sttys
 
-
-terminfoKeys :: Terminal -> [(String, Key)]
-terminfoKeys term = catMaybes $ map getSequence keyCapabilities
-        where getSequence (cap,x) = getCapability term $ do 
-                            keys <- cap
-                            return (keys,x)
-              keyCapabilities = 
-                [(keyLeft,KeyLeft),
-                (keyRight,KeyRight),
-                (keyUp,KeyUp),
-                (keyDown,KeyDown),
-                (keyBackspace,Backspace),
-                (keyDeleteChar,DeleteForward)]
-
-sttyKeys :: IO [(String, Key)]
-sttyKeys = do
-    attrs <- getTerminalAttributes stdOutput
-    let getStty (k,c) = do {str <- controlChar attrs k; return ([str],c)}
-    return $ catMaybes $ map getStty [(Erase,Backspace),(Kill,KillLine)]
-
-getKey :: TreeMap Char Key -> IO Key
-getKey baseMap = getChar >>= getKey' baseMap
-    where
-        getKey' (TreeMap tm) c = case Map.lookup c tm of
-            Nothing -> getKey baseMap -- unrecognized control sequence; try again.
-            Just (Nothing,t) -> getChar >>= getKey' t
-            Just (Just k,t@(TreeMap tm2))
-                | Map.null tm2 -> return k
-                | otherwise  -> do
-                -- We have a choice of either accepting the current sequence, 
-                -- or reading more characters to form a longer sequence.
-                    md <- timeout escDelay getChar
-                    case md of
-                        Nothing -> return k
-                        Just d -> getKey' t d
-
-newtype TreeMap a b = TreeMap (Map.Map a (Maybe b, TreeMap a b))
-                        deriving Show
-
-emptyTreeMap :: TreeMap a b
-emptyTreeMap = TreeMap Map.empty
-
-insertIntoTree :: Ord a => ([a], b) -> TreeMap a b -> TreeMap a b
-insertIntoTree ([],_) _ = error "Can't insert empty list into a treemap!"
-insertIntoTree ((c:cs),k) (TreeMap m) = TreeMap (Map.alter f c m)
-    where
-        alterSubtree = insertIntoTree (cs,k)
-        f Nothing = Just $ if null cs
-                            then (Just k, emptyTreeMap)
-                            else (Nothing, alterSubtree emptyTreeMap)
-        f (Just (y,t)) = Just $ if null cs
-                                    then (Just k, t)
-                                    else (y, alterSubtree t)
-
-listToTree :: Ord a => [([a],b)] -> TreeMap a b
-listToTree = foldl' (flip insertIntoTree) emptyTreeMap
-
--- for debugging
-mapLines :: (Show a, Show b) => TreeMap a b -> [String]
-mapLines (TreeMap m) = let
-    m2 = Map.map (\(k,t) -> show k : mapLines t) m
-    in concatMap (\(k,ls) -> show k : map (' ':) ls) $ Map.toList m2
-
-
--- Time, in microseconds, to wait before timing out and reading e.g. an escape
--- as one character instead of as part of a control sequence.
-escDelay :: Int
-escDelay = 100000 -- 0.1 seconds
-
-
-
---------------------------------
 data Effect s = Change s | PrintLines (Layout -> [String]) s
                 | Redraw {shouldClearScreen :: Bool, redrawState :: s}
                 | Fail | Finish
