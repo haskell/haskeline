@@ -12,7 +12,6 @@ import System.Posix (stdOutput)
 import System.Posix.Terminal
 import System.Timeout
 import Control.Monad
-import Data.Bits
 import Control.Concurrent
 import Control.Concurrent.STM
 import Data.Maybe
@@ -48,11 +47,6 @@ data Key = KeyChar Char | KeyMeta Char
             | KeyLeft | KeyRight | KeyUp | KeyDown
             | Backspace | DeleteForward | KillLine
                 deriving (Eq,Ord,Show)
-
--- Easy translation of control characters; e.g., Ctrl-G or Ctrl-g or ^G
-controlKey :: Char -> Key
-controlKey '?' = KeyChar (toEnum 127)
-controlKey c = KeyChar $ toEnum $ fromEnum c .&. complement (bit 5 .|. bit 6)
 
 getKeySequences :: Terminal -> IO (TreeMap Char Key)
 getKeySequences term = do
