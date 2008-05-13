@@ -29,11 +29,24 @@ import Control.Concurrent
 import System.Posix.Signals.Exts
 
 test :: IO ()
-test = runHaskLineT Settings {complete = completeFilename,
-                     historyFile = Just "myhist",
-                     maxHistorySize = Nothing} $ do
+test = runHaskLineT defaultSettings $ do
     s <- getHaskLine ">:"
     liftIO (print s)
+
+test2 :: IO ()
+test2 = runHaskLineT defaultSettings $ do
+    s <- getHaskLine ">:"
+    runHaskLineT defaultSettings $ do
+        t <- getHaskLine ">:"
+        j <- getHaskLine "3:"
+        liftIO $ print (t,j)
+    q <- getHaskLine "4:"
+    liftIO $ print (s,q)
+
+defaultSettings :: MonadIO m => Settings m
+defaultSettings = Settings {complete = completeFilename,
+                        historyFile = Nothing,
+                        maxHistorySize = Nothing}
 
 -- Note: Without buffering the output, there's a cursor flicker sometimes.
 -- We'll keep it buffered, and manually flush the buffer in 
