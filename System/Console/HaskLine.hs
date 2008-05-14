@@ -9,7 +9,6 @@ import System.Console.HaskLine.Command.Paste
 import System.Console.HaskLine.Command.Completion
 --}
 import System.Console.HaskLine.Command.History
-import System.Console.HaskLine.WindowSize
 import System.Console.HaskLine.Draw
 import System.Console.HaskLine.Vi
 import System.Console.HaskLine.Emacs
@@ -103,12 +102,6 @@ getHaskLine prefix = do
             Just line | not (all isSpace line) -> addHistory line
             _ -> return ()
         return result
-
--- todo: make sure >=2
-getLayout = fmap mkLayout getWindowSize
-    where mkLayout ws = Layout {height = fromEnum (winRows ws),
-                                width = fromEnum (winCols ws)}
-
 
 repeatTillFinish :: forall m s . (MonadIO m, LineState s) 
             => Draw m Event -> TermSettings
