@@ -139,7 +139,7 @@ repeatTillFinish getEvent settings = loop
                 Effect t -> 
                 s -> KeyMap m t -> Draw m (Maybe String)
         actOnCommand Finish s _ = moveToNextLine s >> return (Just (toResult s))
-        actOnCommand Fail _ _ = return Nothing
+        actOnCommand Fail s _ = moveToNextLine s >> return Nothing
         actOnCommand (Redraw shouldClear t) _ next = do
             if shouldClear
                 then clearScreenAndRedraw (prefix settings) t
