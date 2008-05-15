@@ -2,7 +2,8 @@ module System.Console.HaskLine.Posix (
                         withGetEvent,
                         Event(..),
                         Key(..),
-                        getLayout
+                        getLayout,
+                        mapLines
                  ) where
 
 import Foreign
