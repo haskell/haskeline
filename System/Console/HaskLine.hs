@@ -105,37 +105,35 @@ repeatTillFinish getEvent prefix = loop
         -- same contexts, we need the -XGADTs flag (or -fglasgow-exts)
         loop :: forall t . LineState t => t -> KeyMap m t -> Draw m (Maybe String)
         loop s processor = do
-                        liftIO (hFlush stdout)
-                        event <- getEvent
-                        case event of
-                            WindowResize newLayout -> 
+                liftIO (hFlush stdout)
+                event <- getEvent
+                case event of
+                    WindowResize newLayout -> 
                                 actOnResize newLayout s processor
-                            KeyInput k -> case lookupKM processor k of
-                                    Nothing -> loop s processor
-                                    Just f -> do
-                                        KeyAction effect next <- lift (f s)
-                                        actOnCommand effect s next
+                    KeyInput k -> case lookupKM processor k of
+                        Nothing -> loop s processor
+                        Just g -> case g s of
+                            Left r -> moveToNextLine s >> return r
+                            Right f -> do
+                                        KeyAction effect next <- lift f
+                                        actOnCommand prefix s effect
+                                        loop (effectState effect) next
                                 
         actOnResize newLayout s next
                 = withReposition newLayout (loop s next)
 
 
-        actOnCommand :: forall r t . (LineState r,LineState t) => 
-                Effect t -> r -> KeyMap m t -> Draw m (Maybe String)
-        actOnCommand Finish s _ = moveToNextLine s >> return (Just (toResult s))
-        actOnCommand Fail s _ = moveToNextLine s >> return Nothing
-        actOnCommand (Redraw shouldClear t) _ next = do
+actOnCommand :: (LineState s,LineState t, MonadIO m) 
+        => String -> s -> Effect t -> Draw m ()
+actOnCommand prefix s (Redraw shouldClear t) = do
             if shouldClear
-                then clearScreenAndRedraw prefix t
+                then clearScreenAndRedraw prefix s
                 else redrawLine prefix t
-            loop t next
-        actOnCommand (Change t) s next = do
+actOnCommand prefix s (Change t) = do
             diffLinesBreaking prefix s t
-            loop t next
-        actOnCommand (PrintLines ls t) s next = do
+actOnCommand prefix s (PrintLines ls t) = do
                             layout <- ask
                             moveToNextLine s
                             output $ mconcat $ map (\l -> text l <#> nl)
                                             $ ls layout
                             drawLine prefix t
-                            loop t next

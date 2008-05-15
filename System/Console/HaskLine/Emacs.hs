@@ -40,10 +40,9 @@ controlActions = choiceCmd
                                      . skipLeft (not . isAlphaNum))
             ]
 
-
 deleteCharOrEOF :: Key -> HaskLineCmd InsertMode InsertMode
-deleteCharOrEOF k = acceptKey k deleteOrFail >|> justDelete
-  where
-    deleteOrFail s = return $ if s == emptyIM then Fail else Change (deleteNext s)
-    justDelete = try (change deleteNext k >|> justDelete)
-
+deleteCharOrEOF k = acceptKeyM k $ \s -> if s == emptyIM
+                        then Nothing
+                        else Just $ return (Change (deleteNext s), justDelete)
+    where
+        justDelete = try (change deleteNext k >|> justDelete)

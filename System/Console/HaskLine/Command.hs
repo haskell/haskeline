@@ -19,6 +19,7 @@ module System.Console.HaskLine.Command(
                         loopWithBreak,
                         try,
                         finish,
+                        failCmd,
                         simpleCommand,
                         change,
                         changeWithoutKey,
@@ -41,15 +42,16 @@ controlKey '?' = KeyChar (toEnum 127)
 controlKey c = KeyChar $ toEnum $ fromEnum c .&. complement (bit 5 .|. bit 6)
 
 
-data Effect s = Change s | PrintLines (Layout -> [String]) s
-                | Redraw {shouldClearScreen :: Bool, redrawState :: s}
-                | Fail | Finish
+data Effect s = Change {effectState :: s} 
+              | PrintLines {printLines :: Layout -> [String], effectState :: s}
+              | Redraw {shouldClearScreen :: Bool, effectState :: s}
 
-newtype KeyMap m s = KeyMap {keyMap :: Map.Map Key (s -> m (KeyAction m))}
+newtype KeyMap m s = KeyMap {keyMap :: Map.Map Key 
+            (s -> Either (Maybe String) (m (KeyAction m)))}
 
 data KeyAction m = forall t . LineState t => KeyAction (Effect t) (KeyMap m t)
 
-lookupKM :: KeyMap m s -> Key -> Maybe (s -> m (KeyAction m))
+lookupKM :: KeyMap m s -> Key -> Maybe (s -> Either (Maybe String) (m (KeyAction m)))
 lookupKM km k = Map.lookup k (keyMap km)
 
 nullKM :: KeyMap m s
@@ -79,20 +81,22 @@ k >+> f = k +> change id >|> f
 
 acceptKey :: (Monad m, LineState t) => 
                 Key -> (s -> m (Effect t)) -> Command m s t
-acceptKey k act = Command $ \next -> KeyMap $ Map.singleton k $ \s -> do 
+acceptKey k act = Command $ \next -> KeyMap $ Map.singleton k $ \s -> Right $ do 
                                                 t <- act s
                                                 return (KeyAction t next)
 
 acceptChar :: (Monad m, LineState t) => (Char -> s -> t) -> Command m s t
 acceptChar f = Command $ \next -> KeyMap $ Map.fromList 
-                $ map (\c -> (KeyChar c,\s -> return (KeyAction (Change (f c s)) next)))
+                $ map (\c -> (KeyChar c,\s -> Right $ return (KeyAction (Change (f c s)) next)))
                     [' '..'~']
 
-acceptKeyM :: (Monad m, LineState s) => Key -> (s -> m (Effect s, Command m s s))
+acceptKeyM :: (Monad m, LineState s) => Key -> (s -> Maybe (m (Effect s, Command m s s)))
                             -> Command m s s
-acceptKeyM k f = Command $ \next -> KeyMap $ Map.singleton k $ \s -> do
-                (effect,Command g) <- f s
-                return (KeyAction effect (g next))
+acceptKeyM k f = Command $ \next -> KeyMap $ Map.singleton k $ \s -> case f s of
+                Nothing -> Left Nothing
+                Just act -> Right $ do
+                    (effect, Command g) <- act
+                    return (KeyAction effect (g next))
                          
 loopUntil :: Command m s s -> Command m s t -> Command m s t
 loopUntil (Command f) (Command g) 
@@ -107,8 +111,11 @@ loopWithBreak cmd end f = Command $ \next ->
 try :: Command m s s -> Command m s s
 try (Command f) = Command $ \next -> (f next) `orKM` next
 
-finish :: forall s m t . (LineState t, Monad m) => Key -> Command m s t
-finish k = acceptKey k $ const (return Finish)
+finish :: forall s m t . (LineState s, Monad m) => Key -> Command m s t
+finish k = Command $ \_-> KeyMap $ Map.singleton k $ Left . Just . toResult
+
+failCmd :: forall s m t . (LineState s, Monad m) => Key -> Command m s t
+failCmd k = Command $ \_-> KeyMap $ Map.singleton k $ const (Left Nothing)
 
 -- NOTE: SAME AS ACCEPTKEY
 simpleCommand :: (LineState t, Monad m) => (s -> m (Effect t)) 

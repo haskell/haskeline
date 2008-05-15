@@ -29,7 +29,7 @@ makeCompletion f (IMode xs ys) = do
 
 -- | Create a 'Command' for word completion.
 completionCmd :: Monad m => Key -> Command (HaskLineCmdT m) InsertMode InsertMode
-completionCmd k = acceptKeyM k $ \s -> do
+completionCmd k = acceptKeyM k $ \s -> Just $ do
     ctype <- asks completionType
     f <- asks complete
     let g = liftCmdT . f
