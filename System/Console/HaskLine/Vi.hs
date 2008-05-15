@@ -56,11 +56,12 @@ simpleCmdActions = choiceCmd [ KeyChar '\n'  +> finish
                     , useMovements id
                     ]
 
+replaceOnce :: Key -> HaskLineCmd CommandMode CommandMode
 replaceOnce k = k >+> try (acceptChar replaceChar)
 
+loopReplace :: Key -> HaskLineCmd CommandMode CommandMode
 loopReplace k = k >+> loop
     where
-        loop :: HaskLineCmd CommandMode CommandMode
         loop = loopWithBreak (acceptChar (\c -> goRight . replaceChar c))
                     (choiceCmd []) id
 
@@ -108,6 +109,7 @@ deleteIOnce = KeyChar 'c'
               >+> choiceCmd [useMovements deleteAndInsert,
                             KeyChar 'c' +> change (const emptyIM)]
 
+deleteAndInsert :: (CommandMode -> CommandMode) -> CommandMode -> InsertMode
 deleteAndInsert f = insertFromCommandMode . deleteFromMove f
 
 deleteAndInsertR :: (CommandMode -> CommandMode) 
