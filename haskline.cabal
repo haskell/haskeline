@@ -42,7 +42,7 @@ Library
                 System.Console.HaskLine.Posix
                 System.Console.HaskLine.Settings
                 System.Console.HaskLine.Vi
-    ghc-options: -Wall
+    ghc-options: -Wall -Werror
 
 Executable test
     Build-depends:  base>=3.0, terminfo>=0.2, unix>=2.2,
