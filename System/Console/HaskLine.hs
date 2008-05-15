@@ -19,12 +19,9 @@ import System.Console.HaskLine.Command.Completion
 
 import System.Console.Terminfo
 import System.IO
-import Control.Exception
 import Data.Maybe (fromMaybe)
 import Data.Char (isSpace)
 import Control.Monad
-import Control.Concurrent.STM
-import Control.Concurrent
 
 
 test :: IO ()
@@ -68,16 +65,15 @@ maybeOutput term cap = runTermOutput term $
 
 
 
-data TermSettings = TermSettings {prefix :: String,
-                          terminal :: Terminal,
+data TermSettings = TermSettings {terminal :: Terminal,
                           actions :: Actions}
 
 
-makeSettings :: String -> IO TermSettings
-makeSettings pre = do
+makeSettings :: IO TermSettings
+makeSettings = do
     t <- setupTermFromEnv
     let Just acts = getCapability t getActions
-    return TermSettings {prefix = pre, terminal = t, actions = acts}
+    return TermSettings {terminal = t, actions = acts}
 
 
 getHaskLine :: MonadIO m => String -> HaskLineT m (Maybe String)
@@ -86,32 +82,28 @@ getHaskLine prefix = do
     emode <- asks (\prefs -> case editMode prefs of
                     Vi -> viActions
                     Emacs -> emacsCommands)
-    settings <- liftIO (makeSettings prefix) 
+    settings <- liftIO makeSettings
     wrapTerminalOps (terminal settings) $ do
         let ls = emptyIM
         layout <- liftIO getLayout
 
-        tv <- liftIO $ atomically $ newTChan
-
         result <- runHaskLineCmdT
                     $ runDraw (actions settings) (terminal settings) layout
                     $ withGetEvent (terminal settings) $ \getEvent -> 
-                        drawLine prefix ls >> repeatTillFinish getEvent settings ls
-                                                emode
+                        drawLine prefix ls 
+                            >> repeatTillFinish getEvent prefix ls emode
         case result of 
             Just line | not (all isSpace line) -> addHistory line
             _ -> return ()
         return result
 
 repeatTillFinish :: forall m s . (MonadIO m, LineState s) 
-            => Draw m Event -> TermSettings
-                -> s -> KeyMap m s -> Draw m (Maybe String)
-repeatTillFinish getEvent settings = loop
+            => Draw m Event -> String -> s -> KeyMap m s -> Draw m (Maybe String)
+repeatTillFinish getEvent prefix = loop
     where 
         -- NOTE: since the functions in this mutually recursive binding group do not have the 
         -- same contexts, we need the -XGADTs flag (or -fglasgow-exts)
-        loop :: forall s . (MonadIO m, LineState s) => 
-                s -> KeyMap m s -> Draw m (Maybe String)
+        loop :: forall t . LineState t => t -> KeyMap m t -> Draw m (Maybe String)
         loop s processor = do
                         liftIO (hFlush stdout)
                         event <- getEvent
@@ -128,23 +120,22 @@ repeatTillFinish getEvent settings = loop
                 = withReposition newLayout (loop s next)
 
 
-        actOnCommand :: forall s t . (MonadIO m, LineState s, LineState t) => 
-                Effect t -> 
-                s -> KeyMap m t -> Draw m (Maybe String)
+        actOnCommand :: forall r t . (LineState r,LineState t) => 
+                Effect t -> r -> KeyMap m t -> Draw m (Maybe String)
         actOnCommand Finish s _ = moveToNextLine s >> return (Just (toResult s))
         actOnCommand Fail s _ = moveToNextLine s >> return Nothing
         actOnCommand (Redraw shouldClear t) _ next = do
             if shouldClear
-                then clearScreenAndRedraw (prefix settings) t
-                else redrawLine (prefix settings) t
+                then clearScreenAndRedraw prefix t
+                else redrawLine prefix t
             loop t next
         actOnCommand (Change t) s next = do
-            diffLinesBreaking (prefix settings) s t
+            diffLinesBreaking prefix s t
             loop t next
         actOnCommand (PrintLines ls t) s next = do
                             layout <- ask
                             moveToNextLine s
                             output $ mconcat $ map (\l -> text l <#> nl)
                                             $ ls layout
-                            drawLine (prefix settings) t
+                            drawLine prefix t
                             loop t next
