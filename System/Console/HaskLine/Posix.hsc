@@ -2,6 +2,7 @@ module System.Console.HaskLine.Posix (
                         withGetEvent,
                         Event(..),
                         Key(..),
+                        Layout(..),
                         getLayout,
                         mapLines
                  ) where
@@ -20,14 +21,15 @@ import Data.Maybe
 import System.Posix.Signals.Exts
 import Data.List
 
-import System.Console.HaskLine.Draw
 import System.Console.HaskLine.Monads
 
 #include <sys/ioctl.h>
 
-
 -------------------
 -- Window size
+data Layout = Layout {width, height :: Int}
+                    deriving Show
+
 foreign import ccall ioctl :: CInt -> CULong -> Ptr a -> IO ()
 
 getLayout :: IO Layout

@@ -32,7 +32,6 @@ module System.Console.HaskLine.Command(
 import qualified Data.Map as Map
 import Data.Bits
 import System.Console.HaskLine.LineState
-import System.Console.HaskLine.Draw
 import System.Console.HaskLine.Posix
 
 

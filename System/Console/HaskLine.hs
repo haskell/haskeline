@@ -109,31 +109,12 @@ repeatTillFinish getEvent prefix = loop
                 event <- getEvent
                 case event of
                     WindowResize newLayout -> 
-                                actOnResize newLayout s processor
+                        withReposition newLayout (loop s processor)
                     KeyInput k -> case lookupKM processor k of
                         Nothing -> loop s processor
                         Just g -> case g s of
                             Left r -> moveToNextLine s >> return r
                             Right f -> do
                                         KeyAction effect next <- lift f
-                                        actOnCommand prefix s effect
+                                        drawEffect prefix s effect
                                         loop (effectState effect) next
-                                
-        actOnResize newLayout s next
-                = withReposition newLayout (loop s next)
-
-
-actOnCommand :: (LineState s,LineState t, MonadIO m) 
-        => String -> s -> Effect t -> Draw m ()
-actOnCommand prefix s (Redraw shouldClear t) = do
-            if shouldClear
-                then clearScreenAndRedraw prefix s
-                else redrawLine prefix t
-actOnCommand prefix s (Change t) = do
-            diffLinesBreaking prefix s t
-actOnCommand prefix s (PrintLines ls t) = do
-                            layout <- ask
-                            moveToNextLine s
-                            output $ mconcat $ map (\l -> text l <#> nl)
-                                            $ ls layout
-                            drawLine prefix t

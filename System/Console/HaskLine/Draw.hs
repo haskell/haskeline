@@ -1,10 +1,19 @@
-module System.Console.HaskLine.Draw where
+module System.Console.HaskLine.Draw(Actions(),
+                            getActions,
+                            Draw(),
+                            runDraw,
+                            drawLine,
+                            withReposition,
+                            moveToNextLine,
+                            drawEffect)
+                             where
 
 import System.Console.Terminfo
 import Control.Monad
 import System.Console.HaskLine.Monads
 
 import System.Console.HaskLine.LineState
+import System.Console.HaskLine.Command
 
 -- | Keep track of all of the output capabilities we can use.
 -- 
@@ -46,17 +55,14 @@ getWrapLine nl' left1 = (autoRightMargin >>= guard >> withAutoMargin)
                         return (termText " " <#> left1)
                      )`mplus` return mempty
     
-left,right,up,down :: Int -> Actions -> TermOutput
+left,right,up :: Int -> Actions -> TermOutput
 left = flip leftA
 right = flip rightA
 up = flip upA
-down = flip downA
 
 
 --------
 
-data Layout = Layout {width, height :: Int}
-                    deriving Show
 
 mreplicate :: Monoid m => Int -> m -> m
 mreplicate n m
@@ -246,3 +252,20 @@ withReposition newLayout f = do
     let newPos = reposition oldLayout newLayout oldPos
     put newPos
     local newLayout f
+
+
+drawEffect :: (LineState s,LineState t, MonadIO m)
+        => String -> s -> Effect t -> Draw m ()
+drawEffect prefix s (Redraw shouldClear t) = do
+            if shouldClear
+                then clearScreenAndRedraw prefix s
+                else redrawLine prefix t
+drawEffect prefix s (Change t) = do
+            diffLinesBreaking prefix s t
+drawEffect prefix s (PrintLines ls t) = do
+                            layout <- ask
+                            moveToNextLine s
+                            output $ mconcat $ map (\l -> text l <#> nl)
+                                            $ ls layout
+                            drawLine prefix t
+
