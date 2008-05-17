@@ -34,7 +34,7 @@ runHaskLineTWithPrefs prefs settings (HaskLineT f)
         $ runHistoryFromFile (historyFile settings) f
         
 
--- | Reads prefs from $HOME/.haskline
+-- | Reads prefs from $HOME/.haskeline
 runHaskLineT :: MonadIO m => Settings m -> HaskLineT m a -> m a
 runHaskLineT settings f = do
     prefs <- liftIO readPrefsOrDefault
@@ -43,7 +43,7 @@ runHaskLineT settings f = do
 readPrefsOrDefault :: IO Prefs
 readPrefsOrDefault = handle (\_ -> return defaultPrefs) $ do
     home <- getHomeDirectory
-    prefs <- readPrefs (home </> ".haskline")
+    prefs <- readPrefs (home </> ".haskeline")
     evaluate prefs -- make sure this function catches any Read parse errors
     return prefs
 
