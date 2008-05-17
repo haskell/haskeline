@@ -7,7 +7,7 @@ import System.Console.HaskLine.Settings
 
 import System.Directory(getHomeDirectory)
 import System.FilePath
-import Control.Exception(handle)
+import Control.Exception(handle,evaluate)
 
 
 newtype HaskLineT m a= HaskLineT (StateT History (ReaderT Prefs 
@@ -43,5 +43,7 @@ runHaskLineT settings f = do
 readPrefsOrDefault :: IO Prefs
 readPrefsOrDefault = handle (\_ -> return defaultPrefs) $ do
     home <- getHomeDirectory
-    readPrefs (home </> ".haskline")
+    prefs <- readPrefs (home </> ".haskline")
+    evaluate prefs -- make sure this function catches any Read parse errors
+    return prefs
 
