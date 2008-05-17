@@ -41,7 +41,7 @@ Library
                 System.Console.Haskeline.Posix
                 System.Console.Haskeline.Settings
                 System.Console.Haskeline.Vi
-    ghc-options: -Wall -Werror
+    ghc-options: -Wall
 
 Executable test
     Build-depends:  base>=3.0, terminfo>=0.2, unix>=2.2,
