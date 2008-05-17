@@ -11,6 +11,7 @@ main = runHaskLineT defaultSettings (loop 0)
             minput <- getHaskLine (show n ++ ":")
             case minput of
                 Nothing -> return ()
+                Just "quit" -> return ()
                 Just s -> do
                             liftIO $ putStrLn ("line " ++ show n ++ ":" ++ s)
                             loop (n+1)
