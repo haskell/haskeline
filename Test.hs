@@ -2,7 +2,6 @@ module Main where
 
 import System.Console.HaskLine
 import System.Console.HaskLine.Monads
-import System.Console.HaskLine.HaskLineT
 
 main :: IO ()
 main = runHaskLineT defaultSettings (loop 0)

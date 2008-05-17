@@ -31,6 +31,8 @@ Library
                 GADTs
     Exposed-Modules:
                 System.Console.HaskLine
+                System.Console.HaskLine.Monads
+    Other-Modules:
                 System.Console.HaskLine.Command
                 System.Console.HaskLine.Command.Completion
                 System.Console.HaskLine.Command.History
@@ -38,7 +40,6 @@ Library
                 System.Console.HaskLine.Emacs
                 System.Console.HaskLine.HaskLineT
                 System.Console.HaskLine.LineState
-                System.Console.HaskLine.Monads
                 System.Console.HaskLine.Posix
                 System.Console.HaskLine.Settings
                 System.Console.HaskLine.Vi
