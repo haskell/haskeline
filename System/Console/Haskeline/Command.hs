@@ -1,4 +1,4 @@
-module System.Console.HaskLine.Command(
+module System.Console.Haskeline.Command(
                         Key(..),
                         controlKey,
                         -- * Commands
@@ -31,8 +31,8 @@ module System.Console.HaskLine.Command(
 
 import qualified Data.Map as Map
 import Data.Bits
-import System.Console.HaskLine.LineState
-import System.Console.HaskLine.Posix
+import System.Console.Haskeline.LineState
+import System.Console.Haskeline.Posix
 
 
 -- Easy translation of control characters; e.g., Ctrl-G or Ctrl-g or ^G

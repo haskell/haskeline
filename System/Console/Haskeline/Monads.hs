@@ -1,4 +1,4 @@
-module System.Console.HaskLine.Monads where
+module System.Console.Haskeline.Monads where
 
 import Control.Monad(liftM)
 import Control.Exception(finally)

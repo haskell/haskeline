@@ -24,22 +24,22 @@ Library
                 MultiParamTypeClasses, OverlappingInstances
                 PatternSignatures
                 -- Note: GADTs are needed to allow contexts of different
-                -- lengths (see code of HaskLine.repeatTillFinish)
+                -- lengths (see code of Haskeline.repeatTillFinish)
                 GADTs
     Exposed-Modules:
-                System.Console.HaskLine
-                System.Console.HaskLine.Monads
+                System.Console.Haskeline
+                System.Console.Haskeline.Monads
     Other-Modules:
-                System.Console.HaskLine.Command
-                System.Console.HaskLine.Command.Completion
-                System.Console.HaskLine.Command.History
-                System.Console.HaskLine.Draw
-                System.Console.HaskLine.Emacs
-                System.Console.HaskLine.HaskLineT
-                System.Console.HaskLine.LineState
-                System.Console.HaskLine.Posix
-                System.Console.HaskLine.Settings
-                System.Console.HaskLine.Vi
+                System.Console.Haskeline.Command
+                System.Console.Haskeline.Command.Completion
+                System.Console.Haskeline.Command.History
+                System.Console.Haskeline.Draw
+                System.Console.Haskeline.Emacs
+                System.Console.Haskeline.HaskLineT
+                System.Console.Haskeline.LineState
+                System.Console.Haskeline.Posix
+                System.Console.Haskeline.Settings
+                System.Console.Haskeline.Vi
     ghc-options: -Wall -Werror
 
 Executable test
@@ -48,24 +48,24 @@ Executable test
                 filepath>=1.1, directory>=1.0
     Main-Is: Test.hs
     Other-Modules:
-                System.Console.HaskLine
-                System.Console.HaskLine.Command
-                System.Console.HaskLine.Command.Completion
-                System.Console.HaskLine.Command.History
-                System.Console.HaskLine.Draw
-                System.Console.HaskLine.Emacs
-                System.Console.HaskLine.HaskLineT
-                System.Console.HaskLine.LineState
-                System.Console.HaskLine.Monads
-                System.Console.HaskLine.Posix
-                System.Console.HaskLine.Settings
-                System.Console.HaskLine.Vi
+                System.Console.Haskeline
+                System.Console.Haskeline.Command
+                System.Console.Haskeline.Command.Completion
+                System.Console.Haskeline.Command.History
+                System.Console.Haskeline.Draw
+                System.Console.Haskeline.Emacs
+                System.Console.Haskeline.HaskLineT
+                System.Console.Haskeline.LineState
+                System.Console.Haskeline.Monads
+                System.Console.Haskeline.Posix
+                System.Console.Haskeline.Settings
+                System.Console.Haskeline.Vi
     Extensions:     ForeignFunctionInterface, Rank2Types, FlexibleInstances,
                 FlexibleContexts, ExistentialQuantification
                 ScopedTypeVariables, GeneralizedNewtypeDeriving
                 MultiParamTypeClasses, OverlappingInstances
                 PatternSignatures
                 -- Note: GADTs are needed to allow contexts of different
-                -- lengths (see code of HaskLine.repeatTillFinish)
+                -- lengths (see code of Haskeline.repeatTillFinish)
                 GADTs
                 

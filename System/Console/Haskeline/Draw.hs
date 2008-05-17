@@ -1,4 +1,4 @@
-module System.Console.HaskLine.Draw(Actions(),
+module System.Console.Haskeline.Draw(Actions(),
                             getActions,
                             Draw(),
                             runDraw,
@@ -10,10 +10,10 @@ module System.Console.HaskLine.Draw(Actions(),
 
 import System.Console.Terminfo
 import Control.Monad
-import System.Console.HaskLine.Monads
+import System.Console.Haskeline.Monads
 
-import System.Console.HaskLine.LineState
-import System.Console.HaskLine.Command
+import System.Console.Haskeline.LineState
+import System.Console.Haskeline.Command
 
 -- | Keep track of all of the output capabilities we can use.
 -- 

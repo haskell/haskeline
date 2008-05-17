@@ -1,8 +1,8 @@
-module System.Console.HaskLine.Command.Paste where
+module System.Console.Haskeline.Command.Paste where
 
-import System.Console.HaskLine.LineState
-import System.Console.HaskLine.Command
-import System.Console.HaskLine.Command.Undo
+import System.Console.Haskeline.LineState
+import System.Console.Haskeline.Command
+import System.Console.Haskeline.Command.Undo
 
 data Paste = Paste {clipboard :: Maybe String}
                 deriving Show

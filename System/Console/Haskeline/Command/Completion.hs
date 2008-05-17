@@ -1,4 +1,4 @@
-module System.Console.HaskLine.Command.Completion(
+module System.Console.Haskeline.Command.Completion(
                             CompletionFunc,
                             Completion,
                             WordBreakFunc,
@@ -12,11 +12,11 @@ module System.Console.HaskLine.Command.Completion(
                             simpleCompletionFunc,
                             ) where
 
-import System.Console.HaskLine.Command
-import System.Console.HaskLine.LineState
-import System.Console.HaskLine.Monads
-import System.Console.HaskLine.HaskLineT
-import System.Console.HaskLine.Settings
+import System.Console.Haskeline.Command
+import System.Console.Haskeline.LineState
+import System.Console.Haskeline.Monads
+import System.Console.Haskeline.HaskLineT
+import System.Console.Haskeline.Settings
 
 import System.Directory
 import System.FilePath

@@ -1,11 +1,11 @@
-module System.Console.HaskLine.Vi where
+module System.Console.Haskeline.Vi where
 
-import System.Console.HaskLine.Command
-import System.Console.HaskLine.Command.Completion
-import System.Console.HaskLine.Command.History
-import System.Console.HaskLine.LineState
-import System.Console.HaskLine.HaskLineT
-import System.Console.HaskLine.Monads
+import System.Console.Haskeline.Command
+import System.Console.Haskeline.Command.Completion
+import System.Console.Haskeline.Command.History
+import System.Console.Haskeline.LineState
+import System.Console.Haskeline.HaskLineT
+import System.Console.Haskeline.Monads
 
 
 type HaskLineCmd s t = forall m . MonadIO m => Command (HaskLineCmdT m) s t

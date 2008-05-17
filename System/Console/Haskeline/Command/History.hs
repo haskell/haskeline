@@ -1,9 +1,9 @@
-module System.Console.HaskLine.Command.History where
+module System.Console.Haskeline.Command.History where
 
-import System.Console.HaskLine.LineState
-import System.Console.HaskLine.Command
+import System.Console.Haskeline.LineState
+import System.Console.Haskeline.Command
 import Control.Monad(liftM)
-import System.Console.HaskLine.Monads
+import System.Console.Haskeline.Monads
 import Data.List
 import Control.Exception(evaluate)
 

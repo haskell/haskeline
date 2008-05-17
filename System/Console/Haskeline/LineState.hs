@@ -1,4 +1,4 @@
-module System.Console.HaskLine.LineState where
+module System.Console.Haskeline.LineState where
 
 
 class LineState s where

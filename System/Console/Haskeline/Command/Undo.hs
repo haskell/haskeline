@@ -1,7 +1,7 @@
-module System.Console.HaskLine.Command.Undo where
+module System.Console.Haskeline.Command.Undo where
 
-import System.Console.HaskLine.Command
-import System.Console.HaskLine.LineState
+import System.Console.Haskeline.Command
+import System.Console.Haskeline.LineState
 
 data Undo = Undo {pastUndo, futureUndo :: [LineState]}
                     deriving Show

@@ -1,4 +1,4 @@
-module System.Console.HaskLine.Posix (
+module System.Console.Haskeline.Posix (
                         withGetEvent,
                         Event(..),
                         Key(..),
@@ -21,7 +21,7 @@ import Data.Maybe
 import System.Posix.Signals.Exts
 import Data.List
 
-import System.Console.HaskLine.Monads
+import System.Console.Haskeline.Monads
 
 #include <sys/ioctl.h>
 

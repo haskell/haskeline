@@ -1,4 +1,4 @@
-module System.Console.HaskLine.Settings where
+module System.Console.Haskeline.Settings where
 
 {--
 -- | Break off a reversed word from a reversed string.  The input and output 'String's are reversed.

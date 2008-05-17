@@ -1,4 +1,4 @@
-module System.Console.HaskLine(HaskLineT,
+module System.Console.Haskeline(HaskLineT,
                     runHaskLineT,
                     runHaskLineTWithPrefs,
                     getHaskLine,
@@ -14,22 +14,22 @@ module System.Console.HaskLine(HaskLineT,
                     CompletionType(..))
                      where
 
-import System.Console.HaskLine.LineState
-import System.Console.HaskLine.Command
-import System.Console.HaskLine.Posix
+import System.Console.Haskeline.LineState
+import System.Console.Haskeline.Command
+import System.Console.Haskeline.Posix
 {--
-import System.Console.HaskLine.Command.Undo
-import System.Console.HaskLine.Command.Paste
-import System.Console.HaskLine.Command.Completion
+import System.Console.Haskeline.Command.Undo
+import System.Console.Haskeline.Command.Paste
+import System.Console.Haskeline.Command.Completion
 --}
-import System.Console.HaskLine.Command.History
-import System.Console.HaskLine.Draw
-import System.Console.HaskLine.Vi
-import System.Console.HaskLine.Emacs
-import System.Console.HaskLine.Settings
-import System.Console.HaskLine.Monads
-import System.Console.HaskLine.HaskLineT
-import System.Console.HaskLine.Command.Completion
+import System.Console.Haskeline.Command.History
+import System.Console.Haskeline.Draw
+import System.Console.Haskeline.Vi
+import System.Console.Haskeline.Emacs
+import System.Console.Haskeline.Settings
+import System.Console.Haskeline.Monads
+import System.Console.Haskeline.HaskLineT
+import System.Console.Haskeline.Command.Completion
 
 import System.Console.Terminfo
 import System.IO

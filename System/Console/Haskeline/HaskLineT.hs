@@ -1,9 +1,9 @@
-module System.Console.HaskLine.HaskLineT where
+module System.Console.Haskeline.HaskLineT where
 
 
-import System.Console.HaskLine.Command.History
-import System.Console.HaskLine.Monads
-import System.Console.HaskLine.Settings
+import System.Console.Haskeline.Command.History
+import System.Console.Haskeline.Monads
+import System.Console.Haskeline.Settings
 
 import System.Directory(getHomeDirectory)
 import System.FilePath
