@@ -1,4 +1,4 @@
-Name:           haskline
+Name:           haskeline
 Cabal-Version:  >=1.2
 Version:        0.0
 Category:       User Interfaces
@@ -12,7 +12,7 @@ Synopsis:       An extensible library for reading a line of input from the user.
 Description:    This library provides an extensible, flexible interface for reading
                 a line of input from the user.  Its goal is to be useful enough to 
                 replace readline in the GHC compiler.
-Homepage:       http://code.haskell.org/haskline
+Homepage:       http://code.haskell.org/haskeline
 Stability:      Experimental
 Build-depends:  base>=3.0, terminfo>=0.2, unix>=2.2,
                 stm>=2.1.1, mtl>=1.1, containers>=0.1,
