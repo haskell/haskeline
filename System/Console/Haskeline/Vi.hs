@@ -4,16 +4,16 @@ import System.Console.Haskeline.Command
 import System.Console.Haskeline.Command.Completion
 import System.Console.Haskeline.Command.History
 import System.Console.Haskeline.LineState
-import System.Console.Haskeline.HaskLineT
+import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Monads
 
 
-type HaskLineCmd s t = forall m . MonadIO m => Command (HaskLineCmdT m) s t
+type InputCmd s t = forall m . MonadIO m => Command (InputCmdT m) s t
 
-viActions :: MonadIO m => KeyMap (HaskLineCmdT m) InsertMode
+viActions :: MonadIO m => KeyMap (InputCmdT m) InsertMode
 viActions = runCommand $ choiceCmd [startCommand, simpleInsertions]
                             
-simpleInsertions :: MonadIO m => Command (HaskLineCmdT m) InsertMode InsertMode
+simpleInsertions :: MonadIO m => Command (InputCmdT m) InsertMode InsertMode
 simpleInsertions = choiceCmd
                 [ KeyChar '\n' +> finish
                    , KeyLeft +> change goLeft 
@@ -26,14 +26,14 @@ simpleInsertions = choiceCmd
                    , KeyDown +> historyForward
                    ]
 
-startCommand :: HaskLineCmd InsertMode InsertMode
+startCommand :: InputCmd InsertMode InsertMode
 startCommand = KeyChar '\ESC' +> change enterCommandMode
                     >|> viCommandActions
 
-viCommandActions :: HaskLineCmd CommandMode InsertMode
+viCommandActions :: InputCmd CommandMode InsertMode
 viCommandActions = simpleCmdActions `loopUntil` exitingCommands
 
-exitingCommands :: HaskLineCmd CommandMode InsertMode
+exitingCommands :: InputCmd CommandMode InsertMode
 exitingCommands =  choiceCmd [ KeyChar 'i' +> change insertFromCommandMode
                     , KeyChar 'I' +> change (moveToStart . insertFromCommandMode)
                     , KeyChar 'a' +> change appendFromCommandMode
@@ -43,7 +43,7 @@ exitingCommands =  choiceCmd [ KeyChar 'i' +> change insertFromCommandMode
                     , deleteIOnce
                     ]
 
-simpleCmdActions :: HaskLineCmd CommandMode CommandMode
+simpleCmdActions :: InputCmd CommandMode CommandMode
 simpleCmdActions = choiceCmd [ KeyChar '\n'  +> finish
                     , KeyChar '\ESC' +> change id -- helps break out of loops
                     , KeyChar 'r'   +> replaceOnce 
@@ -56,17 +56,17 @@ simpleCmdActions = choiceCmd [ KeyChar '\n'  +> finish
                     , useMovements id
                     ]
 
-replaceOnce :: Key -> HaskLineCmd CommandMode CommandMode
+replaceOnce :: Key -> InputCmd CommandMode CommandMode
 replaceOnce k = k >+> try (acceptChar replaceChar)
 
-loopReplace :: Key -> HaskLineCmd CommandMode CommandMode
+loopReplace :: Key -> InputCmd CommandMode CommandMode
 loopReplace k = k >+> loop
     where
         loop = loopWithBreak (acceptChar (\c -> goRight . replaceChar c))
                     (choiceCmd []) id
 
 
-repeated :: HaskLineCmd CommandMode CommandMode
+repeated :: InputCmd CommandMode CommandMode
 repeated = let
     start = foreachDigit startArg ['1'..'9']
     addDigit = foreachDigit addNum ['0'..'9']
@@ -95,16 +95,16 @@ movements = [ (KeyChar 'h', goLeft)
             ]
 
 useMovements :: LineState t => ((CommandMode -> CommandMode) -> s -> t) 
-                -> HaskLineCmd s t
+                -> InputCmd s t
 useMovements f = choiceCmd $ map (\(k,g) -> k +> change (f g))
                                 movements
 
-deleteOnce :: HaskLineCmd CommandMode CommandMode
+deleteOnce :: InputCmd CommandMode CommandMode
 deleteOnce = KeyChar 'd'
             >+> choiceCmd [useMovements deleteFromMove,
                          KeyChar 'd' +> change (const CEmpty)]
 
-deleteIOnce :: HaskLineCmd CommandMode InsertMode
+deleteIOnce :: InputCmd CommandMode InsertMode
 deleteIOnce = KeyChar 'c'
               >+> choiceCmd [useMovements deleteAndInsert,
                             KeyChar 'c' +> change (const emptyIM)]

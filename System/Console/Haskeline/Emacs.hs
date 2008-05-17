@@ -4,17 +4,17 @@ import System.Console.Haskeline.Command
 import System.Console.Haskeline.Command.Completion
 import System.Console.Haskeline.Command.History
 import System.Console.Haskeline.LineState
-import System.Console.Haskeline.HaskLineT
+import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Monads
 
 import Data.Char
 
-type HaskLineCmd s t = forall m . MonadIO m => Command (HaskLineCmdT m) s t
+type InputCmd s t = forall m . MonadIO m => Command (InputCmdT m) s t
 
-emacsCommands :: MonadIO m => KeyMap (HaskLineCmdT m) InsertMode
+emacsCommands :: MonadIO m => KeyMap (InputCmdT m) InsertMode
 emacsCommands = runCommand $ choiceCmd [simpleActions, controlActions]
 
-simpleActions, controlActions :: HaskLineCmd InsertMode InsertMode
+simpleActions, controlActions :: InputCmd InsertMode InsertMode
 simpleActions = choiceCmd 
             [ KeyChar '\n' +> finish
             , KeyLeft +> change goLeft
@@ -40,7 +40,7 @@ controlActions = choiceCmd
                                      . skipLeft (not . isAlphaNum))
             ]
 
-deleteCharOrEOF :: Key -> HaskLineCmd InsertMode InsertMode
+deleteCharOrEOF :: Key -> InputCmd InsertMode InsertMode
 deleteCharOrEOF k = acceptKeyM k $ \s -> if s == emptyIM
                         then Nothing
                         else Just $ return (Change (deleteNext s), justDelete)

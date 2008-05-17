@@ -1,7 +1,7 @@
-module System.Console.Haskeline(HaskLineT,
-                    runHaskLineT,
-                    runHaskLineTWithPrefs,
-                    getHaskLine,
+module System.Console.Haskeline(InputT,
+                    runInputT,
+                    runInputTWithPrefs,
+                    getInputLine,
                     Settings(..),
                     defaultSettings,
                     CompletionFunc,
@@ -28,7 +28,7 @@ import System.Console.Haskeline.Vi
 import System.Console.Haskeline.Emacs
 import System.Console.Haskeline.Settings
 import System.Console.Haskeline.Monads
-import System.Console.Haskeline.HaskLineT
+import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Command.Completion
 
 import System.Console.Terminfo
@@ -75,8 +75,8 @@ makeSettings = do
     return TermSettings {terminal = t, actions = acts}
 
 
-getHaskLine :: MonadIO m => String -> HaskLineT m (Maybe String)
-getHaskLine prefix = do
+getInputLine :: MonadIO m => String -> InputT m (Maybe String)
+getInputLine prefix = do
 -- TODO: Cache the terminal, actions
     emode <- asks (\prefs -> case editMode prefs of
                     Vi -> viActions
@@ -86,7 +86,7 @@ getHaskLine prefix = do
         let ls = emptyIM
         layout <- liftIO getLayout
 
-        result <- runHaskLineCmdT
+        result <- runInputCmdT
                     $ runDraw (actions settings) (terminal settings) layout
                     $ withGetEvent (terminal settings) $ \getEvent -> 
                         drawLine prefix ls 

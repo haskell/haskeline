@@ -35,7 +35,7 @@ Library
                 System.Console.Haskeline.Command.History
                 System.Console.Haskeline.Draw
                 System.Console.Haskeline.Emacs
-                System.Console.Haskeline.HaskLineT
+                System.Console.Haskeline.InputT
                 System.Console.Haskeline.LineState
                 System.Console.Haskeline.Posix
                 System.Console.Haskeline.Settings
@@ -54,7 +54,7 @@ Executable test
                 System.Console.Haskeline.Command.History
                 System.Console.Haskeline.Draw
                 System.Console.Haskeline.Emacs
-                System.Console.Haskeline.HaskLineT
+                System.Console.Haskeline.InputT
                 System.Console.Haskeline.LineState
                 System.Console.Haskeline.Monads
                 System.Console.Haskeline.Posix

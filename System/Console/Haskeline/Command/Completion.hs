@@ -15,7 +15,7 @@ module System.Console.Haskeline.Command.Completion(
 import System.Console.Haskeline.Command
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Monads
-import System.Console.Haskeline.HaskLineT
+import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Settings
 
 import System.Directory
@@ -28,7 +28,7 @@ makeCompletion f (IMode xs ys) = do
     return (IMode rest ys,completions)
 
 -- | Create a 'Command' for word completion.
-completionCmd :: Monad m => Key -> Command (HaskLineCmdT m) InsertMode InsertMode
+completionCmd :: Monad m => Key -> Command (InputCmdT m) InsertMode InsertMode
 completionCmd k = acceptKeyM k $ \s -> Just $ do
     ctype <- asks completionType
     f <- asks complete

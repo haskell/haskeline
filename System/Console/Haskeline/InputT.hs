@@ -1,4 +1,4 @@
-module System.Console.Haskeline.HaskLineT where
+module System.Console.Haskeline.InputT where
 
 
 import System.Console.Haskeline.Command.History
@@ -10,35 +10,35 @@ import System.FilePath
 import Control.Exception(handle,evaluate)
 
 
-newtype HaskLineT m a= HaskLineT (StateT History (ReaderT Prefs 
+newtype InputT m a = InputT (StateT History (ReaderT Prefs 
                                 (ReaderT (Settings m) m)) a) 
                             deriving (Monad,MonadIO, MonadState History,
                                         MonadReader Prefs)
 
-instance MonadTrans HaskLineT where
-    lift = HaskLineT . lift . lift . lift
-    lift2 f (HaskLineT m) = HaskLineT $ lift2 (lift2 (lift2 f)) m
+instance MonadTrans InputT where
+    lift = InputT . lift . lift . lift
+    lift2 f (InputT m) = InputT $ lift2 (lift2 (lift2 f)) m
 
+-- for internal use only
+type InputCmdT m = StateT HistLog (ReaderT Prefs (ReaderT (Settings m) m))
 
-type HaskLineCmdT m = StateT HistLog (ReaderT Prefs (ReaderT (Settings m) m))
+runInputCmdT :: Monad m => InputCmdT m a -> InputT m a
+runInputCmdT = InputT . runHistLog
 
-runHaskLineCmdT :: Monad m => HaskLineCmdT m a -> HaskLineT m a
-runHaskLineCmdT = HaskLineT . runHistLog
-
-liftCmdT :: Monad m => m a -> HaskLineCmdT m a
+liftCmdT :: Monad m => m a -> InputCmdT m a
 liftCmdT = lift  . lift . lift
 
-runHaskLineTWithPrefs :: MonadIO m => Prefs -> Settings m -> HaskLineT m a -> m a
-runHaskLineTWithPrefs prefs settings (HaskLineT f) 
+runInputTWithPrefs :: MonadIO m => Prefs -> Settings m -> InputT m a -> m a
+runInputTWithPrefs prefs settings (InputT f) 
     = evalReaderT settings $ evalReaderT prefs 
         $ runHistoryFromFile (historyFile settings) f
         
 
 -- | Reads prefs from $HOME/.haskeline
-runHaskLineT :: MonadIO m => Settings m -> HaskLineT m a -> m a
-runHaskLineT settings f = do
+runInputT :: MonadIO m => Settings m -> InputT m a -> m a
+runInputT settings f = do
     prefs <- liftIO readPrefsOrDefault
-    runHaskLineTWithPrefs prefs settings f
+    runInputTWithPrefs prefs settings f
 
 readPrefsOrDefault :: IO Prefs
 readPrefsOrDefault = handle (\_ -> return defaultPrefs) $ do
