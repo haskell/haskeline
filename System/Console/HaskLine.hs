@@ -1,4 +1,18 @@
-module System.Console.HaskLine where
+module System.Console.HaskLine(HaskLineT,
+                    runHaskLineT,
+                    runHaskLineTWithPrefs,
+                    getHaskLine,
+                    Settings(..),
+                    defaultSettings,
+                    CompletionFunc,
+                    Completion(..),
+                    Prefs(..),
+                    BellStyle(..),
+                    EditMode(..),
+                    defaultPrefs,
+                    readPrefs,
+                    CompletionType(..))
+                     where
 
 import System.Console.HaskLine.LineState
 import System.Console.HaskLine.Command
