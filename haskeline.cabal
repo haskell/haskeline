@@ -14,9 +14,6 @@ Description:    This library provides an extensible, flexible interface for read
                 replace readline in the GHC compiler.
 Homepage:       http://code.haskell.org/haskeline
 Stability:      Experimental
-Build-depends:  base>=3.0, terminfo>=0.2, unix>=2.2,
-                stm>=2.1.1, mtl>=1.1, containers>=0.1,
-                filepath>=1.1, directory>=1.0
 Library
     Build-depends:  base>=3.0, terminfo>=0.2, unix>=2.2,
                 stm>=2.1.1, mtl>=1.1, containers>=0.1,
