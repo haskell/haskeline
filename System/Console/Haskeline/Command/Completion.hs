@@ -1,15 +1,13 @@
 module System.Console.Haskeline.Command.Completion(
                             CompletionFunc,
                             Completion,
-                            WordBreakFunc,
                             CompletionType(..),
-                            simpleWordBreak,
                             completionCmd,
-                            -- * Filename completion
-                            completeFilename,
-                            quotedFilenames,
                             -- * Helper functions
-                            simpleCompletionFunc,
+                            completeWord,
+                            simpleCompletion,
+                            completeFilename,
+                            filenameWordBreakChars,
                             ) where
 
 import System.Console.Haskeline.Command
@@ -37,14 +35,14 @@ completionCmd k = acceptKeyM k $ \s -> Just $ do
     case ctype of
         MenuCompletion -> return $ menuCompletion k s
                         $ map (\c -> insertString (replacement c) rest) completions
-        _ -> simpleCompletion s rest completions
+        _ -> pagingCompletion s rest completions
 
-simpleCompletion :: Monad m => InsertMode -> InsertMode -> [Completion] 
+pagingCompletion :: Monad m => InsertMode -> InsertMode -> [Completion] 
                 -> InputCmdT m (Effect InsertMode, Command (InputCmdT m) InsertMode InsertMode)
-simpleCompletion oldIM _ [] = return $ (Change oldIM,continue)
-simpleCompletion _ im [newWord] 
+pagingCompletion oldIM _ [] = return $ (Change oldIM,continue)
+pagingCompletion _ im [newWord] 
         = return (Change $ insertString (replacement newWord) im, continue)
-simpleCompletion oldIM im completions
+pagingCompletion oldIM im completions
     | oldIM /= withPartial = return (Change withPartial, continue)
     | otherwise = do
         layout <- ask
@@ -110,55 +108,39 @@ menuCompletion k oldState (c:cs) = (Change c, loop cs)
         loop [] = choiceCmd [change (const oldState) k,continue]
         loop (d:ds) = choiceCmd [change (const d) k >|> loop ds,continue]
 
---
-----------------
--- Word breaking
+--------------
+-- Word break functions
 
--- | Break off a reversed word from a reversed string.  The input and output 'String's are reversed.
--- 
--- For example, @return . break (==' ')@ is a 'WordBreakFunc':
---
--- >  break (==' ') (reverse "This is a sentence") == ("ecnetnes"," a si sihT")
--- 
-type WordBreakFunc = String -> (String, String)
-
-
-
--- | Break a word at a given set of spaces.  Does not break at a space if it is immediately preceded by
--- the escape character.
--- 
--- > simpleWordBreak Nothing " " (reverse "This is a sentence)          == ("ecnetnes"," a si sihT")
--- > simpleWordBreak (Just '\\') " " (reverse "This is a\\ sentence")   == ("ecnetnes \\a"," si sihT")
--- 
-simpleWordBreak :: Maybe Char -- ^ An optional escape character
-                    -> String -- ^ List of characters which count as whitespace
-                    -> WordBreakFunc
-simpleWordBreak Nothing ws = break (`elem` ws)
-simpleWordBreak (Just e) ws = escapedBreak
-    where
-        escapedBreak (c:d:cs) | d == e
-            = let (xs,ys) = escapedBreak cs in (c:d:xs,ys)
-        escapedBreak (c:cs) | not (elem c ws)
-            = let (xs,ys) = escapedBreak cs in (c:xs,ys)
-        escapedBreak cs = ("",cs)
+-- | The following function creates a custom 'CompletionFunc' for use in the 'Settings.'
+completeWord :: Monad m => Maybe Char 
+        -- ^ An optional escape character
+        -> String -- ^ List of characters which count as whitespace
+        -> (String -> m [Completion]) -- ^ Function to produce a list of possible completions
+        -> CompletionFunc m
+completeWord esc ws f line = do
+    let (word,rest) = case esc of
+                        Nothing -> break (`elem` ws) line
+                        Just e -> escapedBreak e line
+    completions <- f (reverse word)
+    return (rest,completions)
+  where
+    escapedBreak e (c:d:cs) | d == e
+            = let (xs,ys) = escapedBreak e cs in (c:d:xs,ys)
+    escapedBreak e (c:cs) | not (elem c ws)
+            = let (xs,ys) = escapedBreak e cs in (c:xs,ys)
+    escapedBreak _ cs = ("",cs)
     
--- Note: quote marks aren't included here; instead they're stripped by
--- quoteCompletion.
--- | A word break function for filenames.
-filenameWordBreak :: WordBreakFunc
-filenameWordBreak = simpleWordBreak (Just '\\') " \t\n\\`@$><=;|&{("
+-- | Adds a space after the word when inserting it after expansion.
+simpleCompletion :: String -> Completion
+simpleCompletion = setReplacement (++ " ") . completion
 
--------
--- Expansion
-
--- Auxiliary functions
+filenameWordBreakChars :: String
+filenameWordBreakChars = " \t\n\\`@$><=;|&{("
 
 -- A completion command for file and folder names.
 completeFilename :: MonadIO m => CompletionFunc m
-completeFilename line = do
-                    let (word,rest) = filenameWordBreak line
-                    completions <- liftIO $ quotedFilenames (`elem` "\"\'") (reverse word)
-                    return (rest,completions)
+completeFilename  = completeWord (Just '\\') filenameWordBreakChars $ 
+                        (liftIO . quotedFilenames (`elem` "\"\'"))
 
 completion :: String -> Completion
 completion str = Completion str str
@@ -167,13 +149,6 @@ setReplacement, setDisplay :: (String -> String) -> Completion -> Completion
 setReplacement f c = c {replacement = f $ replacement c}
 setDisplay f c = c {display = f $ display c}
 
-
--- | Puts a space after word when completed.
-simpleCompletionFunc :: MonadIO m => (String -> IO [String]) 
-        -> String -> m [Completion]
-simpleCompletionFunc f = liftIO 
-                            . fmap (map (setReplacement (++ " ") . completion)) 
-                            . f
 
 --------
 -- Helper funcs for file completion
@@ -190,8 +165,13 @@ appendIfNotDir :: String -> FilePath -> FilePath
 appendIfNotDir str file | null (takeFileName file) = file
                         | otherwise = file ++ str
 
--- get a list of files in the current directory which are prefixed by this
--- partial path.
+addSlashToDir :: Completion -> IO Completion
+addSlashToDir c@Completion{replacement=file} = do
+    dirExists <- doesDirectoryExist file
+    return $ if dirExists 
+                then c {replacement = addTrailingPathSeparator file}
+                else c
+
 findFiles :: FilePath -> IO [Completion]
 findFiles path = do
     dirExists <- doesDirectoryExist dirPath
@@ -207,10 +187,4 @@ findFiles path = do
     filterPrefix = filter (\f -> not (f `elem` [".",".."])
                                         && file `isPrefixOf` f)
 
-addSlashToDir :: Completion -> IO Completion
-addSlashToDir c@Completion{replacement=file} = do
-    dirExists <- doesDirectoryExist file
-    return $ if dirExists 
-                then c {replacement = addTrailingPathSeparator file}
-                else c
 

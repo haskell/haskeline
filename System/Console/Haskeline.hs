@@ -4,14 +4,19 @@ module System.Console.Haskeline(InputT,
                     getInputLine,
                     Settings(..),
                     defaultSettings,
-                    CompletionFunc,
-                    Completion(..),
                     Prefs(..),
                     BellStyle(..),
                     EditMode(..),
                     defaultPrefs,
                     readPrefs,
-                    CompletionType(..))
+                    CompletionType(..),
+                    -- * Tab completion functions
+                    CompletionFunc,
+                    Completion(..),
+                    completeWord,
+                    simpleCompletion,
+                    completeFilename,
+                    filenameWordBreakChars)
                      where
 
 import System.Console.Haskeline.LineState

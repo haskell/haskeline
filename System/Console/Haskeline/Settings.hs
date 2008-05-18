@@ -1,18 +1,7 @@
 module System.Console.Haskeline.Settings where
 
-{--
--- | Break off a reversed word from a reversed string.  The input and output 'String's are reversed.
--- 
--- For example, @return . break (==' ')@ is a 'WordBreakFunc':
---
--- >  break (==' ') (reverse "This is a sentence") == ("ecnetnes"," a si sihT")
--- 
-type WordBreakFunc m = String -> m (String, String)
-
-type CompletionFunc m = String -> m [Completion]
---}
-
--- | Perform completions from a reversed string.  The output 'String' is also reversed.
+-- | Performs completions from a reversed 'String'.  The output 'String' is also reversed.
+-- In general, this can be built using 'completeWord'.
 type CompletionFunc m = String -> m (String, [Completion])
 
 
