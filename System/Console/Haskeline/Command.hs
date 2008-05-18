@@ -42,7 +42,8 @@ controlKey c = KeyChar $ toEnum $ fromEnum c .&. complement (bit 5 .|. bit 6)
 
 
 data Effect s = Change {effectState :: s} 
-              | PrintLines {printLines :: Layout -> [String], effectState :: s}
+              | PrintLines {linesToPrint :: [String], effectState :: s,
+                            redrawState :: Bool}
               | Redraw {shouldClearScreen :: Bool, effectState :: s}
 
 newtype KeyMap m s = KeyMap {keyMap :: Map.Map Key 

@@ -86,8 +86,8 @@ getInputLine prefix = do
         let ls = emptyIM
         layout <- liftIO getLayout
 
-        result <- runInputCmdT
-                    $ runDraw (actions settings) (terminal settings) layout
+        result <- runInputCmdT layout
+                    $ runDraw (actions settings) (terminal settings)
                     $ withGetEvent (terminal settings) $ \getEvent -> 
                         drawLine prefix ls 
                             >> repeatTillFinish getEvent prefix ls emode
@@ -97,12 +97,12 @@ getInputLine prefix = do
         return result
 
 repeatTillFinish :: forall m s . (MonadIO m, LineState s) 
-            => Draw m Event -> String -> s -> KeyMap m s -> Draw m (Maybe String)
+            => Draw (InputCmdT m) Event -> String -> s -> KeyMap (InputCmdT m) s -> Draw (InputCmdT m) (Maybe String)
 repeatTillFinish getEvent prefix = loop
     where 
         -- NOTE: since the functions in this mutually recursive binding group do not have the 
         -- same contexts, we need the -XGADTs flag (or -fglasgow-exts)
-        loop :: forall t . LineState t => t -> KeyMap m t -> Draw m (Maybe String)
+        loop :: forall t . LineState t => t -> KeyMap (InputCmdT m) t -> Draw (InputCmdT m) (Maybe String)
         loop s processor = do
                 liftIO (hFlush stdout)
                 event <- getEvent

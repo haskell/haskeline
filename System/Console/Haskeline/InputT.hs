@@ -4,6 +4,7 @@ module System.Console.Haskeline.InputT where
 import System.Console.Haskeline.Command.History
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.Settings
+import System.Console.Haskeline.Posix(Layout)
 
 import System.Directory(getHomeDirectory)
 import System.FilePath
@@ -20,13 +21,13 @@ instance MonadTrans InputT where
     lift2 f (InputT m) = InputT $ lift2 (lift2 (lift2 f)) m
 
 -- for internal use only
-type InputCmdT m = StateT HistLog (ReaderT Prefs (ReaderT (Settings m) m))
+type InputCmdT m = ReaderT Layout (StateT HistLog (ReaderT Prefs (ReaderT (Settings m) m)))
 
-runInputCmdT :: Monad m => InputCmdT m a -> InputT m a
-runInputCmdT = InputT . runHistLog
+runInputCmdT :: Monad m => Layout -> InputCmdT m a -> InputT m a
+runInputCmdT layout = InputT . runHistLog . evalReaderT layout
 
 liftCmdT :: Monad m => m a -> InputCmdT m a
-liftCmdT = lift  . lift . lift
+liftCmdT = lift  . lift . lift . lift
 
 runInputTWithPrefs :: MonadIO m => Prefs -> Settings m -> InputT m a -> m a
 runInputTWithPrefs prefs settings (InputT f) 

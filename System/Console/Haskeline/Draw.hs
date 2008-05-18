@@ -10,10 +10,12 @@ module System.Console.Haskeline.Draw(Actions(),
 
 import System.Console.Terminfo
 import Control.Monad
-import System.Console.Haskeline.Monads
+import Data.List(intersperse)
 
+import System.Console.Haskeline.Monads
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Command
+import System.Console.Haskeline.InputT
 
 -- | Keep track of all of the output capabilities we can use.
 -- 
@@ -80,18 +82,18 @@ initTermPos = TermPos {termRow = 0, termCol = 0}
 
 --------------
 
-newtype Draw m a = Draw (ReaderT Actions (ReaderT Terminal (ReaderT Layout (StateT TermPos m))) a)
+newtype Draw m a = Draw (ReaderT Actions (ReaderT Terminal (StateT TermPos m)) a)
     deriving (Monad,MonadIO,MonadReader Actions,MonadReader Terminal,
-        MonadReader Layout,MonadState TermPos)
+        MonadState TermPos)
 
 instance MonadTrans Draw where
-    lift = Draw . lift . lift . lift . lift
-    lift2 f (Draw m) = Draw $ lift2 (lift2 (lift2 (lift2 f))) m
+    lift = Draw . lift . lift . lift
+    lift2 f (Draw m) = Draw $ lift2 (lift2 (lift2 f)) m
     
 
-runDraw :: Monad m => Actions -> Terminal -> Layout -> Draw m a -> m a
-runDraw actions term layout (Draw f) = 
-    evalStateT initTermPos $ evalReaderT layout $ evalReaderT term
+runDraw :: Monad m => Actions -> Terminal -> Draw m a -> m a
+runDraw actions term (Draw f) = 
+    evalStateT initTermPos $ evalReaderT term
         $ evalReaderT actions f
 
 
@@ -104,7 +106,7 @@ output f = do
 
 
 
-changeRight :: MonadIO m => Int -> Draw m ()
+changeRight, changeLeft :: (MonadIO m) => Int -> Draw (InputCmdT m) ()
 changeRight n = do
     w <- asks width
     TermPos {termRow=r,termCol=c} <- get
@@ -119,7 +121,6 @@ changeRight n = do
               put TermPos {termRow=r+linesDown, termCol=newCol}
               output $ mreplicate linesDown nl <#> right newCol
                       
-changeLeft :: MonadIO m => Int -> Draw m ()
 changeLeft n = do
     w <- asks width
     TermPos {termRow=r,termCol=c} <- get
@@ -136,13 +137,13 @@ changeLeft n = do
                 output $ cr <#> up linesUp <#> right newCol
                 
 -- TODO: I think if we wrap this all up in one call to output, it'll be faster...
-printText :: MonadIO m => String -> Draw m ()
+printText :: (MonadIO m) => String -> Draw (InputCmdT m) ()
 printText "" = return ()
 printText xs = fillLine xs >>= printText
 
 -- Draws as much of the string as possible in the line, and returns the rest.
 -- If we fill up the line completely, wrap to the next row.
-fillLine :: MonadIO m => String -> Draw m String
+fillLine :: (MonadIO m) => String -> Draw (InputCmdT m) String
 fillLine str = do
     w <- asks width
     TermPos {termRow=r,termCol=c} <- get
@@ -159,7 +160,7 @@ fillLine str = do
                 return rest
 
 diffLinesBreaking :: (LineState s, LineState t, MonadIO m) 
-                        => String -> s -> t -> Draw m ()
+                        => String -> s -> t -> Draw (InputCmdT m) ()
 diffLinesBreaking prefix s1 s2 = let 
     xs1 = beforeCursor prefix s1
     ys1 = afterCursor s1
@@ -192,7 +193,7 @@ lsLinesLeft layout pos s = linesLeft layout pos (lengthToEnd s)
 lengthToEnd :: LineState s => s -> Int
 lengthToEnd = length . afterCursor
 
-clearDeadText :: MonadIO m => Int -> Draw m ()
+clearDeadText :: (MonadIO m) => Int -> Draw (InputCmdT m) ()
 clearDeadText n
     | n <= 0    = return ()
     | otherwise = do
@@ -206,26 +207,26 @@ clearDeadText n
                     , up (numLinesToClear - 1)
                     , right (termCol pos)]
 
-drawLine :: (LineState s, MonadIO m) => String -> s -> Draw m ()
+drawLine :: (LineState s, MonadIO m) => String -> s -> Draw (InputCmdT m) ()
 drawLine prefix s = do
     printText (beforeCursor prefix s ++ afterCursor s)
     changeLeft (lengthToEnd s)
 
-redrawLine :: (LineState s, MonadIO m) => String -> s -> Draw m ()
+redrawLine :: (LineState s, MonadIO m) => String -> s -> Draw (InputCmdT m) ()
 redrawLine prefix s = do
     pos <- get
     output $ left (termCol pos) <#> up (termRow pos)
     put initTermPos
     drawLine prefix s
 
-clearScreenAndRedraw :: (LineState s, MonadIO m) => String -> s -> Draw m ()
+clearScreenAndRedraw :: (LineState s, MonadIO m) => String -> s -> Draw (InputCmdT m) ()
 clearScreenAndRedraw prefix s = do
     h <- asks height
     output (flip clearAll h)
     put initTermPos
     drawLine prefix s
 
-moveToNextLine :: (LineState s, MonadIO m) => s -> Draw m ()
+moveToNextLine :: (LineState s, MonadIO m) => s -> Draw (InputCmdT m) ()
 moveToNextLine s = do
     pos <- get
     layout <- ask
@@ -245,27 +246,27 @@ reposition :: Layout -> Layout -> TermPos -> TermPos
 reposition oldLayout newLayout oldPos = posFromLength newLayout $ 
                                             posToLength oldLayout oldPos
 
-withReposition :: Monad m => Layout -> Draw m a -> Draw m a
+withReposition :: Monad m => Layout -> Draw (InputCmdT m) a -> Draw (InputCmdT m) a
 withReposition newLayout f = do
     oldPos <- get
     oldLayout <- ask
     let newPos = reposition oldLayout newLayout oldPos
     put newPos
-    local newLayout f
+    lift2 (local newLayout) f
 
 
 drawEffect :: (LineState s,LineState t, MonadIO m)
-        => String -> s -> Effect t -> Draw m ()
+        => String -> s -> Effect t -> Draw (InputCmdT m) ()
 drawEffect prefix s (Redraw shouldClear t) = do
             if shouldClear
                 then clearScreenAndRedraw prefix s
                 else redrawLine prefix t
 drawEffect prefix s (Change t) = do
             diffLinesBreaking prefix s t
-drawEffect prefix s (PrintLines ls t) = do
-                            layout <- ask
+drawEffect prefix s (PrintLines ls t shouldDraw) = do
                             moveToNextLine s
-                            output $ mconcat $ map (\l -> text l <#> nl)
-                                            $ ls layout
-                            drawLine prefix t
+                            output $ mconcat $ intersperse nl $ map text ls
+                            when shouldDraw $ do
+                                when (not (null ls)) $ output nl
+                                drawLine prefix t
 

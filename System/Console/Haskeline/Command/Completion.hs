@@ -34,23 +34,44 @@ completionCmd k = acceptKeyM k $ \s -> Just $ do
     f <- asks complete
     let g = liftCmdT . f
     (rest,completions) <- makeCompletion g s
-    return $ case ctype of
-        MenuCompletion -> menuCompletion k s
-                        (map (\c -> insertString (replacement c) rest) completions)
-        _ -> (simpleCompletion s rest completions, continue)
+    case ctype of
+        MenuCompletion -> return $ menuCompletion k s
+                        $ map (\c -> insertString (replacement c) rest) completions
+        _ -> simpleCompletion s rest completions
 
-simpleCompletion :: InsertMode -> InsertMode -> [Completion] -> Effect InsertMode
-simpleCompletion oldIM _ [] = Change oldIM
-simpleCompletion _ im [newWord] = Change $ insertString (replacement newWord) im
+simpleCompletion :: Monad m => InsertMode -> InsertMode -> [Completion] 
+                -> InputCmdT m (Effect InsertMode, Command (InputCmdT m) InsertMode InsertMode)
+simpleCompletion oldIM _ [] = return $ (Change oldIM,continue)
+simpleCompletion _ im [newWord] 
+        = return (Change $ insertString (replacement newWord) im, continue)
 simpleCompletion oldIM im completions
-    | oldIM /= withPartial = Change (insertString partial im)
-    | otherwise = PrintLines (makeLines $ map display completions) 
-                        (insertString partial im)
+    | oldIM /= withPartial = return (Change withPartial, continue)
+    | otherwise = do
+        layout <- ask
+        let wordLines = makeLines (map display completions) layout
+        prefs <- asks completionType
+        return $ printWordLines prefs layout wordLines withPartial
   where
     withPartial = insertString partial im
     partial = foldl1 commonPrefix (map replacement completions)
     commonPrefix (c:cs) (d:ds) | c == d = c : commonPrefix cs ds
     commonPrefix _ _ = ""
+
+printWordLines :: Monad m => CompletionType -> Layout -> [String] -> InsertMode
+                -> (Effect InsertMode, Command (InputCmdT m) InsertMode InsertMode)
+printWordLines ctype layout wordLines im 
+    -- TODO: here it's assumed that it's not menu
+    | usePaging ctype == False = (PrintLines wordLines im True,continue)
+    | otherwise = case splitAt (height layout-1) wordLines of
+                    (_,[]) -> (PrintLines wordLines im True,continue)
+                    (ws,rest) -> (PrintLines (ws ++ ["----More----"]) im False, 
+                        choiceCmd [
+                            acceptKeyM (KeyChar ' ') $ \_ -> Just $ return $ 
+                                printWordLines ctype layout rest im,
+                            acceptKey (KeyChar 'q') $ \_ -> return $
+                                PrintLines [] im True
+                            ])
+
 
 makeLines :: [String] -> Layout -> [String]
 makeLines ws layout = let
