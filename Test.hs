@@ -4,7 +4,8 @@ import System.Console.Haskeline
 import System.Console.Haskeline.Monads
 
 main :: IO ()
-main = runInputT defaultSettings (loop 0)
+main = runInputT defaultSettings {historyFile = Just "myhist"}
+                    (loop 0)
     where
         loop :: Int -> InputT IO ()
         loop n = do
