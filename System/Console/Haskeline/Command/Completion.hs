@@ -54,7 +54,7 @@ simpleCompletion oldIM im completions
 
 makeLines :: [String] -> Layout -> [String]
 makeLines ws layout = let
-    maxLength = maximum (map length ws) + 2
+    maxLength = min (width layout) (maximum (map length ws) + 2)
     numCols = width layout `div` maxLength
     ls = if (maxLength >= width layout)
                     then map (\x -> [x]) ws
