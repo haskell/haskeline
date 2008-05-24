@@ -119,7 +119,7 @@ changeRight n = do
               let linesDown = m `div` w
               let newCol = m `rem` w
               put TermPos {termRow=r+linesDown, termCol=newCol}
-              output $ mreplicate linesDown nl <#> right newCol
+              output $ cr <#> mreplicate linesDown nl <#> right newCol
                       
 changeLeft n = do
     w <- asks width
