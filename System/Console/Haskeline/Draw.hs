@@ -130,9 +130,8 @@ changeLeft n = do
                 output (left n)
         else do      
                 let m = n - c
-                let linesUp = 1 + (m `div` w)
-                let linesFromEnd = m `rem` w
-                let newCol = w - linesFromEnd
+                let linesUp = 1 + ((m-1) `div` w)
+                let newCol = (-m) `mod` w -- mod returns positive #
                 put TermPos {termRow = r - linesUp, termCol=newCol}
                 output $ cr <#> up linesUp <#> right newCol
                 
