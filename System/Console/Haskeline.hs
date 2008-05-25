@@ -21,14 +21,12 @@ module System.Console.Haskeline(InputT,
 
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Command
-import System.Console.Haskeline.Posix
 {--
 import System.Console.Haskeline.Command.Undo
 import System.Console.Haskeline.Command.Paste
 import System.Console.Haskeline.Command.Completion
 --}
 import System.Console.Haskeline.Command.History
-import System.Console.Haskeline.Draw
 import System.Console.Haskeline.Vi
 import System.Console.Haskeline.Emacs
 import System.Console.Haskeline.Settings
@@ -36,12 +34,18 @@ import System.Console.Haskeline.Monads
 import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Command.Completion
 
-import System.Console.Terminfo
 import System.IO
 import Data.Maybe (fromMaybe)
 import Data.Char (isSpace)
 import Control.Monad
 
+#ifdef MINGW
+import System.Console.Haskeline.Win32
+#else
+import System.Console.Terminfo
+import System.Console.Haskeline.Draw
+import System.Console.Haskeline.Posix
+#endif
 
 defaultSettings :: MonadIO m => Settings m
 defaultSettings = Settings {complete = completeFilename,

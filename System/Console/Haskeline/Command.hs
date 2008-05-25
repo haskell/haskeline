@@ -1,9 +1,10 @@
 module System.Console.Haskeline.Command(
+                        Event(..),
                         Key(..),
                         controlKey,
+                        Layout(..),
                         -- * Commands
                         Effect(..),
-                        Layout(..),
                         KeyMap(), 
                         lookupKM,
                         KeyAction(..),
@@ -32,7 +33,16 @@ module System.Console.Haskeline.Command(
 import qualified Data.Map as Map
 import Data.Bits
 import System.Console.Haskeline.LineState
-import System.Console.Haskeline.Posix
+
+data Layout = Layout {width, height :: Int}
+                    deriving Show
+
+data Key = KeyChar Char | KeyMeta Char
+            | KeyLeft | KeyRight | KeyUp | KeyDown
+            | Backspace | DeleteForward | KillLine
+                deriving (Eq,Ord,Show)
+
+data Event = WindowResize Layout | KeyInput Key
 
 
 -- Easy translation of control characters; e.g., Ctrl-G or Ctrl-g or ^G

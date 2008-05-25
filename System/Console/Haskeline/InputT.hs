@@ -4,7 +4,7 @@ module System.Console.Haskeline.InputT where
 import System.Console.Haskeline.Command.History
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.Settings
-import System.Console.Haskeline.Posix(Layout)
+import System.Console.Haskeline.Command(Layout)
 
 import System.Directory(getHomeDirectory)
 import System.FilePath

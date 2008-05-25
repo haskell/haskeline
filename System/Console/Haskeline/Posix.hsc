@@ -1,8 +1,5 @@
 module System.Console.Haskeline.Posix (
                         withGetEvent,
-                        Event(..),
-                        Key(..),
-                        Layout(..),
                         getLayout,
                         mapLines
                  ) where
@@ -22,13 +19,12 @@ import System.Posix.Signals.Exts
 import Data.List
 
 import System.Console.Haskeline.Monads
+import System.Console.Haskeline.Command
 
 #include <sys/ioctl.h>
 
 -------------------
 -- Window size
-data Layout = Layout {width, height :: Int}
-                    deriving Show
 
 foreign import ccall ioctl :: CInt -> CULong -> Ptr a -> IO ()
 
@@ -47,11 +43,6 @@ getLayout = allocaBytes (#size struct winsize) $ \ws -> do
 
 --------------------
 -- Key sequences
-data Key = KeyChar Char | KeyMeta Char
-            | KeyLeft | KeyRight | KeyUp | KeyDown
-            | Backspace | DeleteForward | KillLine
-                deriving (Eq,Ord,Show)
-
 getKeySequences :: Terminal -> IO (TreeMap Char Key)
 getKeySequences term = do
     sttys <- sttyKeys
@@ -132,7 +123,6 @@ escDelay = 100000 -- 0.1 seconds
 
 ---- '------------------------
 
-data Event = WindowResize Layout | KeyInput Key
 
 withGetEvent :: MonadIO m => Terminal -> (m Event -> m a) -> m a
 withGetEvent term f = do

@@ -15,15 +15,19 @@ Description:    This library provides an extensible, flexible interface for read
 Homepage:       http://code.haskell.org/haskeline
 Stability:      Experimental
 Build-Type:     Simple
+
+flag target-mingw
+    Description: Use native Win32 Console functionality (suitable for MinGW)
+    Default: False
+
 Library
-    Build-depends:  base>=3.0, terminfo>=0.2, unix>=2.2,
-                stm>=2.1.1, mtl>=1.1, containers>=0.1,
-                filepath>=1.1, directory>=1.0
+    Build-depends:  base>=3.0, stm>=2.1.1, mtl>=1.1, containers>=0.1,
+                    filepath>=1.1, directory>=1.0
     Extensions:     ForeignFunctionInterface, Rank2Types, FlexibleInstances,
                 FlexibleContexts, ExistentialQuantification
                 ScopedTypeVariables, GeneralizedNewtypeDeriving
                 MultiParamTypeClasses, OverlappingInstances
-                PatternSignatures
+                PatternSignatures, CPP
                 -- Note: GADTs are needed to allow contexts of different
                 -- lengths (see code of Haskeline.repeatTillFinish)
                 GADTs
@@ -34,39 +38,22 @@ Library
                 System.Console.Haskeline.Command
                 System.Console.Haskeline.Command.Completion
                 System.Console.Haskeline.Command.History
-                System.Console.Haskeline.Draw
                 System.Console.Haskeline.Emacs
                 System.Console.Haskeline.InputT
                 System.Console.Haskeline.LineState
-                System.Console.Haskeline.Posix
                 System.Console.Haskeline.Settings
                 System.Console.Haskeline.Vi
+    include-dirs: includes
+    if flag(target-mingw) {
+        Build-depends: Win32>=2.0
+        Other-modules: System.Console.Haskeline.Win32
+        c-sources: win_console.c
+        includes: win_console.h
+        cpp-options: -DMINGW
+    } else {
+        Build-depends: terminfo>=0.2, unix>=2.2
+        Other-modules: 
+                System.Console.Haskeline.Draw
+                System.Console.Haskeline.Posix
+    }
     ghc-options: -Wall
-
-Executable test
-    Build-depends:  base>=3.0, terminfo>=0.2, unix>=2.2,
-                stm>=2.1.1, mtl>=1.1, containers>=0.1,
-                filepath>=1.1, directory>=1.0
-    Main-Is: Test.hs
-    Other-Modules:
-                System.Console.Haskeline
-                System.Console.Haskeline.Command
-                System.Console.Haskeline.Command.Completion
-                System.Console.Haskeline.Command.History
-                System.Console.Haskeline.Draw
-                System.Console.Haskeline.Emacs
-                System.Console.Haskeline.InputT
-                System.Console.Haskeline.LineState
-                System.Console.Haskeline.Monads
-                System.Console.Haskeline.Posix
-                System.Console.Haskeline.Settings
-                System.Console.Haskeline.Vi
-    Extensions:     ForeignFunctionInterface, Rank2Types, FlexibleInstances,
-                FlexibleContexts, ExistentialQuantification
-                ScopedTypeVariables, GeneralizedNewtypeDeriving
-                MultiParamTypeClasses, OverlappingInstances
-                PatternSignatures
-                -- Note: GADTs are needed to allow contexts of different
-                -- lengths (see code of Haskeline.repeatTillFinish)
-                GADTs
-                
