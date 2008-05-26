@@ -1,10 +1,12 @@
 module System.Console.Haskeline.Win32(
-                HANDLE,
-                Coord(..),
-                readKey,
-                getConsoleSize,
-                getPosition,
-                setPosition
+                Draw(),
+                runDraw,
+                getLayout,
+                drawEffect,
+                moveToNextLine,
+                drawLine,
+                withReposition,
+                withGetEvent
                 )where
 
 
@@ -16,7 +18,7 @@ import Foreign.C.Types
 import Foreign.Marshal.Utils
 import System.Win32.Types
 import Graphics.Win32.Misc(getStdHandle, sTD_INPUT_HANDLE, sTD_OUTPUT_HANDLE)
-import Control.Monad(when)
+import Control.Monad(when,liftM)
 import Data.List(intercalate)
 
 
@@ -133,7 +135,7 @@ getPosition = withScreenBufferInfo $
 getConsoleSize :: HANDLE -> IO Coord
 getConsoleSize = withScreenBufferInfo $
     (#peek CONSOLE_SCREEN_BUFFER_INFO, dwSize)
-    
+
 withScreenBufferInfo :: (Ptr () -> IO a) -> HANDLE -> IO a
 withScreenBufferInfo f h = allocaBytes (#size CONSOLE_SCREEN_BUFFER_INFO)
                                 $ \infoPtr -> do
@@ -148,6 +150,12 @@ data Win32State = Win32State {inHandle, outHandle :: HANDLE}
 
 newtype Draw m a = Draw (ReaderT Win32State m a)
     deriving (Monad,MonadIO, MonadTrans, MonadReader Win32State)
+
+getLayout :: IO Layout
+getLayout = do
+    h <- getStdHandle sTD_OUTPUT_HANDLE
+    coord <- getConsoleSize h
+    return Layout {width = coordX coord, height = coordY coord}
     
 runDraw :: MonadIO m => Draw m a -> m a
 runDraw (Draw f) = liftIO win32State >>= runReaderT f
@@ -231,3 +239,13 @@ drawEffect prefix s (PrintLines ls t shouldDraw) = do
         when (not (null ls)) $ printText crlf
         drawLine prefix t
 -- TODO: rest
+
+
+-- TODO: implement
+withReposition :: Monad m => Layout -> Draw (InputCmdT m) a -> Draw (InputCmdT m) a
+withReposition _ = id
+
+withGetEvent :: MonadIO m => (m Event -> m a) -> m a
+withGetEvent f = do
+    h <- liftIO $ getStdHandle sTD_INPUT_HANDLE
+    f $ liftIO $ liftM KeyInput $ readKey h

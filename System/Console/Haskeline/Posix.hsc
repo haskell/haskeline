@@ -124,11 +124,17 @@ escDelay = 100000 -- 0.1 seconds
 ---- '------------------------
 
 
-withGetEvent :: MonadIO m => Terminal -> (m Event -> m a) -> m a
-withGetEvent term f = do
+withGetEvent :: (MonadReader Terminal m, MonadIO m) => (m Event -> m a) -> m a
+withGetEvent f = do
+    term <- ask
     chan <- liftIO $ atomically $ newTChan
-    withWindowHandler chan $ withForked (commandLoop term chan)
+    wrapKeypad term $ withWindowHandler chan $ withForked (commandLoop term chan)
         $ f (liftIO $ atomically $ readTChan chan)
+  where
+    wrapKeypad term f = finallyIO (liftIO (maybeOutput term keypadOn) >> f)
+                        (maybeOutput term keypadOff)
+    maybeOutput term cap = runTermOutput term $ 
+            fromMaybe mempty (getCapability term cap)
 
 withWindowHandler :: MonadIO m => TChan Event -> m a -> m a
 withWindowHandler tv f = do

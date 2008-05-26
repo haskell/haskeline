@@ -90,9 +90,12 @@ instance MonadTrans Draw where
     lift = Draw . lift . lift . lift
     lift2 f (Draw m) = Draw $ lift2 (lift2 (lift2 f)) m
     
-
-runDraw :: Monad m => Actions -> Terminal -> Draw m a -> m a
-runDraw actions term (Draw f) = 
+-- TODO: cache the terminal, actions?
+runDraw :: MonadIO m => Draw m a -> m a
+runDraw (Draw f) = do
+    term <- liftIO setupTermFromEnv
+    -- TODO: use one-line dumb terminal if the below fails.
+    let Just actions = getCapability term getActions
     evalStateT initTermPos $ evalReaderT term
         $ evalReaderT actions f
 

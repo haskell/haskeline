@@ -35,14 +35,12 @@ import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Command.Completion
 
 import System.IO
-import Data.Maybe (fromMaybe)
 import Data.Char (isSpace)
 import Control.Monad
 
 #ifdef MINGW
 import System.Console.Haskeline.Win32
 #else
-import System.Console.Terminfo
 import System.Console.Haskeline.Draw
 import System.Console.Haskeline.Posix
 #endif
@@ -55,34 +53,17 @@ defaultSettings = Settings {complete = completeFilename,
 -- Note: Without buffering the output, there's a cursor flicker sometimes.
 -- We'll keep it buffered, and manually flush the buffer in 
 -- repeatTillFinish.
-wrapTerminalOps:: MonadIO m => Terminal -> m a -> m a
-wrapTerminalOps term f = do
+wrapTerminalOps:: MonadIO m => m a -> m a
+wrapTerminalOps f = do
     oldInBuf <- liftIO $ hGetBuffering stdin
     oldEcho <- liftIO $ hGetEcho stdout
-    let initialize = do maybeOutput term keypadOn
+    let initialize = do 
                         hSetBuffering stdin NoBuffering
                         hSetEcho stdout False
-    let reset = do maybeOutput term keypadOff
+    let reset = do 
                    hSetBuffering stdin oldInBuf
                    hSetEcho stdout oldEcho
     finallyIO (liftIO initialize >> f) reset
-
-maybeOutput :: Terminal -> Capability TermOutput -> IO ()
-maybeOutput term cap = runTermOutput term $ 
-        fromMaybe mempty (getCapability term cap)
-
-
-
-data TermSettings = TermSettings {terminal :: Terminal,
-                          actions :: Actions}
-
-
-makeSettings :: IO TermSettings
-makeSettings = do
-    t <- setupTermFromEnv
-    let Just acts = getCapability t getActions
-    return TermSettings {terminal = t, actions = acts}
-
 
 getInputLine :: MonadIO m => String -> InputT m (Maybe String)
 getInputLine prefix = do
@@ -90,14 +71,12 @@ getInputLine prefix = do
     emode <- asks (\prefs -> case editMode prefs of
                     Vi -> viActions
                     Emacs -> emacsCommands)
-    settings <- liftIO makeSettings
-    wrapTerminalOps (terminal settings) $ do
+    wrapTerminalOps $ do
         let ls = emptyIM
         layout <- liftIO getLayout
 
-        result <- runInputCmdT layout
-                    $ runDraw (actions settings) (terminal settings)
-                    $ withGetEvent (terminal settings) $ \getEvent -> 
+        result <- runInputCmdT layout $ runDraw 
+                    $ withGetEvent $ \getEvent -> 
                         drawLine prefix ls 
                             >> repeatTillFinish getEvent prefix ls emode
         case result of 
