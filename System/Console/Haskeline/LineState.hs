@@ -6,6 +6,9 @@ class LineState s where
     afterCursor :: s -> String -- text under and to right of cursor
     toResult :: s -> String
 
+lengthToEnd :: LineState s => s -> Int
+lengthToEnd = length . afterCursor
+
 class LineState s => FromString s where
     fromString :: String -> s
 

@@ -189,9 +189,6 @@ linesLeft Layout {width=w} TermPos {termCol = c} n
 lsLinesLeft :: LineState s => Layout -> TermPos -> s -> Int
 lsLinesLeft layout pos s = linesLeft layout pos (lengthToEnd s)
 
-lengthToEnd :: LineState s => s -> Int
-lengthToEnd = length . afterCursor
-
 clearDeadText :: (MonadIO m) => Int -> Draw (InputCmdT m) ()
 clearDeadText n
     | n <= 0    = return ()
