@@ -51,8 +51,14 @@ readKey h = do
     e <- readEvent h
     case e of
         KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc}
+            -- first, some special cases to make this look more unix-y to the KeyMaps.
+            | c == '\b'                     -> return (Backspace)
+            | c == '\r'                     -> return (KeyChar '\n')
+            -- regular character; just return it.
             | c /= '\NUL'                   -> return (KeyChar c)
+            -- special character; see below.
             | Just k <- keyFromCode vc      -> return k
+        -- If the key is not recognized, ignore it and try again.
         _ -> readKey h
 
 keyFromCode (#const VK_BACK) = Just Backspace
