@@ -146,44 +146,42 @@ withScreenBufferInfo f h = allocaBytes (#size CONSOLE_SCREEN_BUFFER_INFO)
 ----------------------------
 -- Drawing
 
-data Win32State = Win32State {inHandle, outHandle :: HANDLE}
+newtype Draw m a = Draw {runDraw :: m a}
+    deriving (Monad,MonadIO)
 
-newtype Draw m a = Draw (ReaderT Win32State m a)
-    deriving (Monad,MonadIO, MonadTrans, MonadReader Win32State)
+instance MonadTrans Draw where
+    lift = Draw
+    lift2 f = Draw . f . runDraw
+
+getInputHandle, getOutputHandle :: MonadIO m => m HANDLE
+getInputHandle = liftIO $ getStdHandle sTD_INPUT_HANDLE
+getOutputHandle = liftIO $ getStdHandle sTD_OUTPUT_HANDLE
 
 getLayout :: IO Layout
 getLayout = do
-    h <- getStdHandle sTD_OUTPUT_HANDLE
+    h <- getOutputHandle
     coord <- getConsoleSize h
     return Layout {width = coordX coord, height = coordY coord}
     
-runDraw :: MonadIO m => Draw m a -> m a
-runDraw (Draw f) = liftIO win32State >>= runReaderT f
-
-win32State :: IO Win32State
-win32State = do
-    hIn <- getStdHandle sTD_INPUT_HANDLE
-    hOut <- getStdHandle sTD_OUTPUT_HANDLE
-    return Win32State {inHandle = hIn, outHandle = hOut}
-    
 getPos :: MonadIO m => Draw m Coord
-getPos = asks outHandle >>= liftIO . getPosition
+getPos = getOutputHandle >>= liftIO . getPosition
     
 setPos :: MonadIO m => Coord -> Draw m ()
-setPos c = asks outHandle >>= \h -> liftIO (setPosition h c)
+setPos c = do
+    h <- getOutputHandle
+    liftIO (setPosition h c)
 
 moveToNextLine :: (MonadIO m, LineState s) => s -> Draw (InputCmdT m) ()
 moveToNextLine s = do
-    Coord {coordX = x, coordY = y} <- getPos
-    w <- asks width
-    let n = lengthToEnd s
-    let linesToEnd = if n+x < w then 1 else 1 + div (x+n) w
-    setPos Coord {coordX = 0, coordY = y+linesToEnd}
+    movePos (lengthToEnd s)
+    printText "\r\n" -- make the console take care of creating a new line
     
 -- TODO: is it bad to be using putStr here?
--- Do I really need to keep the handles around as a reader?
+-- 
+-- NOTE: we need to call hflush explicitly here, so that getPos/setPos are synced
+-- with the character output.
 printText :: MonadIO m => String -> Draw m ()
-printText = liftIO . putStr
+printText txt = liftIO (putStr txt >> hFlush stdout)
     
 printAfter :: MonadIO m => String -> Draw (InputCmdT m) ()
 printAfter str = do
@@ -208,7 +206,7 @@ diffLinesBreaking prefix s1 s2 = let
         (xs1',[])   | xs1' ++ ys1 == ys2    -> movePos $ negate $ length xs1'
         ([],xs2')   | ys1 == xs2' ++ ys2    -> movePos $ length xs2'
         (xs1',xs2')                         -> do
-            movePos (length xs1')
+            movePos (negate $ length xs1')
             let m = length xs1' + length ys1 - (length xs2' + length ys2)
             let deadText = replicate m ' '
             printText xs2'
@@ -247,5 +245,5 @@ withReposition _ = id
 
 withGetEvent :: MonadIO m => (m Event -> m a) -> m a
 withGetEvent f = do
-    h <- liftIO $ getStdHandle sTD_INPUT_HANDLE
+    h <- getInputHandle
     f $ liftIO $ liftM KeyInput $ readKey h
