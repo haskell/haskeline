@@ -50,18 +50,21 @@ defaultSettings = Settings {complete = completeFilename,
                         historyFile = Nothing,
                         maxHistorySize = Nothing}
 
--- Note: Without buffering the output, there's a cursor flicker sometimes.
--- We'll keep it buffered, and manually flush the buffer in 
--- repeatTillFinish.
+-- NOTE: If we set stdout to NoBuffering, there can be a flicker effect when many
+-- characters are printed at once.  We'll keep it buffered here, and manually
+-- flush outputs in repeatTillFinish that don't print a newline.
 wrapTerminalOps:: MonadIO m => m a -> m a
 wrapTerminalOps f = do
     oldInBuf <- liftIO $ hGetBuffering stdin
+    oldOutBuf <- liftIO $ hGetBuffering stdout
     oldEcho <- liftIO $ hGetEcho stdout
     let initialize = do 
                         hSetBuffering stdin NoBuffering
+                        hSetBuffering stdout LineBuffering
                         hSetEcho stdout False
     let reset = do 
                    hSetBuffering stdin oldInBuf
+                   hSetBuffering stdout oldOutBuf
                    hSetEcho stdout oldEcho
     finallyIO (liftIO initialize >> f) reset
 
