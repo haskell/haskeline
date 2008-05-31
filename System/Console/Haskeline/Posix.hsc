@@ -123,22 +123,26 @@ escDelay = 100000 -- 0.1 seconds
 
 ---- '------------------------
 
-
 withGetEvent :: (MonadReader Terminal m, MonadIO m) => (m Event -> m a) -> m a
 withGetEvent f = do
     term <- ask
-    chan <- liftIO $ atomically $ newTChan
-    wrapKeypad term $ withWindowHandler chan $ withForked (commandLoop term chan)
-        $ f (liftIO $ atomically $ readTChan chan)
+    eventChan <- liftIO $ newTChanIO
+    waitingForKey <- liftIO $ newTVarIO False
+    wrapKeypad term $ withWindowHandler eventChan
+      $ withForked (commandLoop term eventChan waitingForKey)
+      $ f $ readEvent eventChan waitingForKey
   where
     wrapKeypad term f = finallyIO (liftIO (maybeOutput term keypadOn) >> f)
                         (maybeOutput term keypadOff)
     maybeOutput term cap = runTermOutput term $ 
             fromMaybe mempty (getCapability term cap)
+    readEvent eventChan waitingForKey = liftIO $ do
+        atomically $ writeTVar waitingForKey True
+        atomically $ readTChan eventChan
 
 withWindowHandler :: MonadIO m => TChan Event -> m a -> m a
-withWindowHandler tv f = do
-    let handler = getLayout >>= atomically . writeTChan tv . WindowResize
+withWindowHandler eventChan f = do
+    let handler = getLayout >>= atomically . writeTChan eventChan . WindowResize
     old_handler <- liftIO $ installHandler windowChange (Catch handler) Nothing
     f `finallyIO` installHandler windowChange old_handler Nothing
 
@@ -148,12 +152,12 @@ withForked threadAct f = do
     threadID <- liftIO $ forkIO threadAct
     f `finallyIO` killThread threadID
     
-commandLoop :: Terminal -> TChan Event -> IO ()
-commandLoop term tv = do
+commandLoop :: Terminal -> TChan Event -> TVar Bool -> IO ()
+commandLoop term eventChan waitingForKey = do
     keySeqs <- getKeySequences term
     let loop = do
+        atomically $ readTVar waitingForKey >>= guard >> writeTVar waitingForKey False
         k <- getKey keySeqs
-        atomically $ writeTChan tv (KeyInput k) 
+        atomically $ writeTChan eventChan (KeyInput k)
         loop
     loop
-
