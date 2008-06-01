@@ -242,7 +242,22 @@ drawEffect prefix s (PrintLines ls t shouldDraw) = do
     when shouldDraw $ do
         when (not (null ls)) $ printText crlf
         drawLine prefix t
--- TODO: rest
+drawEffect prefix s (Redraw shouldClear t) = do
+    if shouldClear
+        then clearScreenAndRedraw prefix t
+        else redrawLine prefix t
+  where
+    redrawLine prefix t = do
+        movePos $ negate $ length $ beforeCursor prefix s
+        drawLine prefix t
+    -- TODO: this scrolls all the way to the top; is that right?
+    -- also: should I be using FillConsoleOutputCharacter?
+    clearScreenAndRedraw prefix t = do
+        lay <- liftIO getLayout
+        setPos (Coord 0 0)
+        printText (replicate (width lay * height lay) ' ')
+        setPos (Coord 0 0)
+        drawLine prefix t
 
 
 -- TODO: implement
