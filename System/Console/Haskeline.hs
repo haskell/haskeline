@@ -68,8 +68,18 @@ wrapTerminalOps f = do
                    hSetEcho stdout oldEcho
     finallyIO (liftIO initialize >> f) reset
 
-getInputLine :: MonadIO m => String -> InputT m (Maybe String)
+getInputLine, getInputCmdLine :: MonadIO m => String -> InputT m (Maybe String)
 getInputLine prefix = do
+    isTerm <- liftIO $ hIsTerminalDevice stdin
+    if isTerm
+        then getInputCmdLine prefix
+        else do
+            isEOF <- liftIO $ hIsEOF stdin
+            if isEOF
+                then return Nothing
+                else liftM Just $ liftIO $ hGetLine stdin
+
+getInputCmdLine prefix = do
 -- TODO: Cache the terminal, actions
     emode <- asks (\prefs -> case editMode prefs of
                     Vi -> viActions
