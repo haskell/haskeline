@@ -43,7 +43,7 @@ data Key = KeyChar Char | KeyMeta Char
                 deriving (Eq,Ord,Show)
 
 data Event = WindowResize Layout | KeyInput Key
-
+            | SigInt
 
 -- Easy translation of control characters; e.g., Ctrl-G or Ctrl-g or ^G
 controlKey :: Char -> Key

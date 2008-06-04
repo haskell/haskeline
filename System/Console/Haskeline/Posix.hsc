@@ -123,12 +123,15 @@ escDelay = 100000 -- 0.1 seconds
 
 ---- '------------------------
 
-withGetEvent :: (MonadReader Terminal m, MonadIO m) => (m Event -> m a) -> m a
-withGetEvent f = do
+withGetEvent :: (MonadReader Terminal m, MonadIO m) 
+                => Bool -> (m Event -> m a) -> m a
+withGetEvent useSigINT f = do
     term <- ask
     eventChan <- liftIO $ newTChanIO
     waitingForKey <- liftIO $ newTVarIO False
-    wrapKeypad term $ withWindowHandler eventChan
+    wrapKeypad term 
+        $ withWindowHandler eventChan
+        $ withSigIntHandler useSigINT eventChan
       $ withForked (commandLoop term eventChan waitingForKey)
       $ f $ readEvent eventChan waitingForKey
   where
@@ -145,6 +148,13 @@ withWindowHandler eventChan f = do
     let handler = getLayout >>= atomically . writeTChan eventChan . WindowResize
     old_handler <- liftIO $ installHandler windowChange (Catch handler) Nothing
     f `finallyIO` installHandler windowChange old_handler Nothing
+
+withSigIntHandler :: MonadIO m => Bool -> TChan Event -> m a -> m a
+withSigIntHandler False _ f = f
+withSigIntHandler True eventChan f = do
+    let handler = atomically $ writeTChan eventChan SigInt
+    old_handler <- liftIO $ installHandler sigINT (CatchOnce handler) Nothing
+    f `finallyIO` installHandler sigINT old_handler Nothing
 
 -- fork a thread, then kill it after the computation is done
 withForked :: MonadIO m => IO () -> m a -> m a

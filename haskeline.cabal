@@ -27,7 +27,8 @@ Library
                 FlexibleContexts, ExistentialQuantification
                 ScopedTypeVariables, GeneralizedNewtypeDeriving
                 MultiParamTypeClasses, OverlappingInstances
-                PatternSignatures, CPP
+                PatternSignatures, CPP, DeriveDataTypeable,
+                PatternGuards
                 -- Note: GADTs are needed to allow contexts of different
                 -- lengths (see code of Haskeline.repeatTillFinish)
                 GADTs

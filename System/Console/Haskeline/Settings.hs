@@ -23,7 +23,8 @@ data CompletionType = MenuCompletion
 
 data Settings m = Settings {complete :: CompletionFunc m,
                             historyFile :: Maybe String,
-                            maxHistorySize :: Maybe Int}
+                            maxHistorySize :: Maybe Int,
+                            handleSigINT :: Bool}
 
 data Prefs = Prefs { bellStyle :: BellStyle,
                      editMode :: EditMode,

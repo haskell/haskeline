@@ -10,6 +10,7 @@ module System.Console.Haskeline(InputT,
                     defaultPrefs,
                     readPrefs,
                     CompletionType(..),
+                    handleInterrupt,
                     -- * Tab completion functions
                     CompletionFunc,
                     Completion(..),
@@ -37,6 +38,8 @@ import System.Console.Haskeline.Command.Completion
 import System.IO
 import Data.Char (isSpace)
 import Control.Monad
+import Control.Exception
+import Data.Dynamic
 
 #ifdef MINGW
 import System.Console.Haskeline.Win32
@@ -48,7 +51,8 @@ import System.Console.Haskeline.Posix
 defaultSettings :: MonadIO m => Settings m
 defaultSettings = Settings {complete = completeFilename,
                         historyFile = Nothing,
-                        maxHistorySize = Nothing}
+                        maxHistorySize = Nothing,
+                        handleSigINT = False}
 
 -- NOTE: If we set stdout to NoBuffering, there can be a flicker effect when many
 -- characters are printed at once.  We'll keep it buffered here, and manually
@@ -68,7 +72,7 @@ wrapTerminalOps f = do
                    hSetEcho stdout oldEcho
     finallyIO (liftIO initialize >> f) reset
 
-getInputLine, getInputCmdLine :: MonadIO m => String -> InputT m (Maybe String)
+getInputLine, getInputCmdLine :: forall m . MonadIO m => String -> InputT m (Maybe String)
 getInputLine prefix = do
     isTerm <- liftIO $ hIsTerminalDevice stdin
     if isTerm
@@ -87,11 +91,12 @@ getInputCmdLine prefix = do
     wrapTerminalOps $ do
         let ls = emptyIM
         layout <- liftIO getLayout
-
-        result <- runInputCmdT layout $ runDraw 
-                    $ withGetEvent $ \getEvent -> 
-                        drawLine prefix ls 
-                            >> repeatTillFinish getEvent prefix ls emode
+        result <- runInputCmdT layout $ do
+                    (settings :: Settings m) <- ask
+                    runDraw $ withGetEvent (handleSigINT settings) 
+                        $ \getEvent -> do
+                            drawLine prefix ls 
+                            repeatTillFinish getEvent prefix ls emode
         case result of 
             Just line | not (all isSpace line) -> addHistory line
             _ -> return ()
@@ -108,6 +113,7 @@ repeatTillFinish getEvent prefix = loop
                 liftIO (hFlush stdout)
                 event <- getEvent
                 case event of
+                    SigInt -> liftIO $ evaluate (throwDyn Interrupt) -- ???
                     WindowResize newLayout -> 
                         withReposition newLayout (loop s processor)
                     KeyInput k -> case lookupKM processor k of
@@ -118,3 +124,11 @@ repeatTillFinish getEvent prefix = loop
                                         KeyAction effect next <- lift f
                                         drawEffect prefix s effect
                                         loop (effectState effect) next
+
+data Interrupt = Interrupt
+                deriving (Show,Typeable,Eq)
+
+handleInterrupt :: MonadIO m => IO a -> m a -> m a
+handleInterrupt f = handleIO $ \e -> case dynExceptions e of
+                    Just dyn | Just Interrupt <- fromDynamic dyn -> f
+                    _ -> throwIO e

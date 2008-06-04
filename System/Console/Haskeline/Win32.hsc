@@ -264,7 +264,8 @@ drawEffect prefix s (Redraw shouldClear t) = do
 withReposition :: Monad m => Layout -> Draw (InputCmdT m) a -> Draw (InputCmdT m) a
 withReposition _ = id
 
-withGetEvent :: MonadIO m => (m Event -> m a) -> m a
-withGetEvent f = do
+-- TODO: Use GHC.ConsoleHandler.installHandler for ctrl-c events
+withGetEvent :: MonadIO m => Bool -> (m Event -> m a) -> m a
+withGetEvent _ f = do
     h <- getInputHandle
     f $ liftIO $ liftM KeyInput $ readKey h
