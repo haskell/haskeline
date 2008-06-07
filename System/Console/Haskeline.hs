@@ -78,8 +78,8 @@ getInputLine prefix = do
     if isTerm
         then getInputCmdLine prefix
         else do
-            isEOF <- liftIO $ hIsEOF stdin
-            if isEOF
+            atEOF <- liftIO $ hIsEOF stdin
+            if atEOF
                 then return Nothing
                 else liftM Just $ liftIO $ hGetLine stdin
 
