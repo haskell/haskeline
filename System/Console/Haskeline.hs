@@ -113,7 +113,9 @@ repeatTillFinish getEvent prefix = loop
                 liftIO (hFlush stdout)
                 event <- getEvent
                 case event of
-                    SigInt -> liftIO $ evaluate (throwDyn Interrupt) -- ???
+                    SigInt -> do
+                        moveToNextLine s
+                        liftIO $ evaluate (throwDyn Interrupt)
                     WindowResize newLayout -> 
                         withReposition newLayout (loop s processor)
                     KeyInput k -> case lookupKM processor k of
