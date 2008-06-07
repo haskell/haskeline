@@ -10,13 +10,13 @@ import qualified Data.Map as Map
 import System.Console.Terminfo
 import System.Posix (stdOutput)
 import System.Posix.Terminal
-import System.Timeout
 import Control.Monad
 import Control.Concurrent
 import Control.Concurrent.STM
 import Data.Maybe
 import System.Posix.Signals.Exts
 import Data.List
+import System.IO
 
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.Command
@@ -71,23 +71,7 @@ sttyKeys = do
     attrs <- getTerminalAttributes stdOutput
     let getStty (k,c) = do {str <- controlChar attrs k; return ([str],c)}
     return $ catMaybes $ map getStty [(Erase,Backspace),(Kill,KillLine)]
-
-getKey :: TreeMap Char Key -> IO Key
-getKey baseMap = getChar >>= getKey' baseMap
-    where
-        getKey' (TreeMap tm) c = case Map.lookup c tm of
-            Nothing -> getKey baseMap -- unrecognized control sequence; try again.
-            Just (Nothing,t) -> getChar >>= getKey' t
-            Just (Just k,t@(TreeMap tm2))
-                | Map.null tm2 -> return k
-                | otherwise  -> do
-                -- We have a choice of either accepting the current sequence, 
-                -- or reading more characters to form a longer sequence.
-                    md <- timeout escDelay getChar
-                    case md of
-                        Nothing -> return k
-                        Just d -> getKey' t d
-
+                        
 newtype TreeMap a b = TreeMap (Map.Map a (Maybe b, TreeMap a b))
                         deriving Show
 
@@ -115,11 +99,17 @@ mapLines (TreeMap m) = let
     m2 = Map.map (\(k,t) -> show k : mapLines t) m
     in concatMap (\(k,ls) -> show k : map (' ':) ls) $ Map.toList m2
 
-
--- Time, in microseconds, to wait before timing out and reading e.g. an escape
--- as one character instead of as part of a control sequence.
-escDelay :: Int
-escDelay = 100000 -- 0.1 seconds
+lexKeys :: TreeMap Char Key -> [Char] -> [Key]
+lexKeys baseMap = loop baseMap
+    where
+        loop _ [] = []
+        loop (TreeMap tm) (c:cs) = case Map.lookup c tm of
+            Nothing -> loop baseMap cs
+            Just (Nothing,t) -> loop t cs
+            Just (Just k,t@(TreeMap tm2))
+                | not (null cs) && not (Map.null tm2) -- ?? lookup d tm2?
+                    -> loop t cs
+                    | otherwise -> k : loop baseMap cs
 
 ---- '------------------------
 
@@ -127,21 +117,17 @@ withGetEvent :: (MonadReader Terminal m, MonadIO m)
                 => Bool -> (m Event -> m a) -> m a
 withGetEvent useSigINT f = do
     term <- ask
+    baseMap <- liftIO (getKeySequences term)
     eventChan <- liftIO $ newTChanIO
-    waitingForKey <- liftIO $ newTVarIO False
     wrapKeypad term 
         $ withWindowHandler eventChan
         $ withSigIntHandler useSigINT eventChan
-      $ withForked (commandLoop term eventChan waitingForKey)
-      $ f $ readEvent eventChan waitingForKey
+        $ f $ liftIO $ getEvent eventChan baseMap
   where
-    wrapKeypad term f = finallyIO (liftIO (maybeOutput term keypadOn) >> f)
+    wrapKeypad term g = finallyIO (liftIO (maybeOutput term keypadOn) >> g)
                         (maybeOutput term keypadOff)
     maybeOutput term cap = runTermOutput term $ 
             fromMaybe mempty (getCapability term cap)
-    readEvent eventChan waitingForKey = liftIO $ do
-        atomically $ writeTVar waitingForKey True
-        atomically $ readTChan eventChan
 
 withWindowHandler :: MonadIO m => TChan Event -> m a -> m a
 withWindowHandler eventChan f = do
@@ -156,18 +142,33 @@ withSigIntHandler True eventChan f = do
     old_handler <- liftIO $ installHandler sigINT (CatchOnce handler) Nothing
     f `finallyIO` installHandler sigINT old_handler Nothing
 
--- fork a thread, then kill it after the computation is done
-withForked :: MonadIO m => IO () -> m a -> m a
-withForked threadAct f = do
-    threadID <- liftIO $ forkIO threadAct
-    f `finallyIO` killThread threadID
-    
-commandLoop :: Terminal -> TChan Event -> TVar Bool -> IO ()
-commandLoop term eventChan waitingForKey = do
-    keySeqs <- getKeySequences term
-    let loop = do
-        atomically $ readTVar waitingForKey >>= guard >> writeTVar waitingForKey False
-        k <- getKey keySeqs
-        atomically $ writeTChan eventChan (KeyInput k)
-        loop
-    loop
+
+getEvent :: TChan Event -> TreeMap Char Key -> IO Event
+getEvent eventChan baseMap = allocaArray bufferSize loop
+    where
+        bufferSize = 100
+        delay = 10000 -- 0.001 seconds
+        -- TODO: instead of this loop, use hWaitForInput or hGetBuf and interrupt
+        -- if an event lands in the eventChan first.
+        -- But am not sure if those functions are interruptible
+        waitAndTryAgain buffer = threadDelay delay >> loop buffer
+        loop :: Ptr Word8 -> IO Event
+        loop buffer = do
+          me <- atomically $ tryReadTChan eventChan
+          case me of
+            Just e -> return e
+            Nothing -> do
+              numRead <- hGetBufNonBlocking stdin buffer bufferSize
+              if numRead < 1
+                then waitAndTryAgain buffer
+                else do
+                  ws <- peekArray numRead buffer
+                  let ks = map KeyInput $ lexKeys baseMap $ map (toEnum . fromEnum) ws
+                  case ks of
+                    [] -> waitAndTryAgain buffer
+                    k:ks' -> do 
+                      atomically $ mapM_ (writeTChan eventChan) ks'
+                      return k
+
+tryReadTChan :: TChan a -> STM (Maybe a)
+tryReadTChan chan = fmap Just (readTChan chan) `orElse` return Nothing
