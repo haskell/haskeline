@@ -147,7 +147,7 @@ getEvent :: TChan Event -> TreeMap Char Key -> IO Event
 getEvent eventChan baseMap = allocaArray bufferSize loop
     where
         bufferSize = 100
-        delay = 10000 -- 0.001 seconds
+        delay = 50000 -- 0.05 seconds
         -- TODO: instead of this loop, use hWaitForInput or hGetBuf and interrupt
         -- if an event lands in the eventChan first.
         -- But I'm not sure if those functions are interruptible.
