@@ -150,7 +150,7 @@ getEvent eventChan baseMap = allocaArray bufferSize loop
         delay = 10000 -- 0.001 seconds
         -- TODO: instead of this loop, use hWaitForInput or hGetBuf and interrupt
         -- if an event lands in the eventChan first.
-        -- But am not sure if those functions are interruptible
+        -- But I'm not sure if those functions are interruptible.
         waitAndTryAgain buffer = threadDelay delay >> loop buffer
         loop :: Ptr Word8 -> IO Event
         loop buffer = do
@@ -163,7 +163,8 @@ getEvent eventChan baseMap = allocaArray bufferSize loop
                 then waitAndTryAgain buffer
                 else do
                   ws <- peekArray numRead buffer
-                  let ks = map KeyInput $ lexKeys baseMap $ map (toEnum . fromEnum) ws
+                  let cs = map (toEnum . fromEnum) ws -- TODO: decode unicode here
+                  let ks = map KeyInput $ lexKeys baseMap cs
                   case ks of
                     [] -> waitAndTryAgain buffer
                     k:ks' -> do 
