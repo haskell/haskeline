@@ -59,18 +59,25 @@ printWordLines :: Monad m => CompletionType -> Layout -> [String] -> InsertMode 
                 -> CmdAction (InputCmdT m) InsertMode
 printWordLines ctype layout wordLines im isFirst
     -- TODO: here it's assumed that it's not menu
-    | usePaging ctype == False = PrintLines wordLines im overwrite >=> continue
+    | usePaging ctype == False = printAll
     | otherwise = case splitAt (height layout-1) wordLines of
-            (_,[]) -> PrintLines wordLines im overwrite >=> continue
-            (ws,rest) -> (PrintLines ws (Message im "----More----") overwrite)
-                        >=> choiceCmd [
-                            acceptKeyM (KeyChar ' ') $ \_ -> Just $ return $ 
-                                printWordLines ctype layout rest im False,
-                            acceptKey (KeyChar 'q') $ \_ -> return $
-                                PrintLines [] im True
-                            ]
+            (_,[]) -> printAll
+            (ws,rest) -> PrintLines ws message overwrite >=> pagingCmds rest
     where
+        printAll = PrintLines wordLines im overwrite >=> continue
         overwrite = not isFirst
+        printOneLine [] = printAll
+        printOneLine (l:ls) = PrintLines [l] message overwrite
+                            >=> pagingCmds ls
+        message = Message im "----More----"
+        pagingCmds ls = choiceCmd [
+                            acceptKeyM (KeyChar ' ') $ \_ -> Just $ return $
+                                printWordLines ctype layout ls im False
+                            ,acceptKey (KeyChar 'q') $ \_ -> return $
+                                PrintLines [] im overwrite
+                            ,acceptKeyM (KeyChar '\n') $ \_ -> Just $ return $
+                                printOneLine ls
+                            ]
 
 
 makeLines :: [String] -> Layout -> [String]
