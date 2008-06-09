@@ -8,6 +8,8 @@ module System.Console.Haskeline.Command(
                         KeyMap(), 
                         lookupKM,
                         KeyAction(..),
+                        CmdAction(..),
+                        (>=>),
                         Command(),
                         runCommand,
                         continue,
@@ -54,7 +56,7 @@ controlKey c = KeyChar $ toEnum $ fromEnum c .&. complement (bit 5 .|. bit 6)
 
 data Effect s = Change {effectState :: s} 
               | PrintLines {linesToPrint :: [String], effectState :: s,
-                            redrawState :: Bool}
+                            overwriteOldState :: Bool}
               | Redraw {shouldClearScreen :: Bool, effectState :: s}
 
 newtype KeyMap m s = KeyMap {keyMap :: Map.Map Key 
@@ -101,12 +103,17 @@ acceptChar f = Command $ \next -> KeyMap $ Map.fromList
                 $ map (\c -> (KeyChar c,\s -> Right $ return (KeyAction (Change (f c s)) next)))
                     [' '..'~']
 
-acceptKeyM :: (Monad m, LineState s) => Key -> (s -> Maybe (m (Effect s, Command m s s)))
-                            -> Command m s s
+data CmdAction m s = forall t . LineState t => CmdAction (Effect t) (Command m t s)
+
+(>=>) :: LineState t => Effect t -> Command m t s -> CmdAction m s
+(>=>) = CmdAction
+
+acceptKeyM :: Monad m => Key -> (s -> Maybe (m (CmdAction m t)))
+                                            -> Command m s t
 acceptKeyM k f = Command $ \next -> KeyMap $ Map.singleton k $ \s -> case f s of
                 Nothing -> Left Nothing
                 Just act -> Right $ do
-                    (effect, Command g) <- act
+                    CmdAction effect (Command g) <- act
                     return (KeyAction effect (g next))
                          
 loopUntil :: Command m s s -> Command m s t -> Command m s t

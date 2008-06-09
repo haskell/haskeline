@@ -143,3 +143,17 @@ applyArg f am = repeatN (arg am) (argState am)
         repeatN n | n <= 1 = f
                     | otherwise = f . repeatN (n-1)
 
+---------------
+data Cleared = Cleared
+
+instance LineState Cleared where
+    beforeCursor _ Cleared = ""
+    afterCursor Cleared = ""
+    toResult Cleared = ""
+
+data Message s = Message {messageState :: s, messageText :: String}
+
+instance LineState s => LineState (Message s) where
+    beforeCursor _ = messageText
+    afterCursor _ = ""
+    toResult = toResult . messageState

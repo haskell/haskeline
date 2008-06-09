@@ -32,7 +32,7 @@ simpleInsertions = choiceCmd
 eofIfEmpty :: Key -> InputCmd InsertMode InsertMode
 eofIfEmpty k = acceptKeyM k $ \s -> if s == emptyIM
                     then Nothing
-                    else Just $ return (Change s, continue)
+                    else Just $ return $ Change s >=> continue
 
 startCommand :: InputCmd InsertMode InsertMode
 startCommand = KeyChar '\ESC' +> change enterCommandMode

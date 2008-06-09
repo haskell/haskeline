@@ -262,10 +262,11 @@ drawEffect prefix s (Redraw shouldClear t) = do
                 else redrawLine prefix t
 drawEffect prefix s (Change t) = do
             diffLinesBreaking prefix s t
-drawEffect prefix s (PrintLines ls t shouldDraw) = do
-                            moveToNextLine s
-                            output $ mconcat $ intersperse nl $ map text ls
-                            when shouldDraw $ do
-                                when (not (null ls)) $ output nl
-                                drawLine prefix t
+drawEffect prefix s (PrintLines ls t overwrite) = do
+            if overwrite
+                then diffLinesBreaking prefix s Cleared
+                else moveToNextLine s
+            output $ mconcat $ intersperse nl $ map text ls
+            when (not (null ls)) $ output nl
+            drawLine prefix t
 

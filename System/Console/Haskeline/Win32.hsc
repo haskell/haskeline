@@ -236,12 +236,13 @@ drawEffect :: (LineState s, LineState t, MonadIO m)
     => String -> s -> Effect t -> Draw (InputCmdT m) ()
 drawEffect prefix s (Change t) = do
     diffLinesBreaking prefix s t
-drawEffect prefix s (PrintLines ls t shouldDraw) = do
-    moveToNextLine s
+drawEffect prefix s (PrintLines ls t overwrite) = do
+    if overwrite
+        then diffLinesBreaking prefix s Cleared 
+        else moveToNextLine s
     printText $ intercalate crlf ls
-    when shouldDraw $ do
-        when (not (null ls)) $ printText crlf
-        drawLine prefix t
+    when (not (null ls)) $ printText crlf
+    drawLine prefix t
 drawEffect prefix s (Redraw shouldClear t) = do
     if shouldClear
         then clearScreenAndRedraw prefix t

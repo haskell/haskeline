@@ -38,37 +38,39 @@ completionCmd k = acceptKeyM k $ \s -> Just $ do
         _ -> pagingCompletion s rest completions
 
 pagingCompletion :: Monad m => InsertMode -> InsertMode -> [Completion] 
-                -> InputCmdT m (Effect InsertMode, Command (InputCmdT m) InsertMode InsertMode)
-pagingCompletion oldIM _ [] = return $ (Change oldIM,continue)
+                -> InputCmdT m (CmdAction (InputCmdT m) InsertMode)
+pagingCompletion oldIM _ [] = return $ Change oldIM >=> continue
 pagingCompletion _ im [newWord] 
-        = return (Change $ insertString (replacement newWord) im, continue)
+        = return $ (Change $ insertString (replacement newWord) im) >=> continue
 pagingCompletion oldIM im completions
-    | oldIM /= withPartial = return (Change withPartial, continue)
+    | oldIM /= withPartial = return $ Change withPartial >=> continue
     | otherwise = do
         layout <- ask
         let wordLines = makeLines (map display completions) layout
         prefs <- asks completionType
-        return $ printWordLines prefs layout wordLines withPartial
+        return $ printWordLines prefs layout wordLines withPartial True
   where
     withPartial = insertString partial im
     partial = foldl1 commonPrefix (map replacement completions)
     commonPrefix (c:cs) (d:ds) | c == d = c : commonPrefix cs ds
     commonPrefix _ _ = ""
 
-printWordLines :: Monad m => CompletionType -> Layout -> [String] -> InsertMode
-                -> (Effect InsertMode, Command (InputCmdT m) InsertMode InsertMode)
-printWordLines ctype layout wordLines im 
+printWordLines :: Monad m => CompletionType -> Layout -> [String] -> InsertMode -> Bool
+                -> CmdAction (InputCmdT m) InsertMode
+printWordLines ctype layout wordLines im isFirst
     -- TODO: here it's assumed that it's not menu
-    | usePaging ctype == False = (PrintLines wordLines im True,continue)
+    | usePaging ctype == False = PrintLines wordLines im overwrite >=> continue
     | otherwise = case splitAt (height layout-1) wordLines of
-                    (_,[]) -> (PrintLines wordLines im True,continue)
-                    (ws,rest) -> (PrintLines (ws ++ ["----More----"]) im False, 
-                        choiceCmd [
+            (_,[]) -> PrintLines wordLines im overwrite >=> continue
+            (ws,rest) -> (PrintLines ws (Message im "----More----") overwrite)
+                        >=> choiceCmd [
                             acceptKeyM (KeyChar ' ') $ \_ -> Just $ return $ 
-                                printWordLines ctype layout rest im,
+                                printWordLines ctype layout rest im False,
                             acceptKey (KeyChar 'q') $ \_ -> return $
                                 PrintLines [] im True
-                            ])
+                            ]
+    where
+        overwrite = not isFirst
 
 
 makeLines :: [String] -> Layout -> [String]
@@ -100,10 +102,10 @@ ceilDiv m n | m `rem` n == 0    =  m `div` n
             | otherwise         =  m `div` n + 1
 
 menuCompletion :: forall m . Monad m => Key -> InsertMode -> [InsertMode] 
-                    -> (Effect InsertMode, Command m InsertMode InsertMode)
-menuCompletion _ oldState [] = (Change oldState,continue)
-menuCompletion _ _ [c] = (Change c, continue)
-menuCompletion k oldState (c:cs) = (Change c, loop cs)
+                    -> CmdAction m InsertMode
+menuCompletion _ oldState [] = Change oldState >=> continue
+menuCompletion _ _ [c] = Change c >=> continue
+menuCompletion k oldState (c:cs) = Change c >=> loop cs
     where
         loop [] = choiceCmd [change (const oldState) k,continue]
         loop (d:ds) = choiceCmd [change (const d) k >|> loop ds,continue]
