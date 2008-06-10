@@ -22,11 +22,6 @@ module System.Console.Haskeline(InputT,
 
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Command
-{--
-import System.Console.Haskeline.Command.Undo
-import System.Console.Haskeline.Command.Paste
-import System.Console.Haskeline.Command.Completion
---}
 import System.Console.Haskeline.Command.History
 import System.Console.Haskeline.Vi
 import System.Console.Haskeline.Emacs
