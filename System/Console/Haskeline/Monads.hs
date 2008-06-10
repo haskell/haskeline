@@ -102,3 +102,9 @@ instance MonadTrans (StateT s) where
         x <- f
         return (x,s)
     lift2 f (StateT m) = StateT $ \s -> f (m s)
+
+
+bracketSet :: MonadIO m => IO a -> (a -> IO ()) -> a -> m b -> m b
+bracketSet getState set newState f = do
+    oldState <- liftIO getState
+    finallyIO (liftIO (set newState) >> f) (set oldState)

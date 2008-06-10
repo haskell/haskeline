@@ -53,19 +53,11 @@ defaultSettings = Settings {complete = completeFilename,
 -- characters are printed at once.  We'll keep it buffered here, and let the Draw
 -- monad manually flush outputs that don't print a newline.
 wrapTerminalOps:: MonadIO m => m a -> m a
-wrapTerminalOps f = do
-    oldInBuf <- liftIO $ hGetBuffering stdin
-    oldOutBuf <- liftIO $ hGetBuffering stdout
-    oldEcho <- liftIO $ hGetEcho stdout
-    let initialize = do 
-                        hSetBuffering stdin NoBuffering
-                        hSetBuffering stdout LineBuffering
-                        hSetEcho stdout False
-    let reset = do 
-                   hSetBuffering stdin oldInBuf
-                   hSetBuffering stdout oldOutBuf
-                   hSetEcho stdout oldEcho
-    finallyIO (liftIO initialize >> f) reset
+wrapTerminalOps =
+    bracketSet (hGetBuffering stdin) (hSetBuffering stdin) NoBuffering
+    . bracketSet (hGetBuffering stdout) (hSetBuffering stdout) LineBuffering
+    . bracketSet (hGetEcho stdout) (hSetEcho stdout) False
+
 
 getInputLine, getInputCmdLine :: forall m . MonadIO m => String -> InputT m (Maybe String)
 getInputLine prefix = do

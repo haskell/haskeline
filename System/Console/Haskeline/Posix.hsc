@@ -123,25 +123,27 @@ withGetEvent useSigINT f = do
         $ withWindowHandler eventChan
         $ withSigIntHandler useSigINT eventChan
         $ f $ liftIO $ getEvent eventChan baseMap
+
+-- If the keypad on/off capabilities are defined, wrap the computation with them.
+wrapKeypad :: MonadIO m => Terminal -> m a -> m a
+wrapKeypad term = bracketSet (return keypadOff) maybeOutput keypadOn
   where
-    wrapKeypad term g = finallyIO (liftIO (maybeOutput term keypadOn) >> g)
-                        (maybeOutput term keypadOff)
-    maybeOutput term cap = runTermOutput term $ 
-            fromMaybe mempty (getCapability term cap)
+        maybeOutput cap = runTermOutput term $
+                            fromMaybe mempty (getCapability term cap)
 
 withWindowHandler :: MonadIO m => TChan Event -> m a -> m a
-withWindowHandler eventChan f = do
-    let handler = getLayout >>= atomically . writeTChan eventChan . WindowResize
-    old_handler <- liftIO $ installHandler windowChange (Catch handler) Nothing
-    f `finallyIO` installHandler windowChange old_handler Nothing
+withWindowHandler eventChan = withHandler windowChange $ Catch $
+    getLayout >>= atomically . writeTChan eventChan . WindowResize
 
 withSigIntHandler :: MonadIO m => Bool -> TChan Event -> m a -> m a
-withSigIntHandler False _ f = f
-withSigIntHandler True eventChan f = do
-    let handler = atomically $ writeTChan eventChan SigInt
-    old_handler <- liftIO $ installHandler sigINT (CatchOnce handler) Nothing
-    f `finallyIO` installHandler sigINT old_handler Nothing
+withSigIntHandler False _ = id
+withSigIntHandler True eventChan = withHandler keyboardSignal $ CatchOnce $
+            atomically $ writeTChan eventChan SigInt
 
+withHandler :: MonadIO m => Signal -> Handler -> m a -> m a
+withHandler signal handler f = do
+    old_handler <- liftIO $ installHandler signal handler Nothing
+    f `finallyIO` installHandler signal old_handler Nothing
 
 getEvent :: TChan Event -> TreeMap Char Key -> IO Event
 getEvent eventChan baseMap = allocaArray bufferSize loop
