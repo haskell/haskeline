@@ -19,6 +19,8 @@ import System.Console.Haskeline.Settings
 import System.Directory
 import System.FilePath
 import Data.List(isPrefixOf, transpose, unfoldr)
+import Control.Exception(handle)
+import Control.Monad(forM)
 
 makeCompletion :: Monad m => CompletionFunc m -> InsertMode -> m (InsertMode, [Completion])
 makeCompletion f (IMode xs ys) = do
@@ -174,26 +176,32 @@ appendIfNotDir :: String -> FilePath -> FilePath
 appendIfNotDir str file | null (takeFileName file) = file
                         | otherwise = file ++ str
 
-addSlashToDir :: Completion -> IO Completion
-addSlashToDir c@Completion{replacement=file} = do
-    dirExists <- doesDirectoryExist file
-    return $ if dirExists 
-                then c {replacement = addTrailingPathSeparator file}
-                else c
-
 findFiles :: FilePath -> IO [Completion]
-findFiles path = do
-    dirExists <- doesDirectoryExist dirPath
+-- NOTE: 'handle' catches exceptions from getDirectoryContents and getHomeDirectory.
+findFiles path = handle (\_ -> return []) $ do
+    fixedDir <- fixPath dir
+    dirExists <- doesDirectoryExist fixedDir
+    -- get all of the files in that directory, as basenames
     allFiles <- if not dirExists
-        then return []
-        else fmap filterPrefix $ getDirectoryContents dirPath
-    let results = map (setReplacement (dir </>) . setDisplay takeFileName)
-                    $ map completion $ filterPrefix allFiles
-    mapM addSlashToDir results
+                    then return []
+                    else fmap (map completion . filterPrefix) 
+                            $ getDirectoryContents fixedDir
+    -- The replacement text should include the directory part, and also 
+    -- have a trailing slash if it's itself a directory.
+    forM allFiles $ \c -> do
+                    isDir <- doesDirectoryExist (fixedDir </> replacement c)
+                    return $ setReplacement (\f -> dir </> maybeAddSlash isDir f) c
   where
     (dir, file) = splitFileName path
-    dirPath = if null dir then "." else dir
     filterPrefix = filter (\f -> not (f `elem` [".",".."])
                                         && file `isPrefixOf` f)
+    maybeAddSlash False = id
+    maybeAddSlash True = addTrailingPathSeparator
 
-
+-- turn a user-visible path into an internal version useable by System.FilePath.
+fixPath :: String -> IO String
+fixPath "" = return "."
+fixPath ('~':c:path) | isPathSeparator c = do
+    home <- getHomeDirectory
+    return (home </> path)
+fixPath path = return path
