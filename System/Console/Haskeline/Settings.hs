@@ -26,6 +26,13 @@ data Settings m = Settings {complete :: CompletionFunc m,
                             maxHistorySize :: Maybe Int,
                             handleSigINT :: Bool}
 
+-- | Because 'complete' is the only field of 'Settings' depending on @m@,
+-- the expression @defaultSettings {completionFunc = f}@ leads to a type error
+-- from being too general.  This function may become unnecessary if another field
+-- depending on @m@ is added.
+setComplete :: CompletionFunc m -> Settings m -> Settings m
+setComplete f s = s {complete = f}
+
 data Prefs = Prefs { bellStyle :: BellStyle,
                      editMode :: EditMode,
                      completionType :: CompletionType
