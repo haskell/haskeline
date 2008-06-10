@@ -55,8 +55,8 @@ defaultSettings = Settings {complete = completeFilename,
                         handleSigINT = False}
 
 -- NOTE: If we set stdout to NoBuffering, there can be a flicker effect when many
--- characters are printed at once.  We'll keep it buffered here, and manually
--- flush outputs in repeatTillFinish that don't print a newline.
+-- characters are printed at once.  We'll keep it buffered here, and let the Draw
+-- monad manually flush outputs that don't print a newline.
 wrapTerminalOps:: MonadIO m => m a -> m a
 wrapTerminalOps f = do
     oldInBuf <- liftIO $ hGetBuffering stdin
@@ -110,7 +110,6 @@ repeatTillFinish getEvent prefix = loop
         -- same contexts, we need the -XGADTs flag (or -fglasgow-exts)
         loop :: forall t . LineState t => t -> KeyMap (InputCmdT m) t -> Draw (InputCmdT m) (Maybe String)
         loop s processor = do
-                liftIO (hFlush stdout)
                 event <- getEvent
                 case event of
                     SigInt -> do

@@ -11,6 +11,7 @@ module System.Console.Haskeline.Draw(Actions(),
 import System.Console.Terminfo
 import Control.Monad
 import Data.List(intersperse)
+import System.IO (hFlush,stdout)
 
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.LineState
@@ -106,6 +107,7 @@ output f = do
     toutput <- asks f
     term <- ask
     liftIO $ runTermOutput term toutput
+    liftIO $ hFlush stdout
 
 
 
