@@ -35,7 +35,7 @@ runInputTWithPrefs prefs settings (InputT f)
         $ runHistoryFromFile (historyFile settings) f
         
 
--- | Reads prefs from $HOME/.haskeline
+-- | Reads prefs from @$HOME/.haskeline@
 runInputT :: MonadIO m => Settings m -> InputT m a -> m a
 runInputT settings f = do
     prefs <- liftIO readPrefsOrDefault
