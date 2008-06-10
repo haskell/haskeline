@@ -145,8 +145,10 @@ completeWord esc ws f line = do
 simpleCompletion :: String -> Completion
 simpleCompletion = setReplacement (++ " ") . completion
 
+-- NOTE: this is the same as for readline, except that I took out the '\\'
+-- so they can be used as a path separator.
 filenameWordBreakChars :: String
-filenameWordBreakChars = " \t\n\\`@$><=;|&{("
+filenameWordBreakChars = " \t\n`@$><=;|&{("
 
 -- A completion command for file and folder names.
 completeFilename :: MonadIO m => CompletionFunc m
