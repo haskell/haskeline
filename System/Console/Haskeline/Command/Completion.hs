@@ -191,14 +191,21 @@ findFiles path = handle (\_ -> return []) $ do
     -- The replacement text should include the directory part, and also 
     -- have a trailing slash if it's itself a directory.
     forM allFiles $ \c -> do
-                    isDir <- doesDirectoryExist (fixedDir </> replacement c)
-                    return $ setReplacement (\f -> dir </> maybeAddSlash isDir f) c
+            isDir <- doesDirectoryExist (fixedDir </> replacement c)
+            return $ setReplacement (fullName . maybeAddSlash isDir) c
   where
     (dir, file) = splitFileName path
     filterPrefix = filter (\f -> not (f `elem` [".",".."])
                                         && file `isPrefixOf` f)
     maybeAddSlash False = id
     maybeAddSlash True = addTrailingPathSeparator
+    -- NOTE In order for completion to work properly, all of the alternatives
+    -- must have the exact same prefix.  As a result, </> is a little too clever;
+    -- for example, it doesn't prepend the directory if the file looks like
+    -- an absolute path (strange, but it can happen).
+    -- The FilePath docs state that (++) is an exact inverse of splitFileName, so
+    -- that's the right function to user here.
+    fullName f = dir ++ f
 
 -- turn a user-visible path into an internal version useable by System.FilePath.
 fixPath :: String -> IO String
