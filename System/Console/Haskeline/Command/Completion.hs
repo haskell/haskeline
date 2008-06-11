@@ -75,8 +75,7 @@ printWordLines ctype layout wordLines im isFirst
         pagingCmds ls = choiceCmd [
                             acceptKeyM (KeyChar ' ') $ \_ -> Just $ return $
                                 printWordLines ctype layout ls im False
-                            ,acceptKey (KeyChar 'q') $ \_ -> return $
-                                PrintLines [] im overwrite
+                            ,KeyChar 'q' +> change (const im)
                             ,acceptKeyM (KeyChar '\n') $ \_ -> Just $ return $
                                 printOneLine ls
                             ]
