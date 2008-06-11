@@ -149,6 +149,19 @@ withScreenBufferInfo f h = allocaBytes (#size CONSOLE_SCREEN_BUFFER_INFO)
             $ c_GetScreenBufferInfo h infoPtr
         f infoPtr
 
+
+getDisplayWindow :: HANDLE -> IO (Coord,Coord)
+getDisplayWindow = withScreenBufferInfo $ \p -> do
+    let windowPtr = (#ptr CONSOLE_SCREEN_BUFFER_INFO, srWindow) p
+    left <- (#peek SMALL_RECT, Left) windowPtr
+    top <- (#peek SMALL_RECT, Top) windowPtr
+    right <- (#peek SMALL_RECT, Right) windowPtr
+    bottom <- (#peek SMALL_RECT, Bottom) windowPtr
+    return (Coord (cvt left) (cvt top), Coord (cvt right) (cvt bottom))
+  where
+    cvt :: CShort -> Int
+    cvt = fromEnum
+
 ----------------------------
 -- Drawing
 
@@ -166,8 +179,9 @@ getOutputHandle = liftIO $ getStdHandle sTD_OUTPUT_HANDLE
 getLayout :: IO Layout
 getLayout = do
     h <- getOutputHandle
-    coord <- getConsoleSize h
-    return Layout {width = coordX coord, height = coordY coord}
+    (topLeft,bottomRight) <- getDisplayWindow h
+    return Layout {width = coordX bottomRight - coordX topLeft+1, 
+                    height = coordY bottomRight - coordY topLeft+1 }
     
 getPos :: MonadIO m => Draw m Coord
 getPos = getOutputHandle >>= liftIO . getPosition
