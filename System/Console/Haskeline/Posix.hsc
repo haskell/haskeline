@@ -15,6 +15,7 @@ import Control.Concurrent
 import Control.Concurrent.STM
 import Data.Maybe
 import System.Posix.Signals.Exts
+import System.Posix.IO(stdInput)
 import Data.List
 import System.IO
 
@@ -146,32 +147,36 @@ withHandler signal handler f = do
     f `finallyIO` installHandler signal old_handler Nothing
 
 getEvent :: TChan Event -> TreeMap Char Key -> IO Event
-getEvent eventChan baseMap = allocaArray bufferSize loop
-    where
-        bufferSize = 100
-        delay = 50000 -- 0.05 seconds
-        -- TODO: instead of this loop, use hWaitForInput or hGetBuf and interrupt
-        -- if an event lands in the eventChan first.
-        -- But I'm not sure if those functions are interruptible.
-        waitAndTryAgain buffer = threadDelay delay >> loop buffer
-        loop :: Ptr Word8 -> IO Event
-        loop buffer = do
-          me <- atomically $ tryReadTChan eventChan
-          case me of
-            Just e -> return e
-            Nothing -> do
-              numRead <- hGetBufNonBlocking stdin buffer bufferSize
-              if numRead < 1
-                then waitAndTryAgain buffer
-                else do
-                  ws <- peekArray numRead buffer
-                  let cs = map (toEnum . fromEnum) ws -- TODO: decode unicode here
-                  let ks = map KeyInput $ lexKeys baseMap cs
-                  case ks of
-                    [] -> waitAndTryAgain buffer
-                    k:ks' -> do 
-                      atomically $ mapM_ (writeTChan eventChan) ks'
-                      return k
-
+getEvent eventChan baseMap = do
+    -- first, see if any events are already queued up (from a key/ctrl-c
+    -- event or from a previous call to getEvent where we read in multiple
+    -- keys)
+    me <- atomically $ tryReadTChan eventChan
+    case me of
+        Just e -> return e
+        Nothing -> do
+            -- no events are queued yet, so fork off a thread to read keys.
+            -- if we receive a different type of event before it's done,
+            -- we'll kill it.
+            tid <- forkIO (allocaArray bufferSize readKeyEvents)
+            e <- atomically $ readTChan eventChan -- key or other event
+            killThread tid
+            return e
+  where
+    bufferSize = 100
+    readKeyEvents :: Ptr Word8 -> IO ()
+    readKeyEvents buffer = do
+        -- Read at least one character of input, and more if available.
+        -- In particular, the characters making up a control sequence will all
+        -- be available at once, so we can process them together with lexKeys.
+        threadWaitRead stdInput
+        numRead <- hGetBufNonBlocking stdin buffer bufferSize
+        ws <- peekArray numRead buffer
+        let cs = map (toEnum . fromEnum) ws
+        let ks = map KeyInput $ lexKeys baseMap cs
+        if null ks
+            then readKeyEvents buffer
+            else atomically $ mapM_ (writeTChan eventChan) ks
+            
 tryReadTChan :: TChan a -> STM (Maybe a)
 tryReadTChan chan = fmap Just (readTChan chan) `orElse` return Nothing
