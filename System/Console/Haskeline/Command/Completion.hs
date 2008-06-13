@@ -37,48 +37,76 @@ completionCmd k = acceptKeyM k $ \s -> Just $ do
     case ctype of
         MenuCompletion -> return $ menuCompletion k s
                         $ map (\c -> insertString (replacement c) rest) completions
-        _ -> pagingCompletion s rest completions
+        ListCompletions shouldPage listLimit -> 
+                pagingCompletion shouldPage listLimit s rest completions
 
-pagingCompletion :: Monad m => InsertMode -> InsertMode -> [Completion] 
+pagingCompletion :: Monad m => Bool -> Maybe Int 
+                -> InsertMode -> InsertMode -> [Completion] 
                 -> InputCmdT m (CmdAction (InputCmdT m) InsertMode)
-pagingCompletion oldIM _ [] = return $ Change oldIM >=> continue
-pagingCompletion _ im [newWord] 
+pagingCompletion _ _ oldIM _ [] = return $ Change oldIM >=> continue
+pagingCompletion _ _ _ im [newWord] 
         = return $ (Change $ insertString (replacement newWord) im) >=> continue
-pagingCompletion oldIM im completions
+pagingCompletion shouldPage listLimit oldIM im completions
     | oldIM /= withPartial = return $ Change withPartial >=> continue
     | otherwise = do
         layout <- ask
         let wordLines = makeLines (map display completions) layout
-        prefs <- asks completionType
-        return $ printWordLines prefs layout wordLines withPartial True
+        printingCmd <- if shouldPage
+                            then printPage wordLines withPartial False
+                            else return $ printAll wordLines withPartial
+        return $ askFirst listLimit (length completions) withPartial printingCmd
   where
     withPartial = insertString partial im
     partial = foldl1 commonPrefix (map replacement completions)
     commonPrefix (c:cs) (d:ds) | c == d = c : commonPrefix cs ds
     commonPrefix _ _ = ""
-
-printWordLines :: Monad m => CompletionType -> Layout -> [String] -> InsertMode -> Bool
-                -> CmdAction (InputCmdT m) InsertMode
-printWordLines ctype layout wordLines im isFirst
-    -- TODO: here it's assumed that it's not menu
-    | not (usePaging ctype) = printAll
-    | otherwise = case splitAt (height layout-1) wordLines of
-            (_,[]) -> printAll
-            (ws,rest) -> PrintLines ws message overwrite >=> pagingCmds rest
-    where
-        printAll = PrintLines wordLines im overwrite >=> continue
-        overwrite = not isFirst
-        printOneLine [] = printAll
-        printOneLine (l:ls) = PrintLines [l] message overwrite
-                            >=> pagingCmds ls
-        message = Message im "----More----"
-        pagingCmds ls = choiceCmd [
-                            acceptKeyM (KeyChar ' ') $ \_ -> Just $ return $
-                                printWordLines ctype layout ls im False
-                            ,KeyChar 'q' +> change (const im)
-                            ,acceptKeyM (KeyChar '\n') $ \_ -> Just $ return $
-                                printOneLine ls
+    
+askFirst :: Monad m => Maybe Int -> Int -> InsertMode
+            -> CmdAction (InputCmdT m) InsertMode
+            -> CmdAction (InputCmdT m) InsertMode
+askFirst mlimit numCompletions im printingCmd = case mlimit of
+    Just limit | limit < numCompletions -> 
+        Change (Message im ("Display all " ++ show numCompletions
+                            ++ " possibilities? (y or n)"))
+                    >=> choiceCmd [
+                            acceptKeyM (KeyChar 'y') $ \_ -> Just $ return $ 
+                                printingCmd
+                            , KeyChar 'n' +> change (const im)
                             ]
+    _ -> printingCmd
+
+printOneLine :: Monad m => [String] -> InsertMode -> CmdAction (InputCmdT m) InsertMode
+printOneLine (w:ws) im | not (null ws) =
+            PrintLines [w] (moreMessage im) True >=> pagingCommands ws im
+printOneLine _ im = Change im >=> continue
+
+moreMessage im = Message im "----More----"
+
+printPage :: Monad m => [String] -> InsertMode -> Bool 
+                    -> InputCmdT m (CmdAction (InputCmdT m) InsertMode)
+printPage ws im overwrite = do
+    layout <- ask
+    return $ case splitAt (height layout - 1) ws of
+        (_,[]) -> PrintLines ws im overwrite >=> continue
+        (ws,rest) -> PrintLines ws (moreMessage im) overwrite 
+                    >=> pagingCommands rest im
+
+
+-- TODO: move testing of nullity into here
+pagingCommands :: Monad m => [String] -> InsertMode
+                        -> Command (InputCmdT m) (Message InsertMode) InsertMode
+pagingCommands ws im = choiceCmd [
+                            acceptKeyM (KeyChar ' ') $ \_ -> Just $
+                                printPage ws im True
+                            ,KeyChar 'q' +> change (const im)
+                           ,acceptKeyM (KeyChar '\n') $ \_ -> Just $ return $
+                                printOneLine ws im
+                            ]
+
+
+printAll :: Monad m => [String] -> InsertMode 
+            -> CmdAction (InputCmdT m) InsertMode
+printAll ws im = PrintLines ws im False >=> continue
 
 
 makeLines :: [String] -> Layout -> [String]
@@ -103,6 +131,13 @@ splitIntoGroups n xs = transpose $ unfoldr f xs
         f [] = Nothing
         f ys = Just (splitAt k ys)
         k = ceilDiv (length xs) n
+
+-- TODO: merge with above.
+splitGroups :: Int -> [a] -> [[a]]
+splitGroups n xs = case splitAt n xs of
+                    (_,[]) -> [xs]
+                    (ys,zs) -> ys : splitGroups n zs
+
 
 -- ceilDiv m n is the smallest k such that k * n >= m.
 ceilDiv :: Integral a => a -> a -> a
