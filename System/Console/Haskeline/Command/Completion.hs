@@ -61,7 +61,7 @@ printWordLines :: Monad m => CompletionType -> Layout -> [String] -> InsertMode 
                 -> CmdAction (InputCmdT m) InsertMode
 printWordLines ctype layout wordLines im isFirst
     -- TODO: here it's assumed that it's not menu
-    | usePaging ctype == False = printAll
+    | not (usePaging ctype) = printAll
     | otherwise = case splitAt (height layout-1) wordLines of
             (_,[]) -> printAll
             (ws,rest) -> PrintLines ws message overwrite >=> pagingCmds rest

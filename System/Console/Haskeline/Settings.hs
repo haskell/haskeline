@@ -11,7 +11,7 @@ data Completion = Completion {replacement, display :: String}
 
 data CompletionType = MenuCompletion
                     -- ^ Cycle through the alternatives one at a time
-                    | CompletionType { -- TODO: listChoicesImmediately :: Bool,
+                    | ListCompletions { -- TODO: listChoicesImmediately :: Bool,
                                   usePaging :: Bool,
                                   askBeforeListing :: Maybe Int
                                     -- ^ If this is set to @Just n@, then warn
@@ -48,7 +48,7 @@ data EditMode = Vi | Emacs
 defaultPrefs :: Prefs
 defaultPrefs = Prefs {bellStyle = AudibleBell,
                       editMode = Emacs,
-                      completionType = CompletionType {
+                      completionType = ListCompletions {
                                 usePaging = True,
                                 askBeforeListing = Just 100
                                 }
