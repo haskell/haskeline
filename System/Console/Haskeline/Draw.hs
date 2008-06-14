@@ -23,7 +23,7 @@ import System.Console.Haskeline.InputT
 -- 
 -- We'll be frequently using the (automatic) 'Monoid' instance for 
 -- @Actions -> TermOutput@.
-data Actions = Actions {leftA, rightA, upA, downA :: Int -> TermOutput,
+data Actions = Actions {leftA, rightA, upA :: Int -> TermOutput,
                         clearToLineEnd :: TermOutput,
                         nl, cr :: TermOutput,
                         clearAll :: LinesAffected -> TermOutput,
@@ -34,13 +34,12 @@ getActions = do
     leftA' <- moveLeft
     rightA' <- moveRight
     upA' <- moveUp
-    downA' <- moveDown
     clearToLineEnd' <- clearEOL
     clearAll' <- clearScreen
     nl' <- newline
     cr' <- carriageReturn
     wrapLine' <- getWrapLine nl' (leftA' 1)
-    return Actions{leftA=leftA',rightA=rightA',upA=upA',downA=downA',
+    return Actions{leftA=leftA',rightA=rightA',upA=upA',
                 clearToLineEnd=clearToLineEnd',nl=nl',cr=cr',
                 clearAll=clearAll',
                  wrapLine=wrapLine'}
