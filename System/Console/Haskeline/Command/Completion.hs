@@ -71,13 +71,13 @@ askFirst mlimit numCompletions im printingCmd = case mlimit of
                     >=> choiceCmd [
                             acceptKeyM (KeyChar 'y') $ \_ -> Just $ return $ 
                                 printingCmd
-                            , KeyChar 'n' +> change (const im)
+                            , KeyChar 'n' +> change messageState
                             ]
     _ -> printingCmd
 
 printOneLine :: Monad m => [String] -> InsertMode -> CmdAction (InputCmdT m) InsertMode
 printOneLine (w:ws) im | not (null ws) =
-            PrintLines [w] (moreMessage im) True >=> pagingCommands ws im
+            PrintLines [w] (moreMessage im) True >=> pagingCommands ws
 printOneLine _ im = Change im >=> continue
 
 moreMessage im = Message im "----More----"
@@ -89,18 +89,17 @@ printPage ws im overwrite = do
     return $ case splitAt (height layout - 1) ws of
         (_,[]) -> PrintLines ws im overwrite >=> continue
         (ws,rest) -> PrintLines ws (moreMessage im) overwrite 
-                    >=> pagingCommands rest im
+                    >=> pagingCommands rest
 
 
 -- TODO: move testing of nullity into here
-pagingCommands :: Monad m => [String] -> InsertMode
-                        -> Command (InputCmdT m) (Message InsertMode) InsertMode
-pagingCommands ws im = choiceCmd [
-                            acceptKeyM (KeyChar ' ') $ \_ -> Just $
-                                printPage ws im True
-                            ,KeyChar 'q' +> change (const im)
-                           ,acceptKeyM (KeyChar '\n') $ \_ -> Just $ return $
-                                printOneLine ws im
+pagingCommands :: Monad m => [String] -> Command (InputCmdT m) (Message InsertMode) InsertMode
+pagingCommands ws = choiceCmd [
+                            acceptKeyM (KeyChar ' ') $ \m -> Just $
+                                printPage ws (messageState m) True
+                            ,KeyChar 'q' +> change messageState
+                           ,acceptKeyM (KeyChar '\n') $ \m -> Just $ return $
+                                printOneLine ws (messageState m)
                             ]
 
 
