@@ -1,11 +1,12 @@
-module System.Console.Haskeline.Draw(Actions(),
-                            getActions,
+module System.Console.Haskeline.Draw(
                             Draw(),
                             runDraw,
-                            drawLine,
                             withReposition,
                             moveToNextLine,
-                            drawEffect)
+                            printLines,
+                            drawLineDiff,
+                            clearLayout
+                            )
                              where
 
 import System.Console.Terminfo
@@ -163,9 +164,9 @@ fillLine str = do
                 put TermPos {termRow=r+1,termCol=0}
                 return rest
 
-diffLinesBreaking :: (LineState s, LineState t, MonadIO m) 
+drawLineDiff :: (LineState s, LineState t, MonadIO m) 
                         => String -> s -> t -> Draw (InputCmdT m) ()
-diffLinesBreaking prefix s1 s2 = let 
+drawLineDiff prefix s1 s2 = let 
     xs1 = beforeCursor prefix s1
     ys1 = afterCursor s1
     xs2 = beforeCursor prefix s2
@@ -208,24 +209,11 @@ clearDeadText n
                     , up (numLinesToClear - 1)
                     , right (termCol pos)]
 
-drawLine :: (LineState s, MonadIO m) => String -> s -> Draw (InputCmdT m) ()
-drawLine prefix s = do
-    printText (beforeCursor prefix s ++ afterCursor s)
-    changeLeft (lengthToEnd s)
-
-redrawLine :: (LineState s, MonadIO m) => String -> s -> Draw (InputCmdT m) ()
-redrawLine prefix s = do
-    pos <- get
-    output $ left (termCol pos) <#> up (termRow pos)
-    put initTermPos
-    drawLine prefix s
-
-clearScreenAndRedraw :: (LineState s, MonadIO m) => String -> s -> Draw (InputCmdT m) ()
-clearScreenAndRedraw prefix s = do
+clearLayout :: MonadIO m => Draw (InputCmdT m) ()
+clearLayout = do
     h <- asks height
     output (flip clearAll h)
     put initTermPos
-    drawLine prefix s
 
 moveToNextLine :: (LineState s, MonadIO m) => s -> Draw (InputCmdT m) ()
 moveToNextLine s = do
@@ -255,20 +243,6 @@ withReposition newLayout f = do
     put newPos
     lift2 (local newLayout) f
 
-
-drawEffect :: (LineState s,LineState t, MonadIO m)
-        => String -> s -> Effect t -> Draw (InputCmdT m) ()
-drawEffect prefix s (Redraw shouldClear t) = do
-            if shouldClear
-                then clearScreenAndRedraw prefix s
-                else redrawLine prefix t
-drawEffect prefix s (Change t) = do
-            diffLinesBreaking prefix s t
-drawEffect prefix s (PrintLines ls t overwrite) = do
-            if overwrite
-                then diffLinesBreaking prefix s Cleared
-                else moveToNextLine s
-            output $ mconcat $ intersperse nl $ map text ls
-            when (not (null ls)) $ output nl
-            drawLine prefix t
-
+printLines :: MonadIO m => [String] -> Draw m ()
+printLines [] = return ()
+printLines ls = output $ mconcat $ intersperse nl (map text ls) ++ [nl]

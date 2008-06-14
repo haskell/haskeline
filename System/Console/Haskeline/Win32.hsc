@@ -1,12 +1,13 @@
 module System.Console.Haskeline.Win32(
+                getLayout,
+                withGetEvent,
                 Draw(),
                 runDraw,
-                getLayout,
-                drawEffect,
-                moveToNextLine,
-                drawLine,
                 withReposition,
-                withGetEvent
+                moveToNextLine,
+                printLines,
+                drawLineDiff,
+                clearLayout
                 )where
 
 
@@ -209,14 +210,9 @@ printAfter str = do
     printText str
     setPos p
     
-drawLine :: (MonadIO m, LineState s) => String -> s -> Draw (InputCmdT m) ()
-drawLine prefix s = do
-    printText (beforeCursor prefix s)
-    printAfter (afterCursor s)
-    
-diffLinesBreaking :: (LineState s, LineState t, MonadIO m)
+drawLineDiff :: (LineState s, LineState t, MonadIO m)
                         => String -> s -> t -> Draw (InputCmdT m) ()
-diffLinesBreaking prefix s1 s2 = let
+drawLineDiff prefix s1 s2 = let
     xs1 = beforeCursor prefix s1
     ys1 = afterCursor s1
     xs2 = beforeCursor prefix s2
@@ -246,34 +242,16 @@ movePos n = do
 
 crlf = "\r\n"
 
-drawEffect :: (LineState s, LineState t, MonadIO m) 
-    => String -> s -> Effect t -> Draw (InputCmdT m) ()
-drawEffect prefix s (Change t) = do
-    diffLinesBreaking prefix s t
-drawEffect prefix s (PrintLines ls t overwrite) = do
-    if overwrite
-        then diffLinesBreaking prefix s Cleared 
-        else moveToNextLine s
-    printText $ intercalate crlf ls
-    when (not (null ls)) $ printText crlf
-    drawLine prefix t
-drawEffect prefix s (Redraw shouldClear t) = do
-    if shouldClear
-        then clearScreenAndRedraw prefix t
-        else redrawLine prefix t
-  where
-    redrawLine prefix t = do
-        movePos $ negate $ length $ beforeCursor prefix s
-        drawLine prefix t
-    -- TODO: this scrolls all the way to the top; is that right?
-    -- also: should I be using FillConsoleOutputCharacter?
-    clearScreenAndRedraw prefix t = do
-        lay <- liftIO getLayout
-        setPos (Coord 0 0)
-        printText (replicate (width lay * height lay) ' ')
-        setPos (Coord 0 0)
-        drawLine prefix t
+clearLayout :: MonadIO m => Draw m ()
+clearLayout = do
+    lay <- liftIO getLayout
+    setPos (Coord 0 0)
+    printText (replicate (width lay * height lay) ' ')
+    setPos (Coord 0 0)
 
+printLines :: MonadIO m => [String] -> Draw m ()
+printLines [] = return ()
+printLines ls = printText $ intercalate crlf ls ++ crlf
 
 -- TODO: implement
 withReposition :: Monad m => Layout -> Draw (InputCmdT m) a -> Draw (InputCmdT m) a

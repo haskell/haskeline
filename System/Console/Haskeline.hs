@@ -120,3 +120,25 @@ handleInterrupt :: MonadIO m => IO a -> m a -> m a
 handleInterrupt f = handleIO $ \e -> case dynExceptions e of
                     Just dyn | Just Interrupt <- fromDynamic dyn -> f
                     _ -> throwIO e
+
+
+
+drawEffect :: (LineState s, LineState t, MonadIO m) 
+    => String -> s -> Effect t -> Draw (InputCmdT m) ()
+drawEffect prefix s (Redraw shouldClear t) = if shouldClear
+    then clearLayout >> drawLine prefix t
+    else clearLine prefix s >> drawLine prefix t
+drawEffect prefix s (Change t) = drawLineDiff prefix s t
+drawEffect prefix s (PrintLines ls t overwrite) = do
+    if overwrite
+        then clearLine prefix s
+        else moveToNextLine s
+    printLines ls
+    drawLine prefix t
+
+drawLine :: (LineState s, MonadIO m) => String -> s -> Draw (InputCmdT m) ()
+drawLine prefix s = drawLineDiff prefix Cleared s
+
+clearLine :: (LineState s, MonadIO m) => String -> s -> Draw (InputCmdT m) ()
+clearLine prefix s = drawLineDiff prefix s Cleared
+        
