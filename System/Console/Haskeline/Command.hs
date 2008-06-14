@@ -129,7 +129,7 @@ loopWithBreak cmd end f = Command $ \next ->
 try :: Command m s s -> Command m s s
 try (Command f) = Command $ \next -> (f next) `orKM` next
 
-finish :: forall s m t . (LineState s, Monad m) => Key -> Command m s t
+finish :: forall s m t . (Result s, Monad m) => Key -> Command m s t
 finish k = Command $ \_-> KeyMap $ Map.singleton k $ Left . Just . toResult
 
 failCmd :: forall s m t . (LineState s, Monad m) => Key -> Command m s t

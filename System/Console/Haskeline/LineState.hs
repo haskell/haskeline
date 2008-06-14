@@ -4,12 +4,14 @@ module System.Console.Haskeline.LineState where
 class LineState s where
     beforeCursor :: String -> s -> String -- text to left of cursor
     afterCursor :: s -> String -- text under and to right of cursor
+
+class LineState s => Result s where
     toResult :: s -> String
 
 lengthToEnd :: LineState s => s -> Int
 lengthToEnd = length . afterCursor
 
-class LineState s => FromString s where
+class (Result s) => FromString s where
     fromString :: String -> s
 
 class Move s where
@@ -22,6 +24,8 @@ data InsertMode = IMode String String
 instance LineState InsertMode where
     beforeCursor prefix (IMode xs _) = prefix ++ reverse xs
     afterCursor (IMode _ ys) = ys
+
+instance Result InsertMode where
     toResult (IMode xs ys) = reverse xs ++ ys
 
 instance Move InsertMode where
@@ -68,6 +72,8 @@ instance LineState CommandMode where
     beforeCursor prefix (CMode xs _ _) = prefix ++ reverse xs
     afterCursor CEmpty = ""
     afterCursor (CMode _ c ys) = c:ys
+
+instance Result CommandMode where
     toResult CEmpty = ""
     toResult (CMode xs c ys) = reverse xs ++ (c:ys)
 
@@ -126,6 +132,8 @@ instance LineState s => LineState (ArgMode s) where
     beforeCursor _ am = beforeCursor ("(arg: " ++ show (arg am) ++ ") ")
                             (argState am)
     afterCursor = afterCursor . argState
+
+instance Result s => Result (ArgMode s) where
     toResult = toResult . argState
 
 startArg :: Int -> s -> ArgMode s
@@ -149,11 +157,9 @@ data Cleared = Cleared
 instance LineState Cleared where
     beforeCursor _ Cleared = ""
     afterCursor Cleared = ""
-    toResult Cleared = ""
 
 data Message s = Message {messageState :: s, messageText :: String}
 
 instance LineState s => LineState (Message s) where
     beforeCursor _ = messageText
     afterCursor _ = ""
-    toResult = toResult . messageState

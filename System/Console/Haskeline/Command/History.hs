@@ -66,6 +66,8 @@ instance LineState SearchMode where
     beforeCursor _ sm = beforeCursor prefix (foundHistory sm)
         where prefix = "(reverse-i-search)`" ++ searchTerm sm ++ "'"
     afterCursor = afterCursor . foundHistory
+
+instance Result SearchMode where
     toResult = toResult . foundHistory
 
 find :: String -> [String] -> Maybe ([String], String, [String])
