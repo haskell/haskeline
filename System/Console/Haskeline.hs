@@ -47,7 +47,6 @@ import System.Console.Haskeline.Posix
 defaultSettings :: MonadIO m => Settings m
 defaultSettings = Settings {complete = completeFilename,
                         historyFile = Nothing,
-                        maxHistorySize = Nothing,
                         handleSigINT = False}
 
 -- NOTE: If we set stdout to NoBuffering, there can be a flicker effect when many

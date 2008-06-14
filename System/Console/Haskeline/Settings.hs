@@ -23,7 +23,6 @@ data CompletionType = MenuCompletion
 
 data Settings m = Settings {complete :: CompletionFunc m,
                             historyFile :: Maybe String,
-                            maxHistorySize :: Maybe Int,
                             handleSigINT :: Bool}
 
 -- | Because 'complete' is the only field of 'Settings' depending on @m@,
@@ -35,6 +34,7 @@ setComplete f s = s {complete = f}
 
 data Prefs = Prefs { bellStyle :: BellStyle,
                      editMode :: EditMode,
+                     maxHistorySize :: Maybe Int,
                      completionType :: CompletionType
                      }
                         deriving (Read,Show)
@@ -47,6 +47,7 @@ data EditMode = Vi | Emacs
 
 defaultPrefs :: Prefs
 defaultPrefs = Prefs {bellStyle = AudibleBell,
+                      maxHistorySize = Nothing,
                       editMode = Emacs,
                       completionType = ListCompletions {
                                 usePaging = True,

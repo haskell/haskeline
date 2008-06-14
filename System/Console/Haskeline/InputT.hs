@@ -32,7 +32,7 @@ liftCmdT = lift  . lift . lift . lift
 runInputTWithPrefs :: MonadIO m => Prefs -> Settings m -> InputT m a -> m a
 runInputTWithPrefs prefs settings (InputT f) 
     = evalReaderT settings $ evalReaderT prefs 
-        $ runHistoryFromFile (historyFile settings) f
+        $ runHistoryFromFile (historyFile settings) (maxHistorySize prefs) f
         
 
 -- | Reads prefs from @$HOME/.haskeline@
