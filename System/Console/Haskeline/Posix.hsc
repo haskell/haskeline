@@ -44,22 +44,31 @@ getLayout = allocaBytes (#size struct winsize) $ \ws -> do
 
 --------------------
 -- Key sequences
+
 getKeySequences :: Terminal -> IO (TreeMap Char Key)
 getKeySequences term = do
     sttys <- sttyKeys
-    let tinfos = terminfoKeys term
+    let tinfos = fromMaybe ansiKeys (terminfoKeys term)
     let chars = map (\c -> ([c],KeyChar c)) $ map toEnum [0..127]
     let metas = map (\c -> (['\ESC',c],KeyMeta c)) $ map toEnum [0..127]
     -- note ++ acts as a union; so the below favors sttys over chars
     return $ listToTree $ chars ++ metas ++ tinfos ++ sttys
 
 
-terminfoKeys :: Terminal -> [(String, Key)]
-terminfoKeys term = catMaybes $ map getSequence keyCapabilities
-        where getSequence (cap,x) = getCapability term $ do 
+ansiKeys :: [(String, Key)]
+ansiKeys = [("\ESC[D",  KeyLeft)
+            ,("\ESC[C",  KeyRight)
+            ,("\ESC[A",  KeyUp)
+            ,("\ESC[B",  KeyDown)
+            ,("\b",      Backspace)]
+
+terminfoKeys :: Terminal -> Maybe [(String,Key)]
+terminfoKeys term = getCapability term $ mapM getSequence keyCapabilities
+    where 
+        getSequence (cap,x) = do 
                             keys <- cap
                             return (keys,x)
-              keyCapabilities = 
+        keyCapabilities = 
                 [(keyLeft,KeyLeft),
                 (keyRight,KeyRight),
                 (keyUp,KeyUp),
