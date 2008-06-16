@@ -14,7 +14,7 @@ import Control.Exception(handle,evaluate)
 newtype InputT m a = InputT (StateT History (ReaderT Prefs 
                                 (ReaderT (Settings m) m)) a) 
                             deriving (Monad,MonadIO, MonadState History,
-                                        MonadReader Prefs)
+                                        MonadReader Prefs, MonadReader (Settings m))
 
 instance MonadTrans InputT where
     lift = InputT . lift . lift . lift

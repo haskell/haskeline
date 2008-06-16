@@ -1,6 +1,6 @@
-module System.Console.Haskeline.Posix (
-                        withGetEvent,
-                        getLayout,
+module System.Console.Haskeline.Backend.Posix (
+                        withPosixGetEvent,
+                        getPosixLayout,
                         mapLines
                  ) where
 
@@ -29,8 +29,8 @@ import System.Console.Haskeline.Command
 
 foreign import ccall ioctl :: CInt -> CULong -> Ptr a -> IO ()
 
-getLayout :: IO Layout
-getLayout = allocaBytes (#size struct winsize) $ \ws -> do
+getPosixLayout :: IO Layout
+getPosixLayout = allocaBytes (#size struct winsize) $ \ws -> do
                             ioctl 1 (#const TIOCGWINSZ) ws
                             rows :: CUShort <- (#peek struct winsize,ws_row) ws
                             cols :: CUShort <- (#peek struct winsize,ws_col) ws
@@ -45,10 +45,11 @@ getLayout = allocaBytes (#size struct winsize) $ \ws -> do
 --------------------
 -- Key sequences
 
-getKeySequences :: Terminal -> IO (TreeMap Char Key)
+-- TODO: What if term not found?
+getKeySequences :: Maybe Terminal -> IO (TreeMap Char Key)
 getKeySequences term = do
     sttys <- sttyKeys
-    let tinfos = fromMaybe ansiKeys (terminfoKeys term)
+    let tinfos = fromMaybe ansiKeys (term >>= terminfoKeys)
     let chars = map (\c -> ([c],KeyChar c)) $ map toEnum [0..127]
     let metas = map (\c -> (['\ESC',c],KeyMeta c)) $ map toEnum [0..127]
     -- note ++ acts as a union; so the below favors sttys over chars
@@ -123,10 +124,8 @@ lexKeys baseMap = loop baseMap
 
 ---- '------------------------
 
-withGetEvent :: (MonadReader Terminal m, MonadIO m) 
-                => Bool -> (m Event -> m a) -> m a
-withGetEvent useSigINT f = do
-    term <- ask
+withPosixGetEvent :: MonadIO m => Maybe Terminal -> Bool -> (m Event -> m a) -> m a
+withPosixGetEvent term useSigINT f = do
     baseMap <- liftIO (getKeySequences term)
     eventChan <- liftIO $ newTChanIO
     wrapKeypad term 
@@ -135,15 +134,16 @@ withGetEvent useSigINT f = do
         $ f $ liftIO $ getEvent eventChan baseMap
 
 -- If the keypad on/off capabilities are defined, wrap the computation with them.
-wrapKeypad :: MonadIO m => Terminal -> m a -> m a
-wrapKeypad term = bracketSet (return keypadOff) maybeOutput keypadOn
+wrapKeypad :: MonadIO m => Maybe Terminal -> m a -> m a
+wrapKeypad Nothing = id
+wrapKeypad (Just term) = bracketSet (return keypadOff) maybeOutput keypadOn
   where
         maybeOutput cap = runTermOutput term $
                             fromMaybe mempty (getCapability term cap)
 
 withWindowHandler :: MonadIO m => TChan Event -> m a -> m a
 withWindowHandler eventChan = withHandler windowChange $ Catch $
-    getLayout >>= atomically . writeTChan eventChan . WindowResize
+    getPosixLayout >>= atomically . writeTChan eventChan . WindowResize
 
 withSigIntHandler :: MonadIO m => Bool -> TChan Event -> m a -> m a
 withSigIntHandler False _ = id

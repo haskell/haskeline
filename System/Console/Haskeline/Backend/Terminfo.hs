@@ -1,11 +1,6 @@
-module System.Console.Haskeline.Draw(
+module System.Console.Haskeline.Backend.Terminfo(
                             Draw(),
-                            runDraw,
-                            withReposition,
-                            moveToNextLine,
-                            printLines,
-                            drawLineDiff,
-                            clearLayout
+                            runTerminfoDraw
                             )
                              where
 
@@ -13,11 +8,14 @@ import System.Console.Terminfo
 import Control.Monad
 import Data.List(intersperse)
 import System.IO (hFlush,stdout)
+import Control.Exception as Exception
 
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Command
 import System.Console.Haskeline.InputT
+import System.Console.Haskeline.Term
+import System.Console.Haskeline.Backend.Posix
 
 -- | Keep track of all of the output capabilities we can use.
 -- 
@@ -44,6 +42,20 @@ getActions = do
                 clearAll=clearAll',
                  wrapLine=wrapLine'}
 
+{--
+ansiActions :: Actions
+ansiActions = Actions {leftA = numArg "\ESC[D",
+                        rightA = numArg "\ESC[C",
+                        upA = numArg "\ESC[A",
+                        clearToLineEnd = termText "\ESC[K",
+                        nl = termText "\n",
+                        cr = termText "\r",
+                        clearAll = \_ -> termText "\ESC[H\ESC[J",
+                        wrapLine = mempty -- Not sure about this...
+                        }
+    where
+        numArg s k = termText $ concat $ replicate k s
+--}
 text :: String -> Actions -> TermOutput
 text str _ = termText str
 
@@ -91,17 +103,21 @@ instance MonadTrans Draw where
     lift = Draw . lift . lift . lift
     lift2 f (Draw m) = Draw $ lift2 (lift2 (lift2 f)) m
     
--- TODO: cache the terminal, actions?
-runDraw :: MonadIO m => Draw m a -> m a
-runDraw (Draw f) = do
-    term <- liftIO setupTermFromEnv
-    -- TODO: use one-line dumb terminal if the below fails.
-    let Just actions = getCapability term getActions
-    evalStateT initTermPos $ evalReaderT term
-        $ evalReaderT actions f
-
-
-
+runTerminfoDraw :: IO (Maybe (RunTerm Draw))
+runTerminfoDraw = do
+    mterm <- Exception.try setupTermFromEnv
+    case mterm of
+        Left _ -> return Nothing
+        Right term -> case getCapability term getActions of
+            Nothing -> return Nothing
+            Just actions -> return $ Just $ RunTerm {
+                getLayout = getPosixLayout,
+                withGetEvent = withPosixGetEvent (Just term),
+                runTerm = \(Draw f) -> evalStateT initTermPos 
+                                    $ evalReaderT term
+                                    $ evalReaderT actions f
+                }
+    
 output :: MonadIO m => (Actions -> TermOutput) -> Draw m ()
 output f = do
     toutput <- asks f
@@ -163,9 +179,9 @@ fillLine str = do
                 put TermPos {termRow=r+1,termCol=0}
                 return rest
 
-drawLineDiff :: (LineState s, LineState t, MonadIO m) 
+drawLineDiffT :: (LineState s, LineState t, MonadIO m) 
                         => String -> s -> t -> Draw (InputCmdT m) ()
-drawLineDiff prefix s1 s2 = let 
+drawLineDiffT prefix s1 s2 = let 
     xs1 = beforeCursor prefix s1
     ys1 = afterCursor s1
     xs2 = beforeCursor prefix s2
@@ -208,14 +224,14 @@ clearDeadText n
                     , up (numLinesToClear - 1)
                     , right (termCol pos)]
 
-clearLayout :: MonadIO m => Draw (InputCmdT m) ()
-clearLayout = do
+clearLayoutT :: MonadIO m => Draw (InputCmdT m) ()
+clearLayoutT = do
     h <- asks height
     output (flip clearAll h)
     put initTermPos
 
-moveToNextLine :: (LineState s, MonadIO m) => s -> Draw (InputCmdT m) ()
-moveToNextLine s = do
+moveToNextLineT :: (LineState s, MonadIO m) => s -> Draw (InputCmdT m) ()
+moveToNextLineT s = do
     pos <- get
     layout <- ask
     output $ mreplicate (lsLinesLeft layout pos s) nl
@@ -234,14 +250,19 @@ reposition :: Layout -> Layout -> TermPos -> TermPos
 reposition oldLayout newLayout oldPos = posFromLength newLayout $ 
                                             posToLength oldLayout oldPos
 
-withReposition :: Monad m => Layout -> Draw (InputCmdT m) a -> Draw (InputCmdT m) a
-withReposition newLayout f = do
+withRepositionT :: Monad m => Layout -> Draw (InputCmdT m) a -> Draw (InputCmdT m) a
+withRepositionT newLayout f = do
     oldPos <- get
     oldLayout <- ask
     let newPos = reposition oldLayout newLayout oldPos
     put newPos
     lift2 (local newLayout) f
 
-printLines :: MonadIO m => [String] -> Draw m ()
-printLines [] = return ()
-printLines ls = output $ mconcat $ intersperse nl (map text ls) ++ [nl]
+instance Term Draw where
+    drawLineDiff = drawLineDiffT
+    withReposition = withRepositionT
+    
+    printLines [] = return ()
+    printLines ls = output $ mconcat $ intersperse nl (map text ls) ++ [nl] 
+    clearLayout = clearLayoutT
+    moveToNextLine = moveToNextLineT

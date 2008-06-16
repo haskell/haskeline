@@ -29,6 +29,7 @@ import System.Console.Haskeline.Emacs
 import System.Console.Haskeline.Settings
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.InputT
+import System.Console.Haskeline.Term
 import System.Console.Haskeline.Command.Completion
 
 import System.IO
@@ -38,10 +39,9 @@ import Control.Exception
 import Data.Dynamic
 
 #ifdef MINGW
-import System.Console.Haskeline.Win32
+import System.Console.Haskeline.Backend.Win32 as Win32
 #else
-import System.Console.Haskeline.Draw
-import System.Console.Haskeline.Posix
+import System.Console.Haskeline.Backend.Terminfo as Terminfo
 #endif
 
 defaultSettings :: MonadIO m => Settings m
@@ -57,6 +57,24 @@ wrapTerminalOps =
     bracketSet (hGetBuffering stdin) (hSetBuffering stdin) NoBuffering
     . bracketSet (hGetBuffering stdout) (hSetBuffering stdout) LineBuffering
     . bracketSet (hGetEcho stdout) (hSetEcho stdout) False
+
+
+-- TODO: Check at runtime which to use
+-- dumb term, and also mingw win32 vs cygwin posix
+myRunTerm :: IO (RunTerm MyTerm)
+
+#ifdef MINGW
+type MyTerm = Win32.Draw
+myRunTerm = return win32Term
+#else
+type MyTerm = Terminfo.Draw
+myRunTerm = do
+    mRun <- runTerminfoDraw
+    case mRun of 
+        Nothing -> error "Couldn't load terminfo and its actions."
+        Just run -> return run
+#endif
+
 
 
 getInputLine, getInputCmdLine :: forall m . MonadIO m => String -> InputT m (Maybe String)
@@ -75,12 +93,13 @@ getInputCmdLine prefix = do
     emode <- asks (\prefs -> case editMode prefs of
                     Vi -> viActions
                     Emacs -> emacsCommands)
+    settings :: Settings m <- ask
     wrapTerminalOps $ do
         let ls = emptyIM
-        layout <- liftIO getLayout
+        run <- liftIO $ myRunTerm
+        layout <- liftIO $ getLayout run
         result <- runInputCmdT layout $ do
-                    (settings :: Settings m) <- ask
-                    runDraw $ withGetEvent (handleSigINT settings) 
+                    runTerm run $ withGetEvent run (handleSigINT settings) 
                         $ \getEvent -> do
                             drawLine prefix ls 
                             repeatTillFinish getEvent prefix ls emode

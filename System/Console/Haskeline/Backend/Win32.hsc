@@ -1,13 +1,6 @@
-module System.Console.Haskeline.Win32(
-                getLayout,
-                withGetEvent,
+module System.Console.Haskeline.Backend.Win32(
                 Draw(),
-                runDraw,
-                withReposition,
-                moveToNextLine,
-                printLines,
-                drawLineDiff,
-                clearLayout
+                win32Term
                 )where
 
 
@@ -27,6 +20,7 @@ import System.Console.Haskeline.Command
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.InputT
+import System.Console.Haskeline.Term
 
 #include "win_console.h"
 
@@ -177,8 +171,8 @@ getInputHandle, getOutputHandle :: MonadIO m => m HANDLE
 getInputHandle = liftIO $ getStdHandle sTD_INPUT_HANDLE
 getOutputHandle = liftIO $ getStdHandle sTD_OUTPUT_HANDLE
 
-getLayout :: IO Layout
-getLayout = do
+getDisplaySize :: IO Layout
+getDisplaySize = do
     h <- getOutputHandle
     (topLeft,bottomRight) <- getDisplayWindow h
     return Layout {width = coordX bottomRight - coordX topLeft+1, 
@@ -192,11 +186,6 @@ setPos c = do
     h <- getOutputHandle
     liftIO (setPosition h c)
 
-moveToNextLine :: (MonadIO m, LineState s) => s -> Draw (InputCmdT m) ()
-moveToNextLine s = do
-    movePos (lengthToEnd s)
-    printText "\r\n" -- make the console take care of creating a new line
-    
 -- TODO: is it bad to be using putStr here?
 -- 
 -- NOTE: we need to call hflush explicitly here, so that getPos/setPos are synced
@@ -210,9 +199,9 @@ printAfter str = do
     printText str
     setPos p
     
-drawLineDiff :: (LineState s, LineState t, MonadIO m)
+drawLineDiffWin :: (LineState s, LineState t, MonadIO m)
                         => String -> s -> t -> Draw (InputCmdT m) ()
-drawLineDiff prefix s1 s2 = let
+drawLineDiffWin prefix s1 s2 = let
     xs1 = beforeCursor prefix s1
     ys1 = afterCursor s1
     xs2 = beforeCursor prefix s2
@@ -240,25 +229,32 @@ movePos n = do
     let (h,x') = divMod (x+n) w
     setPos Coord {coordX = x', coordY = y+h}
 
+crlf :: String
 crlf = "\r\n"
 
-clearLayout :: MonadIO m => Draw m ()
-clearLayout = do
-    lay <- liftIO getLayout
-    setPos (Coord 0 0)
-    printText (replicate (width lay * height lay) ' ')
-    setPos (Coord 0 0)
+instance Term Draw where
+    drawLineDiff = drawLineDiffWin
+    withReposition _ = id -- TODO
 
-printLines :: MonadIO m => [String] -> Draw m ()
-printLines [] = return ()
-printLines ls = printText $ intercalate crlf ls ++ crlf
+    printLines [] = return ()
+    printLines ls = printText $ intercalate crlf ls ++ crlf
+    
+    clearLayout = do
+        lay <- ask
+        setPos (Coord 0 0)
+        printText (replicate (width lay * height lay) ' ')
+        setPos (Coord 0 0)
+    
+    moveToNextLine s = do
+        movePos (lengthToEnd s)
+        printText "\r\n" -- make the console take care of creating a new line
 
--- TODO: implement
-withReposition :: Monad m => Layout -> Draw (InputCmdT m) a -> Draw (InputCmdT m) a
-withReposition _ = id
-
--- TODO: Use GHC.ConsoleHandler.installHandler for ctrl-c events
-withGetEvent :: MonadIO m => Bool -> (m Event -> m a) -> m a
-withGetEvent _ f = do
-    h <- getInputHandle
-    f $ liftIO $ liftM KeyInput $ readKey h
+win32Term :: RunTerm Draw
+win32Term = RunTerm {
+    getLayout = getDisplaySize,
+    runTerm = runDraw,
+    -- TODO: use GHC.ConsoleHandler.installHandler for ctrl-c events
+    withGetEvent = \_ f -> do 
+        h <- getInputHandle
+        f $ liftIO $ liftM KeyInput $ readKey h
+    }

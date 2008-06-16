@@ -43,11 +43,12 @@ Library
                 System.Console.Haskeline.InputT
                 System.Console.Haskeline.LineState
                 System.Console.Haskeline.Settings
+                System.Console.Haskeline.Term
                 System.Console.Haskeline.Vi
     include-dirs: includes
     if flag(target-mingw) {
         Build-depends: Win32>=2.0
-        Other-modules: System.Console.Haskeline.Win32
+        Other-modules: System.Console.Haskeline.Backend.Win32
         c-sources: cbits/win_console.c
         includes: win_console.h
         install-includes: win_console.h
@@ -55,7 +56,7 @@ Library
     } else {
         Build-depends: terminfo>=0.2, unix>=2.2
         Other-modules: 
-                System.Console.Haskeline.Draw
-                System.Console.Haskeline.Posix
+                System.Console.Haskeline.Backend.Posix
+                System.Console.Haskeline.Backend.Terminfo
     }
     ghc-options: -Wall
