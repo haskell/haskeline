@@ -23,7 +23,7 @@ initWindow = Window {pos=0}
 newtype DumbTerm m a = DumbTerm (StateT Window m a) -- keep track of window
                 deriving (Monad,MonadIO, MonadState Window)
 
-runDumbTerm :: MonadIO m => RunTerm DumbTerm m
+runDumbTerm :: MonadIO m => RunTerm (InputCmdT m)
 runDumbTerm = RunTerm {
     getLayout = getPosixLayout,
     withGetEvent = withPosixGetEvent Nothing,

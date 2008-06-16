@@ -60,18 +60,16 @@ wrapTerminalOps =
     . bracketSet (hGetEcho stdout) (hSetEcho stdout) False
 
 
-data SomeTerm m = forall t . (Term (t m), MonadTrans t) => SomeTerm (RunTerm t m)
-
-myRunTerm :: MonadIO m => IO (SomeTerm (InputCmdT m))
+myRunTerm :: MonadIO m => IO (RunTerm (InputCmdT m))
 
 #ifdef MINGW
-myRunTerm = return (SomeTerm win32Term)
+myRunTerm = return win32Term
 #else
 myRunTerm = do
     mRun <- runTerminfoDraw
     case mRun of 
-        Nothing -> return (SomeTerm runDumbTerm)
-        Just run -> return (SomeTerm run)
+        Nothing -> return runDumbTerm
+        Just run -> return run
 #endif
 
 
@@ -95,10 +93,10 @@ getInputCmdLine prefix = do
     settings :: Settings m <- ask
     wrapTerminalOps $ do
         let ls = emptyIM
-        SomeTerm run <- liftIO $ myRunTerm
+        run@RunTerm {withGetEvent = withGetEvent', runTerm=runTerm'} <- liftIO $ myRunTerm
         layout <- liftIO $ getLayout run
         result <- runInputCmdT layout $ do
-                    runTerm run $ withGetEvent run (handleSigINT settings) 
+                    runTerm' $ withGetEvent' (handleSigINT settings) 
                         $ \getEvent -> do
                             drawLine prefix ls 
                             repeatTillFinish getEvent prefix ls emode

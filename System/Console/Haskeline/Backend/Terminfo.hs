@@ -89,7 +89,7 @@ instance MonadTrans Draw where
     lift = Draw . lift . lift . lift
     lift2 f (Draw m) = Draw $ lift2 (lift2 (lift2 f)) m
     
-runTerminfoDraw :: MonadIO m => IO (Maybe (RunTerm Draw m))
+runTerminfoDraw :: MonadIO m => IO (Maybe (RunTerm (InputCmdT m)))
 runTerminfoDraw = do
     mterm <- Exception.try setupTermFromEnv
     case mterm of

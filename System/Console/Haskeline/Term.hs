@@ -17,7 +17,7 @@ class MonadIO m => Term m where
     clearLayout :: m ()
     
 
-data RunTerm t m = RunTerm {
+data RunTerm m = forall t . (Term (t m), MonadTrans t) => RunTerm {
             getLayout :: IO Layout,
             withGetEvent :: forall a . Bool -> (t m Event -> t m a) -> t m a,
             runTerm :: forall a . t m a -> m a

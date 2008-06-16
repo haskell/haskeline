@@ -244,7 +244,7 @@ instance MonadIO m => Term (Draw (InputCmdT m)) where
         movePos (lengthToEnd s)
         printText "\r\n" -- make the console take care of creating a new line
 
-win32Term :: MonadIO m => RunTerm Draw m
+win32Term :: MonadIO m => RunTerm (InputCmdT m)
 win32Term = RunTerm {
     getLayout = getDisplaySize,
     runTerm = runDraw,
