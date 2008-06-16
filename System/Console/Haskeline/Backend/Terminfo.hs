@@ -42,20 +42,6 @@ getActions = do
                 clearAll=clearAll',
                  wrapLine=wrapLine'}
 
-{--
-ansiActions :: Actions
-ansiActions = Actions {leftA = numArg "\ESC[D",
-                        rightA = numArg "\ESC[C",
-                        upA = numArg "\ESC[A",
-                        clearToLineEnd = termText "\ESC[K",
-                        nl = termText "\n",
-                        cr = termText "\r",
-                        clearAll = \_ -> termText "\ESC[H\ESC[J",
-                        wrapLine = mempty -- Not sure about this...
-                        }
-    where
-        numArg s k = termText $ concat $ replicate k s
---}
 text :: String -> Actions -> TermOutput
 text str _ = termText str
 
@@ -103,7 +89,7 @@ instance MonadTrans Draw where
     lift = Draw . lift . lift . lift
     lift2 f (Draw m) = Draw $ lift2 (lift2 (lift2 f)) m
     
-runTerminfoDraw :: IO (Maybe (RunTerm Draw))
+runTerminfoDraw :: MonadIO m => IO (Maybe (RunTerm Draw m))
 runTerminfoDraw = do
     mterm <- Exception.try setupTermFromEnv
     case mterm of
@@ -197,11 +183,6 @@ drawLineDiffT prefix s1 s2 = let
             clearDeadText m
             changeLeft (length ys2)
 
-matchInit :: Eq a => [a] -> [a] -> ([a],[a])
-matchInit (x:xs) (y:ys)  | x == y = matchInit xs ys
-matchInit xs ys = (xs,ys)
-
-
 linesLeft :: Layout -> TermPos -> Int -> Int
 linesLeft Layout {width=w} TermPos {termCol = c} n
     | c + n < w = 1
@@ -258,7 +239,7 @@ withRepositionT newLayout f = do
     put newPos
     lift2 (local newLayout) f
 
-instance Term Draw where
+instance MonadIO m => Term (Draw (InputCmdT m)) where
     drawLineDiff = drawLineDiffT
     withReposition = withRepositionT
     

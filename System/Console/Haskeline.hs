@@ -42,6 +42,7 @@ import Data.Dynamic
 import System.Console.Haskeline.Backend.Win32 as Win32
 #else
 import System.Console.Haskeline.Backend.Terminfo as Terminfo
+import System.Console.Haskeline.Backend.DumbTerm as DumbTerm
 #endif
 
 defaultSettings :: MonadIO m => Settings m
@@ -59,20 +60,18 @@ wrapTerminalOps =
     . bracketSet (hGetEcho stdout) (hSetEcho stdout) False
 
 
--- TODO: Check at runtime which to use
--- dumb term, and also mingw win32 vs cygwin posix
-myRunTerm :: IO (RunTerm MyTerm)
+data SomeTerm m = forall t . (Term (t m), MonadTrans t) => SomeTerm (RunTerm t m)
+
+myRunTerm :: MonadIO m => IO (SomeTerm (InputCmdT m))
 
 #ifdef MINGW
-type MyTerm = Win32.Draw
-myRunTerm = return win32Term
+myRunTerm = return (SomeTerm win32Term)
 #else
-type MyTerm = Terminfo.Draw
 myRunTerm = do
     mRun <- runTerminfoDraw
     case mRun of 
-        Nothing -> error "Couldn't load terminfo and its actions."
-        Just run -> return run
+        Nothing -> return (SomeTerm runDumbTerm)
+        Just run -> return (SomeTerm run)
 #endif
 
 
@@ -96,7 +95,7 @@ getInputCmdLine prefix = do
     settings :: Settings m <- ask
     wrapTerminalOps $ do
         let ls = emptyIM
-        run <- liftIO $ myRunTerm
+        SomeTerm run <- liftIO $ myRunTerm
         layout <- liftIO $ getLayout run
         result <- runInputCmdT layout $ do
                     runTerm run $ withGetEvent run (handleSigINT settings) 
@@ -108,13 +107,15 @@ getInputCmdLine prefix = do
             _ -> return ()
         return result
 
-repeatTillFinish :: forall m s . (MonadIO m, LineState s) 
-            => Draw (InputCmdT m) Event -> String -> s -> KeyMap (InputCmdT m) s -> Draw (InputCmdT m) (Maybe String)
+repeatTillFinish :: forall m s d 
+        . (MonadTrans d, Term (d m), MonadIO m, LineState s)
+            => d m Event -> String -> s -> KeyMap m s 
+            -> d m (Maybe String)
 repeatTillFinish getEvent prefix = loop
     where 
         -- NOTE: since the functions in this mutually recursive binding group do not have the 
         -- same contexts, we need the -XGADTs flag (or -fglasgow-exts)
-        loop :: forall t . LineState t => t -> KeyMap (InputCmdT m) t -> Draw (InputCmdT m) (Maybe String)
+        loop :: forall t . LineState t => t -> KeyMap m t -> d m (Maybe String)
         loop s processor = do
                 event <- getEvent
                 case event of
@@ -142,8 +143,8 @@ handleInterrupt f = handleIO $ \e -> case dynExceptions e of
 
 
 
-drawEffect :: (LineState s, LineState t, MonadIO m) 
-    => String -> s -> Effect t -> Draw (InputCmdT m) ()
+drawEffect :: (LineState s, LineState t, Term m) 
+    => String -> s -> Effect t -> m ()
 drawEffect prefix s (Redraw shouldClear t) = if shouldClear
     then clearLayout >> drawLine prefix t
     else clearLine prefix s >> drawLine prefix t
@@ -155,9 +156,9 @@ drawEffect prefix s (PrintLines ls t overwrite) = do
     printLines ls
     drawLine prefix t
 
-drawLine :: (LineState s, MonadIO m) => String -> s -> Draw (InputCmdT m) ()
+drawLine :: (LineState s, Term m) => String -> s -> m ()
 drawLine prefix s = drawLineDiff prefix Cleared s
 
-clearLine :: (LineState s, MonadIO m) => String -> s -> Draw (InputCmdT m) ()
+clearLine :: (LineState s, Term m) => String -> s -> m ()
 clearLine prefix s = drawLineDiff prefix s Cleared
         

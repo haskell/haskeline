@@ -57,6 +57,7 @@ Library
         Build-depends: terminfo>=0.2, unix>=2.2
         Other-modules: 
                 System.Console.Haskeline.Backend.Posix
+                System.Console.Haskeline.Backend.DumbTerm
                 System.Console.Haskeline.Backend.Terminfo
     }
     ghc-options: -Wall

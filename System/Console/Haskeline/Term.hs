@@ -1,23 +1,31 @@
 module System.Console.Haskeline.Term where
 
 import System.Console.Haskeline.Monads
-import System.Console.Haskeline.InputT
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Command
 
 -- TODO: Cache the RunTerm in between runs?
+-- If do this, should make sure in Terminfo and dumb terms that they 
+-- cache the input keymaps too.
 
-class MonadTrans t => Term t where
-    -- I'm suspicious of this one.
-    withReposition :: MonadIO m => Layout -> t (InputCmdT m) a -> t (InputCmdT m) a
-    moveToNextLine :: (MonadIO m, LineState s) => s -> t (InputCmdT m) ()
-    printLines :: MonadIO m => [String] -> t m ()
-    drawLineDiff :: (LineState s, LineState r, MonadIO m)
-                    => String -> s -> r -> t (InputCmdT m) ()
-    clearLayout :: MonadIO m => t (InputCmdT m) ()
+class MonadIO m => Term m where
+    withReposition :: Layout -> m a -> m a
+    moveToNextLine :: LineState s => s -> m ()
+    printLines :: [String] -> m ()
+    drawLineDiff :: (LineState s, LineState r)
+                    => String -> s -> r -> m ()
+    clearLayout :: m ()
+    
 
-data RunTerm t = RunTerm {
+data RunTerm t m = RunTerm {
             getLayout :: IO Layout,
-            withGetEvent :: MonadIO m => Bool -> (m Event -> m a) -> m a,
-            runTerm :: MonadIO m => t m a -> m a
+            withGetEvent :: forall a . Bool -> (t m Event -> t m a) -> t m a,
+            runTerm :: forall a . t m a -> m a
     }
+
+-- Utility function for drawLineDiff instances.
+matchInit :: Eq a => [a] -> [a] -> ([a],[a])
+matchInit (x:xs) (y:ys)  | x == y = matchInit xs ys
+matchInit xs ys = (xs,ys)
+
+

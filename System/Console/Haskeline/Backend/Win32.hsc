@@ -217,11 +217,6 @@ drawLineDiffWin prefix s1 s2 = let
             printText xs2'
             printAfter (ys2 ++ deadText)
 
--- todo: Dupe of Draw.hs
-matchInit :: Eq a => [a] -> [a] -> ([a],[a])
-matchInit (x:xs) (y:ys)  | x == y = matchInit xs ys
-matchInit xs ys = (xs,ys)
-
 movePos :: MonadIO m => Int -> Draw (InputCmdT m) ()
 movePos n = do
     Coord {coordX = x, coordY = y} <- getPos
@@ -232,7 +227,7 @@ movePos n = do
 crlf :: String
 crlf = "\r\n"
 
-instance Term Draw where
+instance MonadIO m => Term (Draw (InputCmdT m)) where
     drawLineDiff = drawLineDiffWin
     withReposition _ = id -- TODO
 
@@ -249,7 +244,7 @@ instance Term Draw where
         movePos (lengthToEnd s)
         printText "\r\n" -- make the console take care of creating a new line
 
-win32Term :: RunTerm Draw
+win32Term :: MonadIO m => RunTerm Draw m
 win32Term = RunTerm {
     getLayout = getDisplaySize,
     runTerm = runDraw,
