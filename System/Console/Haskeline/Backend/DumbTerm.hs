@@ -98,7 +98,7 @@ refitLine (xs,ys) = do
     put Window {pos=p}
     let ys' = take (w - p) ys
     let k = length ys'
-    printText $ [cr] ++ xs' ++ ys'
+    printText $ cr ++ xs' ++ ys'
         ++ spaces (w-k-p)
         ++ backs (w-p)
   where
