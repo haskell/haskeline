@@ -8,10 +8,14 @@ Copyright:      (c) Judah Jacobson
 Author:         Judah Jacobson
 Maintainer:     Judah Jacobson <judah.jacobson@gmail.com>
 Category:       User Interfaces
-Synopsis:       An extensible library for reading a line of input from the user.
-Description:    This library provides an extensible, flexible interface for reading
-                a line of input from the user.  Its goal is to be useful enough to 
-                replace readline in the GHC compiler.
+Synopsis:       A command-line interface for user input, written in Haskell.
+Description:    
+                Haskeline provides a user interface for line input in command-line
+                programs.  This library is similar in purpose to readline, but since
+                it is written in Haskell it is (hopefully) more easily used in by other
+                Haskell programs.
+                .
+                Haskeline runs on Windows under MinGW, as well as on POSIX-compatible systems.
 Homepage:       http://code.haskell.org/haskeline
 Stability:      Experimental
 Build-Type:     Simple
