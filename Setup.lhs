@@ -26,6 +26,6 @@ withTest pkg@PackageDescription {library = Just lib}
                                 buildInfo = alterBuildInfo (libBuildInfo lib)}
 
 alterBuildInfo :: BuildInfo -> BuildInfo
-alterBuildInfo = id
+alterBuildInfo bi = bi {options = (GHC,["-threaded"]) : options bi}
 
 \end{code}
