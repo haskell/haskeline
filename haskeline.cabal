@@ -25,9 +25,16 @@ flag target-mingw
     Description: Use native Win32 Console functionality (suitable for MinGW)
     Default: False
 
+flag old-base
+    Description: Use the base packages from before version 6.8
+
 Library
-    Build-depends:  base>=3.0, stm>=2.1.1, mtl>=1.1, containers>=0.1,
-                    filepath>=1.1, directory>=1.0
+    if flag(old-base)
+        Build-depends: base < 3
+    else
+        Build-depends: base>=3.0, containers>=0.1, directory>=1.0
+    Build-depends:  stm>=2.0, 
+                    filepath>=1.1
     Extensions:     ForeignFunctionInterface, Rank2Types, FlexibleInstances,
                 FlexibleContexts, ExistentialQuantification
                 ScopedTypeVariables, GeneralizedNewtypeDeriving
@@ -59,7 +66,7 @@ Library
         install-includes: win_console.h
         cpp-options: -DMINGW
     } else {
-        Build-depends: terminfo>=0.2, unix>=2.2
+        Build-depends: terminfo>=0.2, unix>=2.0
         Other-modules: 
                 System.Console.Haskeline.Backend.Posix
                 System.Console.Haskeline.Backend.DumbTerm
