@@ -37,16 +37,19 @@ completionCmd k = acceptKeyM k $ \s -> Just $ do
     case ctype of
         MenuCompletion -> return $ menuCompletion k s
                         $ map (\c -> insertString (replacement c) rest) completions
-        ListCompletions shouldPage listLimit -> 
-                pagingCompletion shouldPage listLimit s rest completions
+        ListCompletions {usePaging = shouldPage,
+                listImmediately=listImmediately',
+                    askBeforeListing=listLimit} -> 
+                pagingCompletion (shouldPage, listImmediately', listLimit)
+                    s rest completions k
 
-pagingCompletion :: Monad m => Bool -> Maybe Int 
+pagingCompletion :: Monad m => (Bool, Bool, Maybe Int) 
                 -> InsertMode -> InsertMode -> [Completion] 
-                -> InputCmdT m (CmdAction (InputCmdT m) InsertMode)
-pagingCompletion _ _ oldIM _ [] = return $ Change oldIM >=> continue
-pagingCompletion _ _ _ im [newWord] 
+                -> Key -> InputCmdT m (CmdAction (InputCmdT m) InsertMode)
+pagingCompletion _ oldIM _ [] _ = return $ Change oldIM >=> continue
+pagingCompletion _ _ im [newWord] _ 
         = return $ (Change $ insertString (replacement newWord) im) >=> continue
-pagingCompletion shouldPage listLimit oldIM im completions
+pagingCompletion (shouldPage, listImmediately', listLimit) oldIM im completions k
     | oldIM /= withPartial = return $ Change withPartial >=> continue
     | otherwise = do
         layout <- ask
@@ -54,7 +57,12 @@ pagingCompletion shouldPage listLimit oldIM im completions
         printingCmd <- if shouldPage
                             then printPage wordLines withPartial False
                             else return $ printAll wordLines withPartial
-        return $ askFirst listLimit (length completions) withPartial printingCmd
+        let pageAction = askFirst listLimit (length completions) 
+                            withPartial printingCmd
+        if listImmediately'
+            then return pageAction
+            else return $ RingBell withPartial >=> 
+                        try (acceptKeyM k $ \_ -> Just $ return pageAction)
   where
     withPartial = insertString partial im
     partial = foldl1 commonPrefix (map replacement completions)

@@ -153,7 +153,7 @@ drawEffect prefix s (PrintLines ls t overwrite) = do
         else moveToNextLine s
     printLines ls
     drawLine prefix t
-drawEffect _ _ RingBell = actBell
+drawEffect _ _ (RingBell _) = actBell
 
 drawLine :: (LineState s, Term m) => String -> s -> m ()
 drawLine prefix s = drawLineDiff prefix Cleared s

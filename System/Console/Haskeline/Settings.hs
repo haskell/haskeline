@@ -11,12 +11,13 @@ data Completion = Completion {replacement, display :: String}
 
 data CompletionType = MenuCompletion
                     -- ^ Cycle through the alternatives one at a time
-                    | ListCompletions { -- TODO: listChoicesImmediately :: Bool,
+                    | ListCompletions { 
                                   usePaging :: Bool,
-                                  askBeforeListing :: Maybe Int
+                                  askBeforeListing :: Maybe Int,
                                     -- ^ If this is set to @Just n@, then warn
                                     -- the user before listing more than @n@
                                     -- alternatives.
+                                  listImmediately :: Bool
                                 }
                 deriving (Show,Read)
 
@@ -51,7 +52,8 @@ defaultPrefs = Prefs {bellStyle = AudibleBell,
                       editMode = Emacs,
                       completionType = ListCompletions {
                                 usePaging = True,
-                                askBeforeListing = Just 100
+                                askBeforeListing = Just 100,
+                                listImmediately = False
                                 }
                     }
 
