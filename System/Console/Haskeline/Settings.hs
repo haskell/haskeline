@@ -39,7 +39,7 @@ data Prefs = Prefs { bellStyle :: BellStyle,
                      }
                         deriving (Read,Show)
 
-data BellStyle = NoBell | VisibleBell | AudibleBell
+data BellStyle = NoBell | VisualBell | AudibleBell
                     deriving (Show, Read)
 
 data EditMode = Vi | Emacs

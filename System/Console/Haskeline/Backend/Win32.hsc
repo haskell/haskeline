@@ -243,6 +243,8 @@ instance MonadIO m => Term (Draw (InputCmdT m)) where
     moveToNextLine s = do
         movePos (lengthToEnd s)
         printText "\r\n" -- make the console take care of creating a new line
+    
+    ringBell _ = return () -- TODO
 
 win32Term :: MonadIO m => RunTerm (InputCmdT m)
 win32Term = RunTerm {

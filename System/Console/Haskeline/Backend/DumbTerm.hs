@@ -42,6 +42,8 @@ instance MonadIO m => Term (DumbTerm (InputCmdT m)) where
     printLines = mapM_ (\s -> printText (s ++ crlf))
     moveToNextLine = \_ -> printText crlf
     clearLayout = clearLayoutD
+    ringBell True = printText "\a"
+    ringBell False = return ()
       
 printText :: MonadIO m => String -> m ()
 printText str = liftIO $ putStr str >> hFlush stdout

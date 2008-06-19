@@ -24,6 +24,7 @@ import System.Console.Haskeline.Backend.Posix
 data Actions = Actions {leftA, rightA, upA :: Int -> TermOutput,
                         clearToLineEnd :: TermOutput,
                         nl, cr :: TermOutput,
+                        bellAudible,bellVisual :: TermOutput,
                         clearAll :: LinesAffected -> TermOutput,
                         wrapLine :: TermOutput}
 
@@ -36,9 +37,13 @@ getActions = do
     clearAll' <- clearScreen
     nl' <- newline
     cr' <- carriageReturn
+    -- Don't require the bell capabilities
+    bellAudible' <- bell `mplus` return mempty
+    bellVisual' <- visualBell `mplus` return mempty
     wrapLine' <- getWrapLine nl' (leftA' 1)
     return Actions{leftA=leftA',rightA=rightA',upA=upA',
                 clearToLineEnd=clearToLineEnd',nl=nl',cr=cr',
+                bellAudible=bellAudible', bellVisual=bellVisual',
                 clearAll=clearAll',
                  wrapLine=wrapLine'}
 
@@ -247,3 +252,5 @@ instance MonadIO m => Term (Draw (InputCmdT m)) where
     printLines ls = output $ mconcat $ intersperse nl (map text ls) ++ [nl] 
     clearLayout = clearLayoutT
     moveToNextLine = moveToNextLineT
+    ringBell True = output bellAudible
+    ringBell False = output bellVisual

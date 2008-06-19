@@ -15,6 +15,7 @@ class MonadIO m => Term m where
     drawLineDiff :: (LineState s, LineState r)
                     => String -> s -> r -> m ()
     clearLayout :: m ()
+    ringBell :: Bool -> m ()
     
 
 data RunTerm m = forall t . (Term (t m), MonadTrans t) => RunTerm {

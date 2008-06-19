@@ -58,6 +58,7 @@ data Effect s = Change {effectState :: s}
               | PrintLines {linesToPrint :: [String], effectState :: s,
                             overwriteOldState :: Bool}
               | Redraw {shouldClearScreen :: Bool, effectState :: s}
+              | RingBell
 
 newtype KeyMap m s = KeyMap {keyMap :: Map.Map Key 
             (s -> Either (Maybe String) (m (KeyAction m)))}

@@ -106,7 +106,7 @@ getInputCmdLine prefix = do
         return result
 
 repeatTillFinish :: forall m s d 
-        . (MonadTrans d, Term (d m), MonadIO m, LineState s)
+    . (MonadTrans d, Term (d m), MonadIO m, LineState s, MonadReader Prefs (d m))
             => d m Event -> String -> s -> KeyMap m s 
             -> d m (Maybe String)
 repeatTillFinish getEvent prefix = loop
@@ -123,7 +123,7 @@ repeatTillFinish getEvent prefix = loop
                     WindowResize newLayout -> 
                         withReposition newLayout (loop s processor)
                     KeyInput k -> case lookupKM processor k of
-                        Nothing -> loop s processor
+                        Nothing -> actBell >> loop s processor
                         Just g -> case g s of
                             Left r -> moveToNextLine s >> return r
                             Right f -> do
@@ -141,7 +141,7 @@ handleInterrupt f = handleIO $ \e -> case dynExceptions e of
 
 
 
-drawEffect :: (LineState s, LineState t, Term m) 
+drawEffect :: (LineState s, LineState t, Term m, MonadReader Prefs m) 
     => String -> s -> Effect t -> m ()
 drawEffect prefix s (Redraw shouldClear t) = if shouldClear
     then clearLayout >> drawLine prefix t
@@ -153,6 +153,7 @@ drawEffect prefix s (PrintLines ls t overwrite) = do
         else moveToNextLine s
     printLines ls
     drawLine prefix t
+drawEffect _ _ RingBell = actBell
 
 drawLine :: (LineState s, Term m) => String -> s -> m ()
 drawLine prefix s = drawLineDiff prefix Cleared s
@@ -160,3 +161,10 @@ drawLine prefix s = drawLineDiff prefix Cleared s
 clearLine :: (LineState s, Term m) => String -> s -> m ()
 clearLine prefix s = drawLineDiff prefix s Cleared
         
+actBell :: (Term m, MonadReader Prefs m) => m ()
+actBell = do
+    style <- asks bellStyle
+    case style of
+        NoBell -> return ()
+        VisualBell -> ringBell False
+        AudibleBell -> ringBell True
