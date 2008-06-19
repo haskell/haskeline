@@ -42,7 +42,9 @@ runInputT settings f = do
     runInputTWithPrefs prefs settings f
 
 readPrefsOrDefault :: IO Prefs
-readPrefsOrDefault = handle (\_ -> return defaultPrefs) $ do
+readPrefsOrDefault = handle (\_ -> do
+                putStrLn "Warning: error reading preferences"
+                return defaultPrefs) $ do
     home <- getHomeDirectory
     prefs <- readPrefs (home </> ".haskeline")
     evaluate prefs -- make sure this function catches any Read parse errors
