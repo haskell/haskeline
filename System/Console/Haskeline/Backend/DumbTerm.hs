@@ -89,8 +89,12 @@ drawLineDiff' prefix s1 s2 = do
                     printText $ backs (length xs1')
                 ([],_) | ys1 == xs2' ++ ys2 -> -- moved right
                     printText xs2'
-                _ -> printText $ backs (length xs1')
-                        ++ xs2' ++ ys2' ++ backs (length ys2')
+                _ -> let
+                        extraLength = length xs1' + length ys1
+                                    - length xs2' - length ys2
+                     in printText $ backs (length xs1')
+                        ++ xs2' ++ ys2' ++ clearDeadText extraLength
+                        ++ backs (length ys2')
 
 refitLine :: MonadIO m => (String,String) -> DumbTerm (InputCmdT m) ()
 refitLine (xs,ys) = do
@@ -108,3 +112,6 @@ refitLine (xs,ys) = do
                         (_,"") -> zs
                         (_,zs') -> dropFrames w zs'
     
+clearDeadText :: Int -> String
+clearDeadText n | n > 0 = spaces n ++ backs n
+                | otherwise = ""
