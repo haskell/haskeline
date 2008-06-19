@@ -46,7 +46,7 @@ completionCmd k = acceptKeyM k $ \s -> Just $ do
 pagingCompletion :: Monad m => (Bool, Bool, Maybe Int) 
                 -> InsertMode -> InsertMode -> [Completion] 
                 -> Key -> InputCmdT m (CmdAction (InputCmdT m) InsertMode)
-pagingCompletion _ oldIM _ [] _ = return $ Change oldIM >=> continue
+pagingCompletion _ oldIM _ [] _ = return $ RingBell oldIM >=> continue
 pagingCompletion _ _ im [newWord] _ 
         = return $ (Change $ insertString (replacement newWord) im) >=> continue
 pagingCompletion (shouldPage, listImmediately', listLimit) oldIM im completions k
@@ -153,7 +153,7 @@ ceilDiv m n | m `rem` n == 0    =  m `div` n
 
 menuCompletion :: forall m . Monad m => Key -> InsertMode -> [InsertMode] 
                     -> CmdAction m InsertMode
-menuCompletion _ oldState [] = Change oldState >=> continue
+menuCompletion _ oldState [] = RingBell oldState >=> continue
 menuCompletion _ _ [c] = Change c >=> continue
 menuCompletion k oldState (c:cs) = Change c >=> loop cs
     where
