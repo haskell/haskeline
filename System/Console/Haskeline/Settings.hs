@@ -1,5 +1,9 @@
 module System.Console.Haskeline.Settings where
 
+import Language.Haskell.TH
+import Data.Char(isSpace,toLower)
+import Data.List(foldl')
+
 -- | Performs completions from a reversed 'String'.  The output 'String' is also reversed.
 -- In general, this can be built using 'completeWord'.
 type CompletionFunc m = String -> m (String, [Completion])
@@ -7,19 +11,6 @@ type CompletionFunc m = String -> m (String, [Completion])
 
 data Completion = Completion {replacement, display :: String}
                     deriving Show
-
-
-data CompletionType = MenuCompletion
-                    -- ^ Cycle through the alternatives one at a time
-                    | ListCompletions { 
-                                  usePaging :: Bool,
-                                  askBeforeListing :: Maybe Int,
-                                    -- ^ If this is set to @Just n@, then warn
-                                    -- the user before listing more than @n@
-                                    -- alternatives.
-                                  listImmediately :: Bool
-                                }
-                deriving (Show,Read)
 
 
 data Settings m = Settings {complete :: CompletionFunc m,
@@ -33,12 +24,19 @@ data Settings m = Settings {complete :: CompletionFunc m,
 setComplete :: CompletionFunc m -> Settings m -> Settings m
 setComplete f s = s {complete = f}
 
-data Prefs = Prefs { bellStyle :: BellStyle,
-                     editMode :: EditMode,
-                     maxHistorySize :: Maybe Int,
-                     completionType :: CompletionType
+data Prefs = Prefs { bellStyle :: !BellStyle,
+                     editMode :: !EditMode,
+                     maxHistorySize :: !(Maybe Int),
+                     completionType :: !CompletionType,
+                     completionPaging :: !Bool,
+                     completionPromptLimit :: !(Maybe Int),
+                     listCompletionsImmediately :: !Bool
                      }
                         deriving (Read,Show)
+
+data CompletionType = ListCompletion | MenuCompletion
+            deriving (Read,Show)
+
 
 data BellStyle = NoBell | VisualBell | AudibleBell
                     deriving (Show, Read)
@@ -50,16 +48,37 @@ defaultPrefs :: Prefs
 defaultPrefs = Prefs {bellStyle = AudibleBell,
                       maxHistorySize = Nothing,
                       editMode = Emacs,
-                      completionType = ListCompletions {
-                                usePaging = True,
-                                askBeforeListing = Just 100,
-                                listImmediately = False
-                                }
+                      completionType = ListCompletion,
+                      completionPaging = True,
+                      completionPromptLimit = Just 100,
+                      listCompletionsImmediately = True
                     }
 
--- better to have syntax beyond Read instance.
+mkSettor :: Read a => (a -> Prefs -> Prefs) -> String -> Prefs -> Prefs
+mkSettor f str = case reads str of
+                [(x,_)] -> f x
+                _ -> id
+
+settors :: [(String,String -> Prefs -> Prefs)]
+settors = $(do
+    DataConI _ _ prefsType _ <- reify 'Prefs
+    TyConI (DataD _ _ _ [RecC _ fields] _) <- reify prefsType
+    x <- newName "x"
+    p <- newName "p"
+    -- settor f => ("f", mkSettor (\x p -> p {f=x}))
+    let settor (f,_,_) = TupE [LitE (StringL (map toLower $ nameBase f)),
+                        AppE (VarE 'mkSettor) $ LamE [VarP x,VarP p]
+                        $ RecUpdE (VarE p) [(f,VarE x)]]
+    return $ ListE $ map settor fields)
+
 readPrefs :: FilePath -> IO Prefs
-readPrefs = fmap read . readFile
-
-
-
+readPrefs file = do
+    ls <- fmap lines $ readFile file
+    return $ foldl' applyField defaultPrefs ls
+  where
+    applyField p l = case break (==':') l of
+                (name,val)  -> case lookup (map toLower $ trimSpaces name) settors of
+                        Nothing -> p
+                        Just set -> set (drop 1 val) p  -- drop initial ":", don't crash if val==""
+    trimSpaces = dropWhile isSpace . reverse . dropWhile isSpace . reverse
+                    

@@ -30,36 +30,33 @@ makeCompletion f (IMode xs ys) = do
 -- | Create a 'Command' for word completion.
 completionCmd :: Monad m => Key -> Command (InputCmdT m) InsertMode InsertMode
 completionCmd k = acceptKeyM k $ \s -> Just $ do
-    ctype <- asks completionType
+    prefs <- ask
     f <- asks complete
     let g = liftCmdT . f
     (rest,completions) <- makeCompletion g s
-    case ctype of
+    case completionType prefs of
         MenuCompletion -> return $ menuCompletion k s
                         $ map (\c -> insertString (replacement c) rest) completions
-        ListCompletions {usePaging = shouldPage,
-                listImmediately=listImmediately',
-                    askBeforeListing=listLimit} -> 
-                pagingCompletion (shouldPage, listImmediately', listLimit)
-                    s rest completions k
+        ListCompletion -> 
+                pagingCompletion prefs s rest completions k
 
-pagingCompletion :: Monad m => (Bool, Bool, Maybe Int) 
+pagingCompletion :: Monad m => Prefs
                 -> InsertMode -> InsertMode -> [Completion] 
                 -> Key -> InputCmdT m (CmdAction (InputCmdT m) InsertMode)
 pagingCompletion _ oldIM _ [] _ = return $ RingBell oldIM >=> continue
 pagingCompletion _ _ im [newWord] _ 
         = return $ (Change $ insertString (replacement newWord) im) >=> continue
-pagingCompletion (shouldPage, listImmediately', listLimit) oldIM im completions k
+pagingCompletion prefs oldIM im completions k
     | oldIM /= withPartial = return $ Change withPartial >=> continue
     | otherwise = do
         layout <- ask
         let wordLines = makeLines (map display completions) layout
-        printingCmd <- if shouldPage
+        printingCmd <- if completionPaging prefs
                             then printPage wordLines withPartial False
                             else return $ printAll wordLines withPartial
-        let pageAction = askFirst listLimit (length completions) 
+        let pageAction = askFirst (completionPromptLimit prefs) (length completions) 
                             withPartial printingCmd
-        if listImmediately'
+        if listCompletionsImmediately prefs
             then return pageAction
             else return $ RingBell withPartial >=> 
                         try (acceptKeyM k $ \_ -> Just $ return pageAction)
