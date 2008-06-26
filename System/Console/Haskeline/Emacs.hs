@@ -41,8 +41,8 @@ controlActions = choiceCmd
             ]
 
 deleteCharOrEOF :: Key -> InputCmd InsertMode InsertMode
-deleteCharOrEOF k = acceptKeyM k $ \s -> if s == emptyIM
+deleteCharOrEOF k = k +> acceptKeyOrFail (\s -> if s == emptyIM
             then Nothing
-            else Just $ return $ Change (deleteNext s) >=> justDelete
+            else Just $ Change (deleteNext s) >=> justDelete)
     where
         justDelete = try (change deleteNext k >|> justDelete)

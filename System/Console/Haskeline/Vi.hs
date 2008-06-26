@@ -30,9 +30,9 @@ simpleInsertions = choiceCmd
 -- If we receive a ^D and the line is empty, return Nothing
 -- otherwise, ignore it.
 eofIfEmpty :: Key -> InputCmd InsertMode InsertMode
-eofIfEmpty k = acceptKeyM k $ \s -> if s == emptyIM
+eofIfEmpty k = k +> acceptKeyOrFail (\s -> if s == emptyIM
                     then Nothing
-                    else Just $ return $ Change s >=> continue
+                    else Just $ Change s >=> continue)
 
 startCommand :: InputCmd InsertMode InsertMode
 startCommand = KeyChar '\ESC' +> change enterCommandMode

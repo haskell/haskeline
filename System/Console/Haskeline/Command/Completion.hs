@@ -22,23 +22,22 @@ import Data.List(isPrefixOf, transpose, unfoldr)
 import Control.Exception(handle)
 import Control.Monad(forM)
 
-makeCompletion :: Monad m => CompletionFunc m -> InsertMode -> m (InsertMode, [Completion])
-makeCompletion f (IMode xs ys) = do
-    (rest,completions) <- f xs
+makeCompletion :: Monad m => InsertMode -> InputCmdT m (InsertMode, [Completion])
+makeCompletion (IMode xs ys) = do
+    f <- asks complete
+    (rest,completions) <- liftCmdT (f xs)
     return (IMode rest ys,completions)
 
 -- | Create a 'Command' for word completion.
 completionCmd :: Monad m => Key -> Command (InputCmdT m) InsertMode InsertMode
-completionCmd k = acceptKeyM k $ \s -> Just $ do
+completionCmd k = k +> acceptKeyM (\s -> do
     prefs <- ask
-    f <- asks complete
-    let g = liftCmdT . f
-    (rest,completions) <- makeCompletion g s
+    (rest,completions) <- makeCompletion s
     case completionType prefs of
         MenuCompletion -> return $ menuCompletion k s
                         $ map (\c -> insertString (replacement c) rest) completions
         ListCompletion -> 
-                pagingCompletion prefs s rest completions k
+                pagingCompletion prefs s rest completions k)
 
 pagingCompletion :: Monad m => Prefs
                 -> InsertMode -> InsertMode -> [Completion] 
@@ -52,14 +51,14 @@ pagingCompletion prefs oldIM im completions k
         layout <- ask
         let wordLines = makeLines (map display completions) layout
         printingCmd <- if completionPaging prefs
-                            then printPage wordLines withPartial
-                            else return $ printAll wordLines withPartial
+                        then printPage wordLines (moreMessage withPartial)
+                        else return $ printAll wordLines withPartial
         let pageAction = askFirst (completionPromptLimit prefs) (length completions) 
                             withPartial printingCmd
         if listCompletionsImmediately prefs
             then return pageAction
             else return $ RingBell withPartial >=> 
-                        try (acceptKeyM k $ \_ -> Just $ return pageAction)
+                        try (k +> acceptKey (const pageAction))
   where
     withPartial = insertString partial im
     partial = foldl1 commonPrefix (map replacement completions)
@@ -74,37 +73,34 @@ askFirst mlimit numCompletions im printingCmd = case mlimit of
         Change (Message im ("Display all " ++ show numCompletions
                             ++ " possibilities? (y or n)"))
                     >=> choiceCmd [
-                            acceptKeyM (KeyChar 'y') $ \_ -> Just $ return $ 
-                                printingCmd
+                            KeyChar 'y' +> acceptKey (const printingCmd)
                             , KeyChar 'n' +> change messageState
                             ]
     _ -> printingCmd
 
-printOneLine :: Monad m => [String] -> InsertMode -> CmdAction (InputCmdT m) InsertMode
+printOneLine :: Monad m => [String] -> Message InsertMode -> CmdAction (InputCmdT m) InsertMode
 printOneLine (w:ws) im | not (null ws) =
-            PrintLines [w] (moreMessage im) >=> pagingCommands ws
-printOneLine _ im = Change im >=> continue
+            PrintLines [w] im >=> pagingCommands ws
+printOneLine _ im = Change (messageState im) >=> continue
 
 moreMessage im = Message im "----More----"
 
-printPage :: Monad m => [String] -> InsertMode
+printPage :: Monad m => [String] -> Message InsertMode
                     -> InputCmdT m (CmdAction (InputCmdT m) InsertMode)
 printPage ws im = do
     layout <- ask
     return $ case splitAt (height layout - 1) ws of
-        (_,[]) -> PrintLines ws im >=> continue
-        (ws,rest) -> PrintLines ws (moreMessage im)
+        (_,[]) -> PrintLines ws (messageState im) >=> continue
+        (ws,rest) -> PrintLines ws im
                     >=> pagingCommands rest
 
 
 -- TODO: move testing of nullity into here
 pagingCommands :: Monad m => [String] -> Command (InputCmdT m) (Message InsertMode) InsertMode
 pagingCommands ws = choiceCmd [
-                            acceptKeyM (KeyChar ' ') $ \m -> Just $
-                                printPage ws (messageState m)
+                            KeyChar ' ' +> acceptKeyM (printPage ws)
                             ,KeyChar 'q' +> change messageState
-                           ,acceptKeyM (KeyChar '\n') $ \m -> Just $ return $
-                                printOneLine ws (messageState m)
+                            ,KeyChar '\n' +> acceptKey (printOneLine ws)
                             ]
 
 
