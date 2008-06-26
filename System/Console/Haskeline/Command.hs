@@ -55,8 +55,7 @@ controlKey c = KeyChar $ toEnum $ fromEnum c .&. complement (bit 5 .|. bit 6)
 
 
 data Effect s = Change {effectState :: s} 
-              | PrintLines {linesToPrint :: [String], effectState :: s,
-                            overwriteOldState :: Bool}
+              | PrintLines {linesToPrint :: [String], effectState :: s}
               | Redraw {shouldClearScreen :: Bool, effectState :: s}
               | RingBell {effectState :: s}
 

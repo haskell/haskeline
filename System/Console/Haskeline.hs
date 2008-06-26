@@ -147,8 +147,8 @@ drawEffect prefix s (Redraw shouldClear t) = if shouldClear
     then clearLayout >> drawLine prefix t
     else clearLine prefix s >> drawLine prefix t
 drawEffect prefix s (Change t) = drawLineDiff prefix s t
-drawEffect prefix s (PrintLines ls t overwrite) = do
-    if overwrite
+drawEffect prefix s (PrintLines ls t) = do
+    if isTemporary s
         then clearLine prefix s
         else moveToNextLine s
     printLines ls

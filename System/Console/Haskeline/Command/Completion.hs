@@ -52,7 +52,7 @@ pagingCompletion prefs oldIM im completions k
         layout <- ask
         let wordLines = makeLines (map display completions) layout
         printingCmd <- if completionPaging prefs
-                            then printPage wordLines withPartial False
+                            then printPage wordLines withPartial
                             else return $ printAll wordLines withPartial
         let pageAction = askFirst (completionPromptLimit prefs) (length completions) 
                             withPartial printingCmd
@@ -82,18 +82,18 @@ askFirst mlimit numCompletions im printingCmd = case mlimit of
 
 printOneLine :: Monad m => [String] -> InsertMode -> CmdAction (InputCmdT m) InsertMode
 printOneLine (w:ws) im | not (null ws) =
-            PrintLines [w] (moreMessage im) True >=> pagingCommands ws
+            PrintLines [w] (moreMessage im) >=> pagingCommands ws
 printOneLine _ im = Change im >=> continue
 
 moreMessage im = Message im "----More----"
 
-printPage :: Monad m => [String] -> InsertMode -> Bool 
+printPage :: Monad m => [String] -> InsertMode
                     -> InputCmdT m (CmdAction (InputCmdT m) InsertMode)
-printPage ws im overwrite = do
+printPage ws im = do
     layout <- ask
     return $ case splitAt (height layout - 1) ws of
-        (_,[]) -> PrintLines ws im overwrite >=> continue
-        (ws,rest) -> PrintLines ws (moreMessage im) overwrite 
+        (_,[]) -> PrintLines ws im >=> continue
+        (ws,rest) -> PrintLines ws (moreMessage im)
                     >=> pagingCommands rest
 
 
@@ -101,7 +101,7 @@ printPage ws im overwrite = do
 pagingCommands :: Monad m => [String] -> Command (InputCmdT m) (Message InsertMode) InsertMode
 pagingCommands ws = choiceCmd [
                             acceptKeyM (KeyChar ' ') $ \m -> Just $
-                                printPage ws (messageState m) True
+                                printPage ws (messageState m)
                             ,KeyChar 'q' +> change messageState
                            ,acceptKeyM (KeyChar '\n') $ \m -> Just $ return $
                                 printOneLine ws (messageState m)
@@ -110,7 +110,7 @@ pagingCommands ws = choiceCmd [
 
 printAll :: Monad m => [String] -> InsertMode 
             -> CmdAction (InputCmdT m) InsertMode
-printAll ws im = PrintLines ws im False >=> continue
+printAll ws im = PrintLines ws im >=> continue
 
 
 makeLines :: [String] -> Layout -> [String]

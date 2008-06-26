@@ -4,6 +4,8 @@ module System.Console.Haskeline.LineState where
 class LineState s where
     beforeCursor :: String -> s -> String -- text to left of cursor
     afterCursor :: s -> String -- text under and to right of cursor
+    isTemporary :: s -> Bool
+    isTemporary _ = False
 
 class LineState s => Result s where
     toResult :: s -> String
@@ -163,3 +165,4 @@ data Message s = Message {messageState :: s, messageText :: String}
 instance LineState s => LineState (Message s) where
     beforeCursor _ = messageText
     afterCursor _ = ""
+    isTemporary _ = True
