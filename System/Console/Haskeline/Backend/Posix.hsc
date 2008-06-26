@@ -135,10 +135,11 @@ withPosixGetEvent term useSigINT f = do
 
 -- If the keypad on/off capabilities are defined, wrap the computation with them.
 wrapKeypad :: MonadIO m => Maybe Terminal -> m a -> m a
-wrapKeypad Nothing = id
-wrapKeypad (Just term) = bracketSet (return keypadOff) maybeOutput keypadOn
+wrapKeypad Nothing f = f
+wrapKeypad (Just term) f = (maybeOutput keypadOn >> f) 
+                            `finallyIO` maybeOutput keypadOn
   where
-        maybeOutput cap = runTermOutput term $
+    maybeOutput cap = liftIO $ runTermOutput term $
                             fromMaybe mempty (getCapability term cap)
 
 withWindowHandler :: MonadIO m => TChan Event -> m a -> m a
