@@ -9,7 +9,7 @@ module System.Console.Haskeline(InputT,
                     BellStyle(..),
                     EditMode(..),
                     defaultPrefs,
-                    readPrefs,
+                    readPrefsOrDefault,
                     CompletionType(..),
                     handleInterrupt,
                     -- * Tab completion functions
