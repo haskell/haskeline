@@ -45,6 +45,15 @@ import System.Console.Haskeline.Backend.Terminfo as Terminfo
 import System.Console.Haskeline.Backend.DumbTerm as DumbTerm
 #endif
 
+-- | A useful default.  In particular:
+--
+-- @
+-- defaultSettings = Settings {
+--           complete = completeFilename,
+--           historyFile = Nothing,
+--           handleSigINT = False
+--           }
+-- @
 defaultSettings :: MonadIO m => Settings m
 defaultSettings = Settings {complete = completeFilename,
                         historyFile = Nothing,
@@ -73,8 +82,18 @@ myRunTerm = do
 #endif
 
 
-
-getInputLine, getInputCmdLine :: forall m . MonadIO m => String -> InputT m (Maybe String)
+{- | Read one line of input from the user, with a rich line-editing
+user interface.  Returns 'Nothing' if the user presses Ctrl-D and the input
+text is empty.  Otherwise, it returns the input line with the final newline
+removed.  
+ 
+If 'stdin' is not connected to a terminal (for example, piped from
+another process), then this function is equivalent to 'getLine', except that
+it returns 'Nothing' if an EOF is encountered before any characters are
+read.
+-}
+getInputLine :: forall m . MonadIO m => String -- ^ The input prompt
+                            -> InputT m (Maybe String)
 getInputLine prefix = do
     isTerm <- liftIO $ hIsTerminalDevice stdin
     if isTerm
@@ -85,6 +104,7 @@ getInputLine prefix = do
                 then return Nothing
                 else liftM Just $ liftIO $ hGetLine stdin
 
+getInputCmdLine :: forall m . MonadIO m => String -> InputT m (Maybe String)
 getInputCmdLine prefix = do
 -- TODO: Cache the terminal, actions
     emode <- asks (\prefs -> case editMode prefs of
@@ -131,9 +151,12 @@ repeatTillFinish getEvent prefix = loop
                                         drawEffect prefix s effect
                                         loop (effectState effect) next
 
+-- | If signal handling is enabled in the 'Settings', then an 'Interrupt'
+-- exception will be thrown when the user presses Ctrl-C.
 data Interrupt = Interrupt
                 deriving (Show,Typeable,Eq)
 
+-- | Catch and handle an exception generated when the user pressed Ctrl-C.
 handleInterrupt :: MonadIO m => IO a -> m a -> m a
 handleInterrupt f = handleIO $ \e -> case dynExceptions e of
                     Just dyn | Just Interrupt <- fromDynamic dyn -> f

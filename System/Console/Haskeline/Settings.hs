@@ -5,17 +5,19 @@ import Data.Char(isSpace,toLower)
 import Data.List(foldl')
 
 -- | Performs completions from a reversed 'String'.  The output 'String' is also reversed.
--- In general, this can be built using 'completeWord'.
+-- These functions may be built using 'completeWord'.
 type CompletionFunc m = String -> m (String, [Completion])
 
 
 data Completion = Completion {replacement, display :: String}
                     deriving Show
 
-
+-- | Application-specific customizations to the user interface.
 data Settings m = Settings {complete :: CompletionFunc m,
-                            historyFile :: Maybe String,
-                            handleSigINT :: Bool}
+                            historyFile :: Maybe FilePath,
+                            handleSigINT :: Bool -- ^ Throw an 'Interrupt'
+                            -- exception if the user presses Ctrl-C
+                            }
 
 -- | Because 'complete' is the only field of 'Settings' depending on @m@,
 -- the expression @defaultSettings {completionFunc = f}@ leads to a type error
@@ -24,6 +26,17 @@ data Settings m = Settings {complete :: CompletionFunc m,
 setComplete :: CompletionFunc m -> Settings m -> Settings m
 setComplete f s = s {complete = f}
 
+{- |
+'Prefs' allow the user to customize the line-editing interface.  They are
+usually set in @~/.haskeline@.  Each line of a @.haskeline@ file may define
+one field of the 'Prefs' datatype; field names are case-insensitive and
+unparseable lines are ignored.  For example:
+
+> editMode: Vi
+> completionType: MenuCompletion
+> maxhistorysize: Just 40
+
+-}
 data Prefs = Prefs { bellStyle :: !BellStyle,
                      editMode :: !EditMode,
                      maxHistorySize :: !(Maybe Int),

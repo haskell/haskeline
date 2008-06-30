@@ -10,7 +10,8 @@ import System.Directory(getHomeDirectory)
 import System.FilePath
 import Control.Exception(handle,evaluate)
 
-
+-- | A monad transformer which carries all of the state and settings
+-- relevant to a line-reading application.
 newtype InputT m a = InputT (StateT History (ReaderT Prefs 
                                 (ReaderT (Settings m) m)) a) 
                             deriving (Monad,MonadIO, MonadState History,
@@ -35,12 +36,15 @@ runInputTWithPrefs prefs settings (InputT f)
         $ runHistoryFromFile (historyFile settings) (maxHistorySize prefs) f
         
 
--- | Reads prefs from @$HOME/.haskeline@
+-- | Run a line-reading application, reading user 'Prefs' from 
+-- @$HOME/.haskeline@
 runInputT :: MonadIO m => Settings m -> InputT m a -> m a
 runInputT settings f = do
     prefs <- liftIO readPrefsOrDefault
     runInputTWithPrefs prefs settings f
 
+-- | Read 'Prefs' from a given file.  If there is an error reading the file, the
+-- 'defaultPrefs' will be returned.
 readPrefsOrDefault :: IO Prefs
 readPrefsOrDefault = handle (\_ -> return defaultPrefs) $ do
     home <- getHomeDirectory
