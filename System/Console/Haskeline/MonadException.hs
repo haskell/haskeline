@@ -1,6 +1,5 @@
 module System.Console.Haskeline.MonadException where
 
-import Control.Monad
 import qualified Control.Exception as E
 import Prelude hiding (catch)
 import Control.Exception(Exception)
