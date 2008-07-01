@@ -16,6 +16,7 @@ import System.Console.Haskeline.Command
 import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.Backend.Posix
+import qualified Codec.Binary.UTF8.String as UTF8
 
 -- | Keep track of all of the output capabilities we can use.
 -- 
@@ -48,7 +49,7 @@ getActions = do
                  wrapLine=wrapLine'}
 
 text :: String -> Actions -> TermOutput
-text str _ = termText str
+text str _ = termText (UTF8.encodeString str)
 
 getWrapLine :: TermOutput -> TermOutput -> Capability TermOutput
 getWrapLine nl' left1 = (autoRightMargin >>= guard >> withAutoMargin)

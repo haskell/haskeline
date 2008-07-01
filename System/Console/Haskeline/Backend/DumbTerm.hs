@@ -8,6 +8,7 @@ import System.Console.Haskeline.Monads as Monads
 import System.Console.Haskeline.Command
 
 import System.IO
+import qualified System.IO.UTF8 as UTF8
 
 -- TODO: 
 ---- Make this unicode-aware, too.
@@ -54,7 +55,7 @@ instance MonadIO m => Term (DumbTerm (InputCmdT m)) where
     ringBell False = return ()
       
 printText :: MonadIO m => String -> m ()
-printText str = liftIO $ putStr str >> hFlush stdout
+printText str = liftIO $ UTF8.putStr str >> hFlush stdout
 
 -- Things we can assume a dumb terminal knows how to do
 cr,crlf :: String

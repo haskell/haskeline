@@ -18,6 +18,8 @@ import System.Posix.Signals.Exts
 import System.Posix.IO(stdInput)
 import Data.List
 import System.IO
+import qualified Data.ByteString as B
+import qualified Data.ByteString.UTF8 as UTF8
 
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.Command
@@ -172,24 +174,22 @@ getEvent eventChan baseMap = do
             -- no events are queued yet, so fork off a thread to read keys.
             -- if we receive a different type of event before it's done,
             -- we'll kill it.
-            tid <- forkIO (allocaArray bufferSize readKeyEvents)
+            tid <- forkIO readKeyEvents
             e <- atomically $ readTChan eventChan -- key or other event
             killThread tid
             return e
   where
     bufferSize = 100
-    readKeyEvents :: Ptr Word8 -> IO ()
-    readKeyEvents buffer = do
+    readKeyEvents = do
         -- Read at least one character of input, and more if available.
         -- In particular, the characters making up a control sequence will all
         -- be available at once, so we can process them together with lexKeys.
         threadWaitRead stdInput
-        numRead <- hGetBufNonBlocking stdin buffer bufferSize
-        ws <- peekArray numRead buffer
-        let cs = map (toEnum . fromEnum) ws
+        bs <- B.hGetNonBlocking stdin bufferSize
+        let cs = UTF8.toString bs
         let ks = map KeyInput $ lexKeys baseMap cs
         if null ks
-            then readKeyEvents buffer
+            then readKeyEvents
             else atomically $ mapM_ (writeTChan eventChan) ks
 
 tryReadTChan :: TChan a -> STM (Maybe a)
