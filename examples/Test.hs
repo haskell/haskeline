@@ -2,6 +2,7 @@ module Main where
 
 import System.Console.Haskeline
 import System.Console.Haskeline.Monads
+import qualified System.IO.UTF8 as UTF8
 
 mySettings :: MonadIO m => Settings m
 mySettings = defaultSettings {historyFile = Just "myhist",
@@ -21,5 +22,5 @@ main = runInputT mySettings (loop 0)
                 Nothing -> return ()
                 Just "quit" -> return ()
                 Just s -> do
-                            liftIO $ putStrLn ("line " ++ show n ++ ":" ++ s)
+                            liftIO $ UTF8.putStrLn ("line " ++ show n ++ ":" ++ s)
                             loop (n+1)
