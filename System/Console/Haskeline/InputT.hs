@@ -48,7 +48,5 @@ runInputT settings f = do
 readPrefsOrDefault :: IO Prefs
 readPrefsOrDefault = handle (\_ -> return defaultPrefs) $ do
     home <- getHomeDirectory
-    prefs <- readPrefs (home </> ".haskeline")
-    evaluate prefs -- make sure this function catches any Read parse errors
-    return prefs
+    readPrefs (home </> ".haskeline")
 
