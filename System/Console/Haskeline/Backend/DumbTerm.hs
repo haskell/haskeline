@@ -4,7 +4,7 @@ import System.Console.Haskeline.Backend.Posix
 import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.LineState
-import System.Console.Haskeline.Monads
+import System.Console.Haskeline.Monads as Monads
 import System.Console.Haskeline.Command
 
 import System.IO
@@ -20,20 +20,28 @@ data Window = Window {pos :: Int -- ^ # of visible chars to left of cursor
 initWindow :: Window
 initWindow = Window {pos=0}
 
-newtype DumbTerm m a = DumbTerm (StateT Window m a) -- keep track of window
+newtype DumbTerm m a = DumbTerm {unDumbTerm :: StateT Window m a}
                 deriving (Monad,MonadIO, MonadState Window)
 
-runDumbTerm :: MonadIO m => RunTerm (InputCmdT m)
+instance MonadReader Layout m => MonadReader Layout (DumbTerm m) where
+    ask = lift ask
+    local r = DumbTerm . local r . unDumbTerm
+
+instance MonadException m => MonadException (DumbTerm m) where
+    block = DumbTerm . block . unDumbTerm
+    unblock = DumbTerm . unblock . unDumbTerm
+    catch (DumbTerm f) g = DumbTerm $ Monads.catch f (unDumbTerm . g)
+
+runDumbTerm :: MonadException m => RunTerm (InputCmdT m)
 runDumbTerm = RunTerm {
     getLayout = getPosixLayout,
     withGetEvent = withPosixGetEvent Nothing,
-    runTerm = \(DumbTerm f) -> evalStateT initWindow f
+    runTerm = evalStateT' initWindow . unDumbTerm
     }
     
 
 instance MonadTrans DumbTerm where
     lift = DumbTerm . lift
-    lift2 f (DumbTerm m) = DumbTerm (lift2 f m)
 
 instance MonadIO m => Term (DumbTerm (InputCmdT m)) where
     withReposition _ = id

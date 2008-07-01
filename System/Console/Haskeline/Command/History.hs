@@ -17,7 +17,7 @@ histLog :: History -> HistLog
 histLog hist = HistLog {pastHistory = historyLines hist, futureHistory = []}
 
 runHistoryFromFile :: MonadIO m => Maybe FilePath -> Maybe Int -> StateT History m a -> m a
-runHistoryFromFile Nothing _ f = evalStateT (History []) f
+runHistoryFromFile Nothing _ f = evalStateT' (History []) f
 runHistoryFromFile (Just file) stifleAmt f = do
     contents <- liftIO $ do
                 exists <- doesFileExist file
@@ -39,7 +39,7 @@ addHistory l = modify $ \(History ls) -> History (l:ls)
 runHistLog :: Monad m => StateT HistLog m a -> StateT History m a
 runHistLog f = do
     history <- get
-    lift (evalStateT (histLog history) f)
+    lift (evalStateT' (histLog history) f)
 
 
 prevHistory, nextHistory :: FromString s => s -> HistLog -> (s, HistLog)

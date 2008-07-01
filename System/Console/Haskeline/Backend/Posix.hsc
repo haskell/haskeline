@@ -124,7 +124,7 @@ lexKeys baseMap = loop baseMap
 
 ---- '------------------------
 
-withPosixGetEvent :: MonadIO m => Maybe Terminal -> Bool -> (m Event -> m a) -> m a
+withPosixGetEvent :: MonadException m => Maybe Terminal -> Bool -> (m Event -> m a) -> m a
 withPosixGetEvent term useSigINT f = do
     baseMap <- liftIO (getKeySequences term)
     eventChan <- liftIO $ newTChanIO
@@ -134,27 +134,27 @@ withPosixGetEvent term useSigINT f = do
         $ f $ liftIO $ getEvent eventChan baseMap
 
 -- If the keypad on/off capabilities are defined, wrap the computation with them.
-wrapKeypad :: MonadIO m => Maybe Terminal -> m a -> m a
+wrapKeypad :: MonadException m => Maybe Terminal -> m a -> m a
 wrapKeypad Nothing f = f
 wrapKeypad (Just term) f = (maybeOutput keypadOn >> f) 
-                            `finallyIO` maybeOutput keypadOn
+                            `finally` maybeOutput keypadOn
   where
     maybeOutput cap = liftIO $ runTermOutput term $
                             fromMaybe mempty (getCapability term cap)
 
-withWindowHandler :: MonadIO m => TChan Event -> m a -> m a
+withWindowHandler :: MonadException m => TChan Event -> m a -> m a
 withWindowHandler eventChan = withHandler windowChange $ Catch $
     getPosixLayout >>= atomically . writeTChan eventChan . WindowResize
 
-withSigIntHandler :: MonadIO m => Bool -> TChan Event -> m a -> m a
+withSigIntHandler :: MonadException m => Bool -> TChan Event -> m a -> m a
 withSigIntHandler False _ = id
 withSigIntHandler True eventChan = withHandler keyboardSignal $ CatchOnce $
             atomically $ writeTChan eventChan SigInt
 
-withHandler :: MonadIO m => Signal -> Handler -> m a -> m a
+withHandler :: MonadException m => Signal -> Handler -> m a -> m a
 withHandler signal handler f = do
     old_handler <- liftIO $ installHandler signal handler Nothing
-    f `finallyIO` installHandler signal old_handler Nothing
+    f `finally` liftIO (installHandler signal old_handler Nothing)
 
 getEvent :: TChan Event -> TreeMap Char Key -> IO Event
 getEvent eventChan baseMap = do

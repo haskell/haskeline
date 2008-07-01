@@ -35,7 +35,7 @@ import System.Console.Haskeline.Command.Completion
 import System.IO
 import Data.Char (isSpace)
 import Control.Monad
-import Control.Exception
+import qualified Control.Exception as Exception
 import Data.Dynamic
 
 #ifdef MINGW
@@ -62,14 +62,21 @@ defaultSettings = Settings {complete = completeFilename,
 -- NOTE: If we set stdout to NoBuffering, there can be a flicker effect when many
 -- characters are printed at once.  We'll keep it buffered here, and let the Draw
 -- monad manually flush outputs that don't print a newline.
-wrapTerminalOps:: MonadIO m => m a -> m a
+wrapTerminalOps:: MonadException m => m a -> m a
 wrapTerminalOps =
     bracketSet (hGetBuffering stdin) (hSetBuffering stdin) NoBuffering
     . bracketSet (hGetBuffering stdout) (hSetBuffering stdout) LineBuffering
     . bracketSet (hGetEcho stdout) (hSetEcho stdout) False
 
+bracketSet :: (Eq a, MonadException m) => IO a -> (a -> IO ()) -> a -> m b -> m b
+bracketSet getState set newState f = do
+    oldState <- liftIO getState
+    if oldState == newState
+        then f
+        else finally (liftIO (set newState) >> f) (liftIO (set oldState))
 
-myRunTerm :: MonadIO m => IO (RunTerm (InputCmdT m))
+
+myRunTerm :: MonadException m => IO (RunTerm (InputCmdT m))
 
 #ifdef MINGW
 myRunTerm = return win32Term
@@ -92,7 +99,7 @@ another process), then this function is equivalent to 'getLine', except that
 it returns 'Nothing' if an EOF is encountered before any characters are
 read.
 -}
-getInputLine :: forall m . MonadIO m => String -- ^ The input prompt
+getInputLine :: forall m . MonadException m => String -- ^ The input prompt
                             -> InputT m (Maybe String)
 getInputLine prefix = do
     isTerm <- liftIO $ hIsTerminalDevice stdin
@@ -104,7 +111,7 @@ getInputLine prefix = do
                 then return Nothing
                 else liftM Just $ liftIO $ hGetLine stdin
 
-getInputCmdLine :: forall m . MonadIO m => String -> InputT m (Maybe String)
+getInputCmdLine :: forall m . MonadException m => String -> InputT m (Maybe String)
 getInputCmdLine prefix = do
 -- TODO: Cache the terminal, actions
     emode <- asks (\prefs -> case editMode prefs of
@@ -126,7 +133,7 @@ getInputCmdLine prefix = do
         return result
 
 repeatTillFinish :: forall m s d 
-    . (MonadTrans d, Term (d m), MonadIO m, LineState s, MonadReader Prefs (d m))
+    . (MonadTrans d, Term (d m), MonadIO m, LineState s, MonadReader Prefs m)
             => d m Event -> String -> s -> KeyMap m s 
             -> d m (Maybe String)
 repeatTillFinish getEvent prefix = loop
@@ -139,7 +146,7 @@ repeatTillFinish getEvent prefix = loop
                 case event of
                     SigInt -> do
                         moveToNextLine s
-                        liftIO $ evaluate (throwDyn Interrupt)
+                        liftIO $ Exception.evaluate (Exception.throwDyn Interrupt)
                     WindowResize newLayout -> 
                         withReposition newLayout (loop s processor)
                     KeyInput k -> case lookupKM processor k of
@@ -157,15 +164,16 @@ data Interrupt = Interrupt
                 deriving (Show,Typeable,Eq)
 
 -- | Catch and handle an exception generated when the user pressed Ctrl-C.
-handleInterrupt :: MonadIO m => IO a -> m a -> m a
-handleInterrupt f = handleIO $ \e -> case dynExceptions e of
+handleInterrupt :: MonadException m => m a -> m a -> m a
+handleInterrupt f = handle $ \e -> case Exception.dynExceptions e of
                     Just dyn | Just Interrupt <- fromDynamic dyn -> f
                     _ -> throwIO e
 
 
 
-drawEffect :: (LineState s, LineState t, Term m, MonadReader Prefs m) 
-    => String -> s -> Effect t -> m ()
+drawEffect :: (LineState s, LineState t, Term (d m), 
+                MonadTrans d, MonadReader Prefs m) 
+    => String -> s -> Effect t -> d m ()
 drawEffect prefix s (Redraw shouldClear t) = if shouldClear
     then clearLayout >> drawLine prefix t
     else clearLine prefix s >> drawLine prefix t
@@ -184,9 +192,9 @@ drawLine prefix s = drawLineDiff prefix Cleared s
 clearLine :: (LineState s, Term m) => String -> s -> m ()
 clearLine prefix s = drawLineDiff prefix s Cleared
         
-actBell :: (Term m, MonadReader Prefs m) => m ()
+actBell :: (Term (d m), MonadTrans d, MonadReader Prefs m) => d m ()
 actBell = do
-    style <- asks bellStyle
+    style <- lift (asks bellStyle)
     case style of
         NoBell -> return ()
         VisualBell -> ringBell False

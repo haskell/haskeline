@@ -165,7 +165,6 @@ newtype Draw m a = Draw {runDraw :: m a}
 
 instance MonadTrans Draw where
     lift = Draw
-    lift2 f = Draw . f . runDraw
 
 getInputHandle, getOutputHandle :: MonadIO m => m HANDLE
 getInputHandle = liftIO $ getStdHandle sTD_INPUT_HANDLE

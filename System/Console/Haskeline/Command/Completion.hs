@@ -19,7 +19,6 @@ import System.Console.Haskeline.Settings
 import System.Directory
 import System.FilePath
 import Data.List(isPrefixOf, transpose, unfoldr)
-import Control.Exception(handle)
 import Control.Monad(forM)
 
 makeCompletion :: Monad m => InsertMode -> InputCmdT m (InsertMode, [Completion])

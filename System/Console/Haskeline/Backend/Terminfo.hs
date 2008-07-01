@@ -8,9 +8,9 @@ import System.Console.Terminfo
 import Control.Monad
 import Data.List(intersperse)
 import System.IO (hFlush,stdout)
-import Control.Exception as Exception
+import qualified Control.Exception as Exception
 
-import System.Console.Haskeline.Monads
+import System.Console.Haskeline.Monads as Monads
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Command
 import System.Console.Haskeline.InputT
@@ -86,15 +86,24 @@ initTermPos = TermPos {termRow = 0, termCol = 0}
 
 --------------
 
-newtype Draw m a = Draw (ReaderT Actions (ReaderT Terminal (StateT TermPos m)) a)
+newtype Draw m a = Draw {unDraw :: ReaderT Actions (ReaderT Terminal (StateT TermPos m)) a}
     deriving (Monad,MonadIO,MonadReader Actions,MonadReader Terminal,
         MonadState TermPos)
 
+instance MonadReader Layout m => MonadReader Layout (Draw m) where
+    ask = lift ask
+    local r = Draw . local r . unDraw
+
+instance MonadException m => MonadException (Draw m) where
+    block = Draw . block . unDraw
+    unblock = Draw . unblock . unDraw
+    catch (Draw f) g = Draw $ Monads.catch f (unDraw . g)
+
+
 instance MonadTrans Draw where
     lift = Draw . lift . lift . lift
-    lift2 f (Draw m) = Draw $ lift2 (lift2 (lift2 f)) m
     
-runTerminfoDraw :: MonadIO m => IO (Maybe (RunTerm (InputCmdT m)))
+runTerminfoDraw :: MonadException m => IO (Maybe (RunTerm (InputCmdT m)))
 runTerminfoDraw = do
     mterm <- Exception.try setupTermFromEnv
     case mterm of
@@ -104,9 +113,9 @@ runTerminfoDraw = do
             Just actions -> return $ Just $ RunTerm {
                 getLayout = getPosixLayout,
                 withGetEvent = withPosixGetEvent (Just term),
-                runTerm = \(Draw f) -> evalStateT initTermPos 
-                                    $ evalReaderT term
-                                    $ evalReaderT actions f
+                runTerm = \(Draw f) -> evalStateT' initTermPos 
+                                    $ runReaderT' term
+                                    $ runReaderT' actions f
                 }
     
 output :: MonadIO m => (Actions -> TermOutput) -> Draw m ()
@@ -242,7 +251,7 @@ withRepositionT newLayout f = do
     oldLayout <- ask
     let newPos = reposition oldLayout newLayout oldPos
     put newPos
-    lift2 (local newLayout) f
+    local newLayout f
 
 instance MonadIO m => Term (Draw (InputCmdT m)) where
     drawLineDiff = drawLineDiffT
