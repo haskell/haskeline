@@ -50,7 +50,7 @@ pagingCompletion prefs oldIM im completions k
         layout <- ask
         let wordLines = makeLines (map display completions) layout
         printingCmd <- if completionPaging prefs
-                        then printPage wordLines (moreMessage withPartial)
+                        then printPage wordLines moreMessage
                         else return $ printAll wordLines withPartial
         let pageAction = askFirst (completionPromptLimit prefs) (length completions) 
                             withPartial printingCmd
@@ -63,7 +63,8 @@ pagingCompletion prefs oldIM im completions k
     partial = foldl1 commonPrefix (map replacement completions)
     commonPrefix (c:cs) (d:ds) | c == d = c : commonPrefix cs ds
     commonPrefix _ _ = ""
-    
+    moreMessage = Message withPartial "----More----"
+
 askFirst :: Monad m => Maybe Int -> Int -> InsertMode
             -> CmdAction (InputCmdT m) InsertMode
             -> CmdAction (InputCmdT m) InsertMode
@@ -82,15 +83,13 @@ printOneLine (w:ws) im | not (null ws) =
             PrintLines [w] im >=> pagingCommands ws
 printOneLine _ im = Change (messageState im) >=> continue
 
-moreMessage im = Message im "----More----"
-
 printPage :: Monad m => [String] -> Message InsertMode
                     -> InputCmdT m (CmdAction (InputCmdT m) InsertMode)
 printPage ws im = do
     layout <- ask
     return $ case splitAt (height layout - 1) ws of
         (_,[]) -> PrintLines ws (messageState im) >=> continue
-        (ws,rest) -> PrintLines ws im
+        (zs,rest) -> PrintLines zs im
                     >=> pagingCommands rest
 
 
@@ -130,13 +129,6 @@ splitIntoGroups n xs = transpose $ unfoldr f xs
         f [] = Nothing
         f ys = Just (splitAt k ys)
         k = ceilDiv (length xs) n
-
--- TODO: merge with above.
-splitGroups :: Int -> [a] -> [[a]]
-splitGroups n xs = case splitAt n xs of
-                    (_,[]) -> [xs]
-                    (ys,zs) -> ys : splitGroups n zs
-
 
 -- ceilDiv m n is the smallest k such that k * n >= m.
 ceilDiv :: Integral a => a -> a -> a
@@ -191,9 +183,8 @@ completeFilename  = completeWord (Just '\\') filenameWordBreakChars $
 completion :: String -> Completion
 completion str = Completion str str
 
-setReplacement, setDisplay :: (String -> String) -> Completion -> Completion
+setReplacement :: (String -> String) -> Completion -> Completion
 setReplacement f c = c {replacement = f $ replacement c}
-setDisplay f c = c {display = f $ display c}
 
 
 --------
