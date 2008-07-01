@@ -104,7 +104,7 @@ insertIntoTree ((c:cs),k) (TreeMap m) = TreeMap (Map.alter f c m)
 listToTree :: Ord a => [([a],b)] -> TreeMap a b
 listToTree = foldl' (flip insertIntoTree) emptyTreeMap
 
--- for debugging
+-- for debugging '
 mapLines :: (Show a, Show b) => TreeMap a b -> [String]
 mapLines (TreeMap m) = let
     m2 = Map.map (\(k,t) -> show k : mapLines t) m
@@ -122,7 +122,7 @@ lexKeys baseMap = loop baseMap
                     -> loop t cs
                     | otherwise -> k : loop baseMap cs
 
----- '------------------------
+-----------------------------
 
 withPosixGetEvent :: MonadException m => Maybe Terminal -> Bool -> (m Event -> m a) -> m a
 withPosixGetEvent term useSigINT f = do
