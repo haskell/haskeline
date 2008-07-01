@@ -2,9 +2,6 @@ module Main where
 
 import System.Console.Haskeline
 import System.Console.Haskeline.Monads
-import Control.Concurrent
-import Control.Concurrent.MVar
-import Control.Exception
 
 mySettings :: MonadIO m => Settings m
 mySettings = defaultSettings {historyFile = Just "myhist",
