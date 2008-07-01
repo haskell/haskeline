@@ -50,10 +50,8 @@ getKeySequences :: Maybe Terminal -> IO (TreeMap Char Key)
 getKeySequences term = do
     sttys <- sttyKeys
     let tinfos = fromMaybe ansiKeys (term >>= terminfoKeys)
-    let chars = map (\c -> ([c],KeyChar c)) $ map toEnum [0..127]
-    let metas = map (\c -> (['\ESC',c],KeyMeta c)) $ map toEnum [0..127]
-    -- note ++ acts as a union; so the below favors sttys over chars
-    return $ listToTree $ chars ++ metas ++ tinfos ++ sttys
+    -- note ++ acts as a union; so the below favors sttys over tinfos
+    return $ listToTree $ tinfos ++ sttys
 
 
 ansiKeys :: [(String, Key)]
@@ -111,16 +109,22 @@ mapLines (TreeMap m) = let
     in concatMap (\(k,ls) -> show k : map (' ':) ls) $ Map.toList m2
 
 lexKeys :: TreeMap Char Key -> [Char] -> [Key]
-lexKeys baseMap = loop baseMap
-    where
-        loop _ [] = []
-        loop (TreeMap tm) (c:cs) = case Map.lookup c tm of
-            Nothing -> loop baseMap cs
-            Just (Nothing,t) -> loop t cs
-            Just (Just k,t@(TreeMap tm2))
+lexKeys _ [] = []
+lexKeys baseMap cs
+    | Just (k,ds) <- lookupChars baseMap cs
+            = k : lexKeys baseMap ds
+lexKeys baseMap ('\ESC':c:cs) = KeyMeta c : lexKeys baseMap cs
+lexKeys baseMap (c:cs) = KeyChar c : lexKeys baseMap cs
+
+lookupChars :: TreeMap Char Key -> [Char] -> Maybe (Key,[Char])
+lookupChars _ [] = Nothing
+lookupChars (TreeMap tm) (c:cs) = case Map.lookup c tm of
+    Nothing -> Nothing
+    Just (Nothing,t) -> lookupChars t cs
+    Just (Just k, t@(TreeMap tm2))
                 | not (null cs) && not (Map.null tm2) -- ?? lookup d tm2?
-                    -> loop t cs
-                    | otherwise -> k : loop baseMap cs
+                    -> lookupChars t cs
+                | otherwise -> Just (k, cs)
 
 -----------------------------
 
@@ -187,6 +191,6 @@ getEvent eventChan baseMap = do
         if null ks
             then readKeyEvents buffer
             else atomically $ mapM_ (writeTChan eventChan) ks
-            
+
 tryReadTChan :: TChan a -> STM (Maybe a)
 tryReadTChan chan = fmap Just (readTChan chan) `orElse` return Nothing
