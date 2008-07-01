@@ -23,7 +23,7 @@ finally f ender = block (do
     return r)
 
 throwIO :: MonadIO m => Exception -> m a
-throwIO = liftIO . throwIO
+throwIO = liftIO . E.throwIO
 
 bracket :: MonadException m => m a -> (a -> m b) -> (a -> m c) -> m c
 bracket before after thing =
