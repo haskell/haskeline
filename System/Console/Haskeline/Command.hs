@@ -33,7 +33,8 @@ module System.Console.Haskeline.Command(
                         spliceCmd
                         ) where
 
-import qualified Data.Map as Map
+import Data.Char(isPrint)
+import Control.Monad(mplus)
 import Data.Bits
 import System.Console.Haskeline.LineState
 
@@ -60,19 +61,19 @@ data Effect s = Change {effectState :: s}
               | Redraw {shouldClearScreen :: Bool, effectState :: s}
               | RingBell {effectState :: s}
 
-newtype KeyMap m s = KeyMap {keyMap :: Map.Map Key 
+newtype KeyMap m s = KeyMap {lookupKM :: Key -> Maybe 
             (s -> Either (Maybe String) (m (KeyAction m)))}
+
+useKey :: Key -> (s -> Either (Maybe String) (m (KeyAction m))) -> KeyMap m s
+useKey k f = KeyMap $ \k' -> if k==k' then Just f else Nothing
 
 data KeyAction m = forall t . LineState t => KeyAction (Effect t) (KeyMap m t)
 
-lookupKM :: KeyMap m s -> Key -> Maybe (s -> Either (Maybe String) (m (KeyAction m)))
-lookupKM km k = Map.lookup k (keyMap km)
-
 nullKM :: KeyMap m s
-nullKM = KeyMap $ Map.empty
+nullKM = KeyMap $ const Nothing
 
 orKM :: KeyMap m s -> KeyMap m s -> KeyMap m s
-orKM (KeyMap m) (KeyMap n) = KeyMap $ m `Map.union` n
+orKM (KeyMap m) (KeyMap n) = KeyMap $ \k -> m k `mplus` n k
 
 choiceKM :: [KeyMap m s] -> KeyMap m s
 choiceKM = foldl orKM nullKM
@@ -94,9 +95,10 @@ infixl 6 >+>
 k >+> f = k +> change id >|> f
 
 acceptChar :: (Monad m, LineState t) => (Char -> s -> t) -> Command m s t
-acceptChar f = Command $ \next -> KeyMap $ Map.fromList 
-                $ map (\c -> (KeyChar c,\s -> Right $ return (KeyAction (Change (f c s)) next)))
-                    [' '..'~']
+acceptChar f = Command $ \next -> KeyMap $ \k -> case k of
+    KeyChar c | isPrint c   -> Just $ \s -> Right $ return
+                    $ KeyAction (Change (f c s)) next
+    _ -> Nothing
 
 data CmdAction m s = forall t . LineState t => CmdAction (Effect t) (Command m t s)
 
@@ -111,7 +113,7 @@ acceptKeyM f = acceptKeyFull (Just . f)
 
 acceptKeyFull :: Monad m => (s -> Maybe (m (CmdAction m t)))
                             -> Key -> Command m s t
-acceptKeyFull f k = Command $ \next -> KeyMap $ Map.singleton k $ \s -> case f s of
+acceptKeyFull f k = Command $ \next -> useKey k $ \s -> case f s of
                 Nothing -> Left Nothing
                 Just act -> Right $ do
                     CmdAction effect (Command g) <- act
@@ -135,10 +137,10 @@ try :: Command m s s -> Command m s s
 try (Command f) = Command $ \next -> (f next) `orKM` next
 
 finish :: forall s m t . (Result s, Monad m) => Key -> Command m s t
-finish k = Command $ \_-> KeyMap $ Map.singleton k $ Left . Just . toResult
+finish k = Command $ \_-> useKey k (Left . Just . toResult)
 
 failCmd :: forall s m t . (LineState s, Monad m) => Key -> Command m s t
-failCmd k = Command $ \_-> KeyMap $ Map.singleton k $ const (Left Nothing)
+failCmd k = Command $ \_-> useKey k (const $ Left Nothing)
 
 simpleCommand :: (LineState t, Monad m) => (s -> m (Effect t)) 
                     -> Key -> Command m s t
@@ -150,8 +152,7 @@ change :: (LineState t, Monad m) => (s -> t) -> Key -> Command m s t
 change f = simpleCommand (return . Change . f)
 
 changeWithoutKey :: (s -> t) -> Command m s t
-changeWithoutKey f = Command $ \(KeyMap next) -> KeyMap $ fmap (\g -> g . f) next
-    -- (\(KeyAction g next') -> KeyAction (g . f) next') next
+changeWithoutKey f = Command $ \(KeyMap next) -> KeyMap $ fmap (. f) . next
 
 clearScreenCmd :: (LineState s, Monad m) => Key -> Command m s s
 clearScreenCmd k = k +> simpleCommand (\s -> return (Redraw True s))
