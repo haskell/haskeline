@@ -6,6 +6,7 @@ import Control.Monad(liftM)
 import System.Console.Haskeline.Monads
 import Data.List
 import Control.Exception(evaluate)
+import qualified System.IO.UTF8 as UTF8
 
 import System.Directory(doesFileExist)
 
@@ -22,7 +23,7 @@ runHistoryFromFile (Just file) stifleAmt f = do
     contents <- liftIO $ do
                 exists <- doesFileExist file
                 if exists
-                    then readFile file
+                    then UTF8.readFile file
                     else return ""
     liftIO $ evaluate (length contents) -- force file closed
     let oldHistory = History (lines contents)
@@ -30,7 +31,7 @@ runHistoryFromFile (Just file) stifleAmt f = do
     let stifle = case stifleAmt of
                     Nothing -> id
                     Just m -> take m
-    liftIO $ writeFile file (unlines $ stifle $ historyLines newHistory)
+    liftIO $ UTF8.writeFile file (unlines $ stifle $ historyLines newHistory)
     return x
 
 addHistory :: MonadState History m => String -> m ()
