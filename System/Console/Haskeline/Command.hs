@@ -20,7 +20,6 @@ module System.Console.Haskeline.Command(
                         acceptKeyOrFail,
                         acceptChar,
                         loopUntil,
-                        loopWithBreak,
                         try,
                         finish,
                         failCmd,
@@ -29,8 +28,7 @@ module System.Console.Haskeline.Command(
                         changeWithoutKey,
                         clearScreenCmd,
                         (+>),
-                        choiceCmd,
-                        spliceCmd
+                        choiceCmd
                         ) where
 
 import Data.Char(isPrint)
@@ -124,14 +122,7 @@ acceptKeyOrFail :: Monad m => (s -> Maybe (CmdAction m t)) -> Key
 acceptKeyOrFail f = acceptKeyFull (fmap return . f)
                          
 loopUntil :: Command m s s -> Command m s t -> Command m s t
-loopUntil (Command f) (Command g) 
-    = Command $ \next -> let loop = g next `orKM` f loop
-                         in loop
-
-loopWithBreak :: Command m s s -> Command m s t -> (s -> t) -> Command m s t
-loopWithBreak cmd end f = Command $ \next -> 
-    runCommand $ choiceCmd [cmd, spliceCmd next end, 
-                        spliceCmd next (changeWithoutKey f)]
+loopUntil f g = choiceCmd [g, f >|> loopUntil f g]
 
 try :: Command m s s -> Command m s s
 try (Command f) = Command $ \next -> (f next) `orKM` next
@@ -164,8 +155,3 @@ k +> f = f k
 choiceCmd :: [Command m s t] -> Command m s t
 choiceCmd cmds = Command $ \next -> 
     choiceKM $ map (\(Command f) -> f next) cmds
-
-spliceCmd :: KeyMap m t -> Command m s t -> Command m s u
-spliceCmd alternate (Command f) = Command $ \_-> f alternate
-
-
