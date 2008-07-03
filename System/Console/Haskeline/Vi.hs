@@ -51,6 +51,7 @@ exitingCommands =  choiceCmd [ KeyChar 'i' +> change insertFromCommandMode
                     , KeyChar 's' +> change (insertFromCommandMode . deleteChar)
                     , KeyChar 'S' +> change (const emptyIM)
                     , deleteIOnce
+                    , repeated
                     ]
 
 simpleCmdActions :: InputCmd CommandMode CommandMode
@@ -61,7 +62,6 @@ simpleCmdActions = choiceCmd [ KeyChar '\n'  +> finish
                     , KeyChar 'x' +> change deleteChar
                     , KeyUp +> historyBack
                     , KeyDown +> historyForward
-                    , repeated
                     , deleteOnce
                     , useMovements id
                     ]
@@ -76,7 +76,7 @@ loopReplace k = k >+> loop
                     (choiceCmd []) id
 
 
-repeated :: InputCmd CommandMode CommandMode
+repeated :: InputCmd CommandMode InsertMode
 repeated = let
     start = foreachDigit startArg ['1'..'9']
     addDigit = foreachDigit addNum ['0'..'9']
@@ -86,13 +86,15 @@ repeated = let
     deleteIR = KeyChar 'c'
                 >+> choiceCmd [useMovements deleteAndInsertR,
                              KeyChar 'c' +> change (const emptyIM)]
-    in start >|> loopWithBreak addDigit 
-                    (choiceCmd [ useMovements applyArg
-                    , deleteR
-                    , spliceCmd viActions deleteIR
-                    , KeyChar 'x' +> change (applyArg deleteChar)
-                    ])
-                    argState
+    loop = choiceCmd [addDigit >|> loop
+                     , useMovements applyArg >|> viCommandActions
+                     , deleteR >|> viCommandActions
+                     , deleteIR
+                     , KeyChar 'x' +> change (applyArg deleteChar)
+                        >|> viCommandActions
+                     , changeWithoutKey argState >|> viCommandActions
+                     ]
+    in start >|> loop
 
 movements :: [(Key,CommandMode -> CommandMode)]
 movements = [ (KeyChar 'h', goLeft)
