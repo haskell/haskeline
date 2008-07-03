@@ -72,9 +72,8 @@ replaceOnce k = k >+> try (acceptChar replaceChar)
 loopReplace :: Key -> InputCmd CommandMode CommandMode
 loopReplace k = k >+> loop
     where
-        loop = loopWithBreak (acceptChar (\c -> goRight . replaceChar c))
-                    (choiceCmd []) id
-
+        loop = choiceCmd [acceptChar (\c -> goRight . replaceChar c) >|> loop
+                         , continue]
 
 repeated :: InputCmd CommandMode InsertMode
 repeated = let
