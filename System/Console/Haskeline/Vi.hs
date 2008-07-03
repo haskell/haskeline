@@ -10,9 +10,12 @@ import System.Console.Haskeline.InputT
 type InputCmd s t = forall m . Monad m => Command (InputCmdT m) s t
 
 viActions :: Monad m => KeyMap (InputCmdT m) InsertMode
-viActions = runCommand $ choiceCmd [startCommand, simpleInsertions]
+viActions = runCommand insertionCommands
+
+insertionCommands :: InputCmd InsertMode InsertMode
+insertionCommands = choiceCmd [startCommand, simpleInsertions]
                             
-simpleInsertions :: Monad m => Command (InputCmdT m) InsertMode InsertMode
+simpleInsertions :: InputCmd InsertMode InsertMode
 simpleInsertions = choiceCmd
                 [ KeyChar '\n' +> finish
                    , KeyLeft +> change goLeft 
