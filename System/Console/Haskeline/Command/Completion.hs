@@ -109,13 +109,23 @@ printAll ws im = PrintLines ws im >=> continue
 
 makeLines :: [String] -> Layout -> [String]
 makeLines ws layout = let
-    maxLength = min (width layout) (maximum (map length ws) + 2)
-    numCols = width layout `div` maxLength
-    ls = if (maxLength >= width layout)
+    minColPad = 2
+    printWidth = width layout
+    maxLength = min printWidth (maximum (map length ws) + minColPad)
+    numCols = printWidth `div` maxLength
+    ls = if (maxLength >= printWidth)
                     then map (\x -> [x]) ws
                     else splitIntoGroups numCols ws
-    padToLength xs = xs ++ replicate (maxLength - length xs) ' '
-    in map (concatMap padToLength) ls
+    in map (padWords maxLength) ls
+
+-- Add spaces to the end of each word so that it takes up the given length.
+-- Don't padd the word in the last column, since printing a space in the last column
+-- causes a line wrap on some terminals.
+padWords :: Int -> [String] -> String
+padWords _ [x] = x
+padWords _ [] = ""
+padWords len (x:xs) = x ++ replicate (len - length x) ' '
+			++ padWords len xs
 
 -- Split xs into rows of length n,
 -- such that the list increases incrementally along the columns.
