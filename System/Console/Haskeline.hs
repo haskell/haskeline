@@ -1,17 +1,22 @@
 module System.Console.Haskeline(InputT,
+                    -- * Main functions
                     runInputT,
                     runInputTWithPrefs,
                     getInputLine,
+                    -- * Settings
                     Settings(..),
                     defaultSettings,
                     setComplete,
+                    -- ** Ctrl-C handling
+                    Interrupt(..),
+                    handleInterrupt,
+                    -- * User preferences
                     Prefs(..),
                     BellStyle(..),
                     EditMode(..),
                     defaultPrefs,
                     readPrefs,
                     CompletionType(..),
-                    handleInterrupt,
                     -- * Tab completion functions
                     CompletionFunc,
                     Completion(..),
