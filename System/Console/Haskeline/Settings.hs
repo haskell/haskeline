@@ -5,12 +5,18 @@ import Data.Char(isSpace,toLower)
 import Data.List(foldl')
 import Control.Exception(handle)
 
--- | Performs completions from a reversed 'String'.  The output 'String' is also reversed.
--- These functions may be built using 'completeWord'.
+-- | Performs completions from a reversed 'String'.  
+-- The output 'String' is also reversed.
+-- Use 'completeWord' to build these functions.
+
 type CompletionFunc m = String -> m (String, [Completion])
 
 
-data Completion = Completion {replacement, display :: String}
+data Completion = Completion {replacement  :: String, -- ^ Text to insert in line.
+                        display  :: String
+                                -- ^ Text to display when listing
+                                -- alternatives.
+                            }
                     deriving Show
 
 -- | Application-specific customizations to the user interface.
@@ -61,6 +67,18 @@ data BellStyle = NoBell | VisualBell | AudibleBell
 data EditMode = Vi | Emacs
                     deriving (Show,Read)
 
+{- | The default preferences which may be overwritten in the @.haskeline@ file:
+
+> defaultPrefs = Prefs {bellStyle = AudibleBell,
+>                      maxHistorySize = Nothing,
+>                      editMode = Emacs,
+>                      completionType = ListCompletion,
+>                      completionPaging = True,
+>                      completionPromptLimit = Just 100,
+>                      listCompletionsImmediately = True
+>                    }
+
+-}
 defaultPrefs :: Prefs
 defaultPrefs = Prefs {bellStyle = AudibleBell,
                       maxHistorySize = Nothing,

@@ -1,15 +1,10 @@
 module System.Console.Haskeline(InputT,
                     -- * Main functions
+                    --
+                    -- $maindoc
                     runInputT,
                     runInputTWithPrefs,
                     getInputLine,
-                    -- * Settings
-                    Settings(..),
-                    defaultSettings,
-                    setComplete,
-                    -- ** Ctrl-C handling
-                    Interrupt(..),
-                    handleInterrupt,
                     -- * User preferences
                     Prefs(..),
                     BellStyle(..),
@@ -17,6 +12,13 @@ module System.Console.Haskeline(InputT,
                     defaultPrefs,
                     readPrefs,
                     CompletionType(..),
+                    -- * Settings
+                    Settings(..),
+                    defaultSettings,
+                    setComplete,
+                    -- ** Ctrl-C handling
+                    Interrupt(..),
+                    handleInterrupt,
                     -- * Tab completion functions
                     CompletionFunc,
                     Completion(..),
@@ -49,6 +51,27 @@ import System.Console.Haskeline.Backend.Win32 as Win32
 import System.Console.Haskeline.Backend.Terminfo as Terminfo
 import System.Console.Haskeline.Backend.DumbTerm as DumbTerm
 #endif
+
+
+{- $maindoc
+
+TODO: some intro for this section (maybe explain why inputt is needed
+An example usage of these functions is:
+
+
+> readEvalPrintLoop :: IO ()
+> readEvalPrintLoop = runInputT defaultSettings loop
+>    where loop = do
+>            minput <- getInputLine "% "
+>            case minput of
+>                Nothing -> return ()
+>                Just "quit" -> return ()
+>                Just input -> do putStrLn $ "Input was: " ++ input
+>                                 loop
+
+
+-}
+
 
 -- | A useful default.  In particular:
 --
