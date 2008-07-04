@@ -39,16 +39,16 @@ runInputTWithPrefs prefs settings (InputT f)
         $ runHistoryFromFile (historyFile settings) (maxHistorySize prefs) f
         
 -- | Run a line-reading application, reading user 'Prefs' from 
--- @$HOME/.haskeline@
+-- @~/.haskeline@
 runInputT :: MonadIO m => Settings m -> InputT m a -> m a
 runInputT settings f = do
-    prefs <- liftIO readPrefsOrDefault
+    prefs <- liftIO readPrefsFromHome
     runInputTWithPrefs prefs settings f
 
--- | Read 'Prefs' from a given file.  If there is an error reading the file, the
--- 'defaultPrefs' will be returned.
-readPrefsOrDefault :: IO Prefs
-readPrefsOrDefault = handle (\_ -> return defaultPrefs) $ do
+-- | Read 'Prefs' from @~/.haskeline.@   If there is an error reading the file,
+-- the 'defaultPrefs' will be returned.
+readPrefsFromHome :: IO Prefs
+readPrefsFromHome = handle (\_ -> return defaultPrefs) $ do
     home <- getHomeDirectory
     readPrefs (home </> ".haskeline")
 

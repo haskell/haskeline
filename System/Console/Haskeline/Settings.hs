@@ -3,6 +3,7 @@ module System.Console.Haskeline.Settings where
 import Language.Haskell.TH
 import Data.Char(isSpace,toLower)
 import Data.List(foldl')
+import Control.Exception(handle)
 
 -- | Performs completions from a reversed 'String'.  The output 'String' is also reversed.
 -- These functions may be built using 'completeWord'.
@@ -28,7 +29,10 @@ setComplete f s = s {complete = f}
 
 {- |
 'Prefs' allow the user to customize the line-editing interface.  They are
-usually set in @~/.haskeline@.  Each line of a @.haskeline@ file may define
+read by default from @~/.haskeline@; to override that behavior, use
+'readPrefs' and 'runInputTWithPrefs'.  
+
+Each line of a @.haskeline@ file may define
 one field of the 'Prefs' datatype; field names are case-insensitive and
 unparseable lines are ignored.  For example:
 
@@ -84,8 +88,10 @@ settors = $(do
                         $ RecUpdE (VarE p) [(f,VarE x)]]
     return $ ListE $ map settor fields)
 
+-- | Read 'Prefs' from a given file.  If there is an error reading the file,
+-- the 'defaultPrefs' will be returned.
 readPrefs :: FilePath -> IO Prefs
-readPrefs file = do
+readPrefs file = handle (\_ -> return defaultPrefs) $ do
     ls <- fmap lines $ readFile file
     return $ foldl' applyField defaultPrefs ls
   where
