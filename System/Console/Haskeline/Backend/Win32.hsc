@@ -161,7 +161,7 @@ getDisplayWindow = withScreenBufferInfo $ \p -> do
 -- Drawing
 
 newtype Draw m a = Draw {runDraw :: m a}
-    deriving (Monad,MonadIO)
+    deriving (Monad,MonadIO,MonadException)
 
 instance MonadTrans Draw where
     lift = Draw
