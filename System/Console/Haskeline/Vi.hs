@@ -18,9 +18,11 @@ insertionCommands = choiceCmd [startCommand, simpleInsertions]
 simpleInsertions :: InputCmd InsertMode InsertMode
 simpleInsertions = choiceCmd
                 [ KeyChar '\n' +> finish
+		   , KeyChar '\r' +> finish
                    , KeyLeft +> change goLeft 
                    , KeyRight +> change goRight
                    , Backspace +> change deletePrev 
+		   , KeyChar '\b' +> change deletePrev
                    , DeleteForward +> change deleteNext 
                    , acceptChar insertChar
                    , KeyChar '\t' +> completionCmd

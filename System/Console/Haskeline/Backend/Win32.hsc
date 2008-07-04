@@ -47,8 +47,6 @@ readKey h = do
     case e of
         KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc}
             -- first, some special cases to make this look more unix-y to the KeyMaps.
-            | c == '\b'                     -> return (Backspace)
-            | c == '\r'                     -> return (KeyChar '\n')
             -- regular character; just return it.
             | c /= '\NUL'                   -> return (KeyChar c)
             -- special character; see below.

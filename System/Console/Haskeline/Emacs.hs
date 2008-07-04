@@ -16,10 +16,12 @@ emacsCommands = runCommand $ choiceCmd [simpleActions, controlActions]
 simpleActions, controlActions :: InputCmd InsertMode InsertMode
 simpleActions = choiceCmd 
             [ KeyChar '\n' +> finish
+	    , KeyChar '\r' +> finish
             , KeyLeft +> change goLeft
             , KeyRight +> change goRight
             , Backspace +> change deletePrev
-            , DeleteForward +> change deleteNext 
+            , KeyChar '\b' +> change deletePrev
+	    , DeleteForward +> change deleteNext 
             , acceptChar insertChar
             , KeyChar '\t' +> completionCmd
             , KeyUp +> historyBack
