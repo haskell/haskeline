@@ -90,7 +90,7 @@ myRunTerm = do
 
 
 {- | Read one line of input from the user, with a rich line-editing
-user interface.  Returns 'Nothing' if the user presses Ctrl-D and the input
+user interface.  Returns 'Nothing' if the user presses Ctrl-D when the input
 text is empty.  Otherwise, it returns the input line with the final newline
 removed.  
  
