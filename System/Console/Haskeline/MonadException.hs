@@ -1,3 +1,7 @@
+{- | This module redefines some of the functions in "Control.Exception" to
+work for more general monads than only 'IO'.
+-}
+
 module System.Console.Haskeline.MonadException where
 
 import qualified Control.Exception as E
