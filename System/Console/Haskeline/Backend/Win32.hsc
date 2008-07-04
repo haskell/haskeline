@@ -12,9 +12,8 @@ import Foreign.C.Types
 import Foreign.Marshal.Utils
 import System.Win32.Types
 import Graphics.Win32.Misc(getStdHandle, sTD_INPUT_HANDLE, sTD_OUTPUT_HANDLE)
-import Control.Monad(when,liftM)
+import Control.Monad(liftM)
 import Data.List(intercalate)
-
 
 import System.Console.Haskeline.Command
 import System.Console.Haskeline.Monads
@@ -23,20 +22,6 @@ import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Term
 
 #include "win_console.h"
-
-foreign import stdcall "windows.h GetConsoleMode" c_GetConsoleMode 
-    :: HANDLE -> Ptr DWORD -> IO Bool
-
-foreign import stdcall "windows.h SetConsoleMode" c_SetConsoleMode
-    :: HANDLE -> DWORD -> IO Bool
-    
-getConsoleMode :: HANDLE -> IO DWORD
-getConsoleMode h = alloca $ \modePtr -> do
-    failIfFalse_ "GetConsoleMode" $ c_GetConsoleMode h modePtr 
-    peek modePtr
-    
-setConsoleMode :: HANDLE -> DWORD -> IO ()
-setConsoleMode h m = failIfFalse_ "SetConsoleMode" $ c_SetConsoleMode h m
 
 foreign import stdcall "windows.h ReadConsoleInputA" c_ReadConsoleInput
     :: HANDLE -> Ptr () -> DWORD -> Ptr DWORD -> IO Bool
@@ -54,6 +39,7 @@ readKey h = do
         -- If the key is not recognized, ignore it and try again.
         _ -> readKey h
 
+keyFromCode :: WORD -> Maybe Key
 keyFromCode (#const VK_BACK) = Just Backspace
 keyFromCode (#const VK_LEFT) = Just KeyLeft
 keyFromCode (#const VK_RIGHT) = Just KeyRight
@@ -130,10 +116,6 @@ foreign import stdcall "windows.h GetConsoleScreenBufferInfo"
 getPosition :: HANDLE -> IO Coord
 getPosition = withScreenBufferInfo $ 
     (#peek CONSOLE_SCREEN_BUFFER_INFO, dwCursorPosition)
-
-getConsoleSize :: HANDLE -> IO Coord
-getConsoleSize = withScreenBufferInfo $
-    (#peek CONSOLE_SCREEN_BUFFER_INFO, dwSize)
 
 withScreenBufferInfo :: (Ptr () -> IO a) -> HANDLE -> IO a
 withScreenBufferInfo f h = allocaBytes (#size CONSOLE_SCREEN_BUFFER_INFO)
