@@ -166,6 +166,10 @@ newtype Draw m a = Draw {runDraw :: m a}
 instance MonadTrans Draw where
     lift = Draw
 
+instance MonadReader Layout m => MonadReader Layout (Draw m) where
+    ask = lift ask
+    local r = Draw . local r . runDraw
+
 getInputHandle, getOutputHandle :: MonadIO m => m HANDLE
 getInputHandle = liftIO $ getStdHandle sTD_INPUT_HANDLE
 getOutputHandle = liftIO $ getStdHandle sTD_OUTPUT_HANDLE
