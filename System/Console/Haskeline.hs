@@ -13,7 +13,8 @@ module System.Console.Haskeline(InputT,
                     Interrupt(..),
                     handleInterrupt,
                     module System.Console.Haskeline.Completion,
-                    module System.Console.Haskeline.Prefs)
+                    module System.Console.Haskeline.Prefs,
+                    module System.Console.Haskeline.MonadException)
                      where
 
 import System.Console.Haskeline.LineState
@@ -23,6 +24,7 @@ import System.Console.Haskeline.Vi
 import System.Console.Haskeline.Emacs
 import System.Console.Haskeline.Prefs
 import System.Console.Haskeline.Monads
+import System.Console.Haskeline.MonadException
 import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.Completion
