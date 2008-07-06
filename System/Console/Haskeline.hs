@@ -119,6 +119,12 @@ If 'stdin' is not connected to a terminal (for example, piped from
 another process), then this function is equivalent to 'getLine', except that
 it returns 'Nothing' if an EOF is encountered before any characters are
 read.
+
+If signal handling is enabled in the 'Settings', then an 'Interrupt' exception
+will be thrown when the user presses Ctrl-C.  This function will clean up after
+itself: the terminal will be restored to its original state,
+and the cursor will be moved to the start of the line after any input entered
+by the user.
 -}
 getInputLine :: forall m . MonadException m => String -- ^ The input prompt
                             -> InputT m (Maybe String)
@@ -179,8 +185,6 @@ repeatTillFinish getEvent prefix = loop
                                         drawEffect prefix s effect
                                         loop (effectState effect) next
 
--- | If signal handling is enabled in the 'Settings', then an 'Interrupt'
--- exception will be thrown when the user presses Ctrl-C.
 data Interrupt = Interrupt
                 deriving (Show,Typeable,Eq)
 
