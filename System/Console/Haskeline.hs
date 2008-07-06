@@ -189,8 +189,11 @@ by moving the cursor to the start of the following line.
 data Interrupt = Interrupt
                 deriving (Show,Typeable,Eq)
 
--- | Catch and handle an exception generated when the user pressed Ctrl-C.
-handleInterrupt :: MonadException m => m a -> m a -> m a
+-- | Catch and handle an exception of type 'Interrupt'.
+handleInterrupt :: MonadException m => m a 
+                        -- ^ Handler to run if Ctrl-C is pressed
+                     -> m a -- ^ Computation to run
+                     -> m a
 handleInterrupt f = handle $ \e -> case Exception.dynExceptions e of
                     Just dyn | Just Interrupt <- fromDynamic dyn -> f
                     _ -> throwIO e
