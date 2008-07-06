@@ -18,14 +18,7 @@ module System.Console.Haskeline(InputT,
                     setComplete,
                     -- ** Ctrl-C handling
                     Interrupt(..),
-                    handleInterrupt,
-                    -- * Tab completion functions
-                    CompletionFunc,
-                    Completion(..),
-                    completeWord,
-                    simpleCompletion,
-                    completeFilename,
-                    filenameWordBreakChars)
+                    handleInterrupt)
                      where
 
 import System.Console.Haskeline.LineState
@@ -37,7 +30,7 @@ import System.Console.Haskeline.Settings
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Term
-import System.Console.Haskeline.Command.Completion
+import System.Console.Haskeline.Completion
 
 import System.IO
 import Data.Char (isSpace)

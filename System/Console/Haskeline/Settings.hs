@@ -5,19 +5,7 @@ import Data.Char(isSpace,toLower)
 import Data.List(foldl')
 import Control.Exception(handle)
 
--- | Performs completions from a reversed 'String'.  
--- The output 'String' is also reversed.
--- Use 'completeWord' to build these functions.
-
-type CompletionFunc m = String -> m (String, [Completion])
-
-
-data Completion = Completion {replacement  :: String, -- ^ Text to insert in line.
-                        display  :: String
-                                -- ^ Text to display when listing
-                                -- alternatives.
-                            }
-                    deriving Show
+import System.Console.Haskeline.Completion
 
 -- | Application-specific customizations to the user interface.
 data Settings m = Settings {complete :: CompletionFunc m,

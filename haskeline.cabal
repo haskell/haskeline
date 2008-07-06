@@ -46,6 +46,7 @@ Library
                 GADTs
     Exposed-Modules:
                 System.Console.Haskeline
+                System.Console.Haskeline.Completion
                 System.Console.Haskeline.MonadException
     Other-Modules:
                 System.Console.Haskeline.Command
