@@ -117,11 +117,9 @@ another process), then this function is equivalent to 'getLine', except that
 it returns 'Nothing' if an EOF is encountered before any characters are
 read.
 
-If signal handling is enabled in the 'Settings', then an 'Interrupt' exception
-will be thrown when the user presses Ctrl-C.  This function will clean up after
-itself: the terminal will be restored to its original state,
-and the cursor will be moved to the start of the line after any input entered
-by the user.
+If signal handling is enabled in the 'Settings', then 'getInputLine' will
+throw an 'Interrupt' exception when the user presses Ctrl-C.
+
 -}
 getInputLine :: forall m . MonadException m => String -- ^ The input prompt
                             -> InputT m (Maybe String)
@@ -181,6 +179,12 @@ repeatTillFinish getEvent prefix = loop
                                         KeyAction effect next <- lift f
                                         drawEffect prefix s effect
                                         loop (effectState effect) next
+
+{-- 
+Note why it is necessary to integrate ctrl-c handling with this module:
+if the user is in the middle of a few wrapped lines, we want to clean up
+by moving the cursor to the start of the following line.
+--}
 
 data Interrupt = Interrupt
                 deriving (Show,Typeable,Eq)
