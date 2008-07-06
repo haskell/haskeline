@@ -18,7 +18,8 @@ module System.Console.Haskeline(InputT,
                     setComplete,
                     -- ** Ctrl-C handling
                     Interrupt(..),
-                    handleInterrupt)
+                    handleInterrupt,
+                    module System.Console.Haskeline.Completion)
                      where
 
 import System.Console.Haskeline.LineState
