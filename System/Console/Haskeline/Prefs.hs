@@ -1,11 +1,3 @@
-module System.Console.Haskeline.Prefs where
-
-import Language.Haskell.TH
-import Data.Char(isSpace,toLower)
-import Data.List(foldl')
-import Control.Exception(handle)
-
-
 {- |
 'Prefs' allow the user to customize the line-editing interface.  They are
 read by default from @~/.haskeline@; to override that behavior, use
@@ -20,13 +12,29 @@ unparseable lines are ignored.  For example:
 > maxhistorysize: Just 40
 
 -}
+module System.Console.Haskeline.Prefs where
+
+import Language.Haskell.TH
+import Data.Char(isSpace,toLower)
+import Data.List(foldl')
+import Control.Exception(handle)
+
+
 data Prefs = Prefs { bellStyle :: !BellStyle,
                      editMode :: !EditMode,
                      maxHistorySize :: !(Maybe Int),
                      completionType :: !CompletionType,
-                     completionPaging :: !Bool,
+                     completionPaging :: !Bool, 
+                        -- ^ When listing completion alternatives, only display
+                        -- one screen of possibilities at a time.
                      completionPromptLimit :: !(Maybe Int),
+                        -- ^ If more than this number of completion
+                        -- possibilities are found, then ask before listing
+                        -- them.
                      listCompletionsImmediately :: !Bool
+                        -- ^ If 'False', completions with multiple possibilities
+                        -- will ring the bell and only display them if the user
+                        -- presses @TAB@ again.
                      }
                         deriving (Read,Show)
 
