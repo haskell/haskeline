@@ -5,21 +5,15 @@ module System.Console.Haskeline(InputT,
                     runInputT,
                     runInputTWithPrefs,
                     getInputLine,
-                    -- * User preferences
-                    Prefs(..),
-                    BellStyle(..),
-                    EditMode(..),
-                    defaultPrefs,
-                    readPrefs,
-                    CompletionType(..),
                     -- * Settings
                     Settings(..),
                     defaultSettings,
                     setComplete,
-                    -- ** Ctrl-C handling
+                    -- * Ctrl-C handling
                     Interrupt(..),
                     handleInterrupt,
-                    module System.Console.Haskeline.Completion)
+                    module System.Console.Haskeline.Completion,
+                    module System.Console.Haskeline.Prefs)
                      where
 
 import System.Console.Haskeline.LineState
@@ -27,7 +21,7 @@ import System.Console.Haskeline.Command
 import System.Console.Haskeline.Command.History
 import System.Console.Haskeline.Vi
 import System.Console.Haskeline.Emacs
-import System.Console.Haskeline.Settings
+import System.Console.Haskeline.Prefs
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Term

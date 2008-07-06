@@ -8,7 +8,7 @@ module System.Console.Haskeline.Command.Completion(
 import System.Console.Haskeline.Command
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.InputT
-import System.Console.Haskeline.Settings
+import System.Console.Haskeline.Prefs
 import System.Console.Haskeline.Completion
 import System.Console.Haskeline.Monads
 

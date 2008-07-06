@@ -1,25 +1,10 @@
-module System.Console.Haskeline.Settings where
+module System.Console.Haskeline.Prefs where
 
 import Language.Haskell.TH
 import Data.Char(isSpace,toLower)
 import Data.List(foldl')
 import Control.Exception(handle)
 
-import System.Console.Haskeline.Completion
-
--- | Application-specific customizations to the user interface.
-data Settings m = Settings {complete :: CompletionFunc m,
-                            historyFile :: Maybe FilePath,
-                            handleSigINT :: Bool -- ^ Throw an 'Interrupt'
-                            -- exception if the user presses Ctrl-C
-                            }
-
--- | Because 'complete' is the only field of 'Settings' depending on @m@,
--- the expression @defaultSettings {completionFunc = f}@ leads to a type error
--- from being too general.  This function may become unnecessary if another field
--- depending on @m@ is added.
-setComplete :: CompletionFunc m -> Settings m -> Settings m
-setComplete f s = s {complete = f}
 
 {- |
 'Prefs' allow the user to customize the line-editing interface.  They are
