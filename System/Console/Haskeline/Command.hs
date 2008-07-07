@@ -18,13 +18,14 @@ module System.Console.Haskeline.Command(
                         acceptKey,
                         acceptKeyM,
                         acceptKeyOrFail,
-                        acceptChar,
                         loopUntil,
                         try,
                         finish,
                         failCmd,
                         simpleCommand,
+                        charCommand,
                         change,
+                        changeFromChar,
                         changeWithoutKey,
                         clearScreenCmd,
                         (+>),
@@ -92,12 +93,6 @@ infixl 6 >+>
 (>+>) :: (Monad m, LineState s) => Key -> Command m s t -> Command m s t
 k >+> f = k +> change id >|> f
 
-acceptChar :: (Monad m, LineState t) => (Char -> s -> t) -> Command m s t
-acceptChar f = Command $ \next -> KeyMap $ \k -> case k of
-    KeyChar c | isPrint c   -> Just $ \s -> Right $ return
-                    $ KeyAction (Change (f c s)) next
-    _ -> Nothing
-
 data CmdAction m s = forall t . LineState t => CmdAction (Effect t) (Command m t s)
 
 (>=>) :: LineState t => Effect t -> Command m t s -> CmdAction m s
@@ -139,8 +134,20 @@ simpleCommand f = acceptKeyM $ \s -> do
             act <- f s
             return (act >=> continue)
 
+charCommand :: (LineState t, Monad m) => (Char -> s -> m (Effect t))
+                    -> Command m s t
+charCommand f = Command $ \next -> KeyMap $ \k -> case k of
+                    KeyChar c | isPrint c -> Just $ \s -> Right $ do
+                                    effect <- f c s
+                                    return (KeyAction effect next)
+                    _ -> Nothing
+                    
+
 change :: (LineState t, Monad m) => (s -> t) -> Key -> Command m s t
 change f = simpleCommand (return . Change . f)
+
+changeFromChar :: (Monad m, LineState t) => (Char -> s -> t) -> Command m s t
+changeFromChar f = charCommand (\c s -> return $ Change (f c s))
 
 changeWithoutKey :: (s -> t) -> Command m s t
 changeWithoutKey f = Command $ \(KeyMap next) -> KeyMap $ fmap (. f) . next

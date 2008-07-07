@@ -24,11 +24,12 @@ simpleInsertions = choiceCmd
                    , Backspace +> change deletePrev 
 		   , KeyChar '\b' +> change deletePrev
                    , DeleteForward +> change deleteNext 
-                   , acceptChar insertChar
+                   , changeFromChar insertChar
                    , KeyChar '\t' +> completionCmd
                    , KeyUp +> historyBack
                    , KeyDown +> historyForward
                    , controlKey 'd' +> eofIfEmpty
+                   , searchHistory
                    ]
 
 -- If we receive a ^D and the line is empty, return Nothing
@@ -69,12 +70,12 @@ simpleCmdActions = choiceCmd [ KeyChar '\n'  +> finish
                     ]
 
 replaceOnce :: Key -> InputCmd CommandMode CommandMode
-replaceOnce k = k >+> try (acceptChar replaceChar)
+replaceOnce k = k >+> try (changeFromChar replaceChar)
 
 loopReplace :: Key -> InputCmd CommandMode CommandMode
 loopReplace k = k >+> loop
     where
-        loop = choiceCmd [acceptChar (\c -> goRight . replaceChar c) >|> loop
+        loop = choiceCmd [changeFromChar (\c -> goRight . replaceChar c) >|> loop
                          , continue]
 
 repeated :: InputCmd CommandMode InsertMode

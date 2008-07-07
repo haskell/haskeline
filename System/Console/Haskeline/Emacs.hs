@@ -22,10 +22,11 @@ simpleActions = choiceCmd
             , Backspace +> change deletePrev
             , KeyChar '\b' +> change deletePrev
 	    , DeleteForward +> change deleteNext 
-            , acceptChar insertChar
+            , changeFromChar insertChar
             , KeyChar '\t' +> completionCmd
             , KeyUp +> historyBack
             , KeyDown +> historyForward
+            , searchHistory
             ] 
             
 controlActions = choiceCmd
