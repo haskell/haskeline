@@ -23,7 +23,7 @@ import System.Console.Haskeline.Term
 
 #include "win_console.h"
 
-foreign import stdcall "windows.h ReadConsoleInputA" c_ReadConsoleInput
+foreign import stdcall "windows.h ReadConsoleInputW" c_ReadConsoleInput
     :: HANDLE -> Ptr () -> DWORD -> Ptr DWORD -> IO Bool
     
 readKey :: HANDLE -> IO Key
@@ -78,13 +78,13 @@ getKeyEvent p = do
     repeat' <- (#peek KEY_EVENT_RECORD, wRepeatCount) p
     keyCode <- (#peek KEY_EVENT_RECORD, wVirtualKeyCode) p
     scanCode <- (#peek KEY_EVENT_RECORD, wVirtualScanCode) p
-    char :: CChar <- (#peek KEY_EVENT_RECORD, uChar) p -- TODO: unicode?
+    char :: CWchar <- (#peek KEY_EVENT_RECORD, uChar) p
     state <- (#peek KEY_EVENT_RECORD, dwControlKeyState) p
     return KeyEvent {keyDown = kDown',
                             repeatCount = repeat',
                             virtualKeyCode = keyCode,
                             virtualScanCode = scanCode,
-                            unicodeChar = toEnum $ fromEnum char,
+                            unicodeChar = toEnum (fromEnum char),
                             controlKeyState = state}
 
 -- NOTE: may be good to make COORD Storable, since used in multiple places.
