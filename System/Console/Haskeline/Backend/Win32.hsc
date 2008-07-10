@@ -87,7 +87,6 @@ getKeyEvent p = do
                             unicodeChar = toEnum (fromEnum char),
                             controlKeyState = state}
 
--- NOTE: may be good to make COORD Storable, since used in multiple places.
 data Coord = Coord {coordX, coordY :: Int}
                 deriving Show
                 
