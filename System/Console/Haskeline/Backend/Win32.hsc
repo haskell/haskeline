@@ -12,8 +12,9 @@ import Foreign.C.Types
 import Foreign.Marshal.Utils
 import System.Win32.Types
 import Graphics.Win32.Misc(getStdHandle, sTD_INPUT_HANDLE, sTD_OUTPUT_HANDLE)
-import Control.Monad(liftM)
 import Data.List(intercalate)
+import Control.Concurrent
+import Control.Concurrent.STM
 
 import System.Console.Haskeline.Command
 import System.Console.Haskeline.Monads
@@ -26,18 +27,30 @@ import System.Console.Haskeline.Term
 foreign import stdcall "windows.h ReadConsoleInputW" c_ReadConsoleInput
     :: HANDLE -> Ptr () -> DWORD -> Ptr DWORD -> IO Bool
     
-readKey :: HANDLE -> IO Key
-readKey h = do
-    e <- readEvent h
-    case e of
-        KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc}
-            -- first, some special cases to make this look more unix-y to the KeyMaps.
-            -- regular character; just return it.
-            | c /= '\NUL'                   -> return (KeyChar c)
-            -- special character; see below.
-            | Just k <- keyFromCode vc      -> return k
-        -- If the key is not recognized, ignore it and try again.
-        _ -> readKey h
+foreign import stdcall "windows.h WaitForSingleObject" c_WaitForSingleObject
+    :: HANDLE -> DWORD -> IO DWORD
+
+getEvent :: HANDLE -> TChan Event -> IO Event
+getEvent h = keyEventLoop readKeyEvents
+  where
+    waitTime = 200 -- milliseconds
+    readKeyEvents eventChan = do
+        yield -- since the foreign call to WaitForSingleObject blocks the killThread
+        ret <- c_WaitForSingleObject h waitTime
+        if ret /= (#const WAIT_OBJECT_0)
+            then readKeyEvents eventChan
+            else do
+                e <- readEvent h
+                case eventToKey e of
+	            Just k -> atomically $ writeTChan eventChan (KeyInput k)
+    	            Nothing -> readKeyEvents eventChan
+
+            
+eventToKey :: InputEvent -> Maybe Key
+eventToKey KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc}
+    | c /= '\NUL' = Just (KeyChar c)
+    | otherwise = keyFromCode vc -- special character; see below.
+eventToKey _ = Nothing
 
 keyFromCode :: WORD -> Maybe Key
 keyFromCode (#const VK_BACK) = Just Backspace
@@ -56,7 +69,7 @@ data InputEvent = KeyEvent {keyDown :: BOOL,
                           unicodeChar :: Char,
                           controlKeyState :: DWORD}
             -- TODO: WINDOW_BUFFER_SIZE_RECORD
-            -- I can't figure out how the user generates them.
+            -- I cant figure out how the user generates them.
            | OtherEvent
                         deriving Show
 
@@ -228,12 +241,35 @@ instance MonadIO m => Term (Draw (InputCmdT m)) where
     
     ringBell _ = return () -- TODO
 
-win32Term :: MonadIO m => RunTerm (InputCmdT m)
+win32Term :: MonadException m => RunTerm (InputCmdT m)
 win32Term = RunTerm {
     getLayout = getDisplaySize,
     runTerm = runDraw,
-    -- TODO: use GHC.ConsoleHandler.installHandler for ctrl-c events
-    withGetEvent = \_ f -> do 
+    withGetEvent = \useSigINT f -> do 
         h <- getInputHandle
-        f $ liftIO $ liftM KeyInput $ readKey h
+	eventChan <- liftIO $ newTChanIO
+        withCtrlCHandler useSigINT eventChan
+		$ f $ liftIO $ getEvent h eventChan
     }
+
+type Handler = DWORD -> IO BOOL
+
+foreign import ccall "wrapper" wrapHandler :: Handler -> IO (FunPtr Handler)
+
+foreign import stdcall "windows.h SetConsoleCtrlHandler" c_SetConsoleCtrlHandler
+    :: FunPtr Handler -> BOOL -> IO BOOL
+
+-- sets the tv to True when ctrl-c is pressed.
+withCtrlCHandler :: MonadException m => Bool -> TChan Event -> m a -> m a
+withCtrlCHandler False _ f = f
+withCtrlCHandler True eventChan f = bracket (liftIO $ do
+                                    fp <- wrapHandler handler
+                                    c_SetConsoleCtrlHandler fp True
+                                    return fp)
+                                (\fp -> liftIO $ c_SetConsoleCtrlHandler fp False)
+                                (const f)
+  where
+    handler (#const CTRL_C_EVENT) = do
+        atomically $ writeTChan eventChan SigInt
+        return True
+    handler _ = return False

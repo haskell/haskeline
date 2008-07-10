@@ -23,6 +23,7 @@ import qualified Data.ByteString.UTF8 as UTF8
 
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.Command
+import System.Console.Haskeline.Term
 
 #include <sys/ioctl.h>
 
@@ -137,7 +138,7 @@ withPosixGetEvent term useSigINT f = do
     wrapKeypad term 
         $ withWindowHandler eventChan
         $ withSigIntHandler useSigINT eventChan
-        $ f $ liftIO $ getEvent eventChan baseMap
+        $ f $ liftIO $ getEvent baseMap eventChan
 
 -- If the keypad on/off capabilities are defined, wrap the computation with them.
 wrapKeypad :: MonadException m => Maybe Terminal -> m a -> m a
@@ -162,25 +163,11 @@ withHandler signal handler f = do
     old_handler <- liftIO $ installHandler signal handler Nothing
     f `finally` liftIO (installHandler signal old_handler Nothing)
 
-getEvent :: TChan Event -> TreeMap Char Key -> IO Event
-getEvent eventChan baseMap = do
-    -- first, see if any events are already queued up (from a key/ctrl-c
-    -- event or from a previous call to getEvent where we read in multiple
-    -- keys)
-    me <- atomically $ tryReadTChan eventChan
-    case me of
-        Just e -> return e
-        Nothing -> do
-            -- no events are queued yet, so fork off a thread to read keys.
-            -- if we receive a different type of event before it's done,
-            -- we'll kill it.
-            tid <- forkIO readKeyEvents
-            e <- atomically $ readTChan eventChan -- key or other event
-            killThread tid
-            return e
+getEvent :: TreeMap Char Key -> TChan Event -> IO Event
+getEvent baseMap = keyEventLoop readKeyEvents
   where
     bufferSize = 100
-    readKeyEvents = do
+    readKeyEvents eventChan = do
         -- Read at least one character of input, and more if available.
         -- In particular, the characters making up a control sequence will all
         -- be available at once, so we can process them together with lexKeys.
@@ -189,8 +176,6 @@ getEvent eventChan baseMap = do
         let cs = UTF8.toString bs
         let ks = map KeyInput $ lexKeys baseMap cs
         if null ks
-            then readKeyEvents
+            then readKeyEvents eventChan
             else atomically $ mapM_ (writeTChan eventChan) ks
 
-tryReadTChan :: TChan a -> STM (Maybe a)
-tryReadTChan chan = fmap Just (readTChan chan) `orElse` return Nothing
