@@ -65,15 +65,21 @@ prevHistory s h = let (s',h') = fromMaybe (toResult s,h) $ prevHistoryM (toResul
 
 historyBack, historyForward :: (FromString s, MonadState HistLog m) => 
                         Key -> Command m s s
-historyBack = simpleCommand $ liftM Change . update . prevHistory
-historyForward = simpleCommand $ liftM Change . update 
-                    . withReverseHist prevHistory
+historyBack = simpleCommand $ histUpdate prevHistory
+historyForward = simpleCommand $ reverseHist $ histUpdate prevHistory
 
-withReverseHist :: (s -> HistLog -> (s,HistLog)) -> s -> HistLog -> (s,HistLog)
-withReverseHist f s h = let (s',h') = f s (reverseHistory h)
-                        in (s',reverseHistory h')
-    where
-        reverseHistory h = HistLog {futureHistory=pastHistory h, 
+histUpdate :: MonadState HistLog m => (s -> HistLog -> (t,HistLog))
+                        -> s -> m (Effect t)
+histUpdate f = liftM Change . update . f
+
+reverseHist :: MonadState HistLog m => (a -> m b) -> a -> m b
+reverseHist f x = do
+    modify reverser
+    y <- f x
+    modify reverser
+    return y
+  where
+    reverser h = HistLog {futureHistory=pastHistory h, 
                             pastHistory=futureHistory h}
 
 data SearchMode = SearchMode {searchTerm :: String,
@@ -130,18 +136,10 @@ searchHistory = controlKey 'r' +> change startSearchMode >|> backSearching
                             ]
         delLastChar s = s {searchTerm = minit (searchTerm s)}
         minit xs = if null xs then "" else init xs
-        oneMoreChar c s = do
-            h <- get
-            let s' = addChar c s
-            let (text,hists) = prepSearch s' h
-            let (s'',h') = fromMaybe (s',h) $ searchHistories
-                            text ((toResult s',h):hists)
-            put h'
-            return $ Change s''
-        searchBackMore s = do
-            h <- get
-            let (text,hists) = prepSearch s h
-            let (s',h') = fromMaybe (s,h) $ searchHistories 
-                                text hists
-            put h'
-            return $ Change s'
+        oneMoreChar c = histUpdate (\s h -> let
+            (text,hists) = prepSearch s h
+            in fromMaybe (s,h) $ searchHistories text ((toResult s,h):hists)
+            ) . addChar c
+        searchBackMore = histUpdate $ \s h -> let
+            (text,hists) = prepSearch s h
+            in fromMaybe (s,h) $ searchHistories text hists
