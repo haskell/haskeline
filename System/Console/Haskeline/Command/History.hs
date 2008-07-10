@@ -7,7 +7,8 @@ import System.Console.Haskeline.Monads
 import Data.List
 import Data.Maybe(fromMaybe)
 import Control.Exception(evaluate)
-import qualified System.IO.UTF8 as UTF8
+import qualified Data.ByteString as B
+import qualified Data.ByteString.UTF8 as UTF8
 
 import System.Directory(doesFileExist)
 
@@ -35,7 +36,9 @@ runHistoryFromFile (Just file) stifleAmt f = do
     contents <- liftIO $ do
                 exists <- doesFileExist file
                 if exists
-                    then UTF8.readFile file
+                    -- use binary file I/O to avoid Windows CRLF line endings
+                    -- which cause confusion when switching between systems.
+                    then fmap UTF8.toString (B.readFile file)
                     else return ""
     liftIO $ evaluate (length contents) -- force file closed
     let oldHistory = History (lines contents)
@@ -43,7 +46,8 @@ runHistoryFromFile (Just file) stifleAmt f = do
     let stifle = case stifleAmt of
                     Nothing -> id
                     Just m -> take m
-    liftIO $ UTF8.writeFile file (unlines $ stifle $ historyLines newHistory)
+    liftIO $ B.writeFile file $ UTF8.fromString 
+        $ unlines $ stifle $ historyLines newHistory
     return x
 
 addHistory :: MonadState History m => String -> m ()
