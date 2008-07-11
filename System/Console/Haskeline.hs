@@ -46,23 +46,24 @@ import System.Console.Haskeline.Backend.DumbTerm as DumbTerm
 
 {- $maindoc
 
-Programs using haskeline will run under the 'InputT' monad transformer which keeps
-track of the user interface state (for example, user preferences or the input
-history).
 
-An example usage of this library for a simple read-eval-print loop is the following:
+An example use of this library for a simple read-eval-print loop is the
+following.
 
-
-> readEvalPrintLoop :: IO ()
-> readEvalPrintLoop = runInputT defaultSettings loop
->    where loop = do
+> import System.Console.Haskeline
+> import Control.Monad.Trans
+> 
+> main :: IO ()
+> main = runInputT defaultSettings loop
+>    where 
+>        loop :: InputT IO ()
+>        loop = do
 >            minput <- getInputLine "% "
 >            case minput of
 >                Nothing -> return ()
 >                Just "quit" -> return ()
->                Just input -> do putStrLn $ "Input was: " ++ input
+>                Just input -> do liftIO $ putStrLn $ "Input was: " ++ input
 >                                 loop
-
 
 -}
 
