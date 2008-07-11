@@ -8,6 +8,7 @@ import System.IO
 import Foreign.Ptr
 import Foreign.Storable
 import Foreign.Marshal.Alloc
+import Foreign.Marshal.Array
 import Foreign.C.Types
 import Foreign.Marshal.Utils
 import System.Win32.Types
@@ -149,6 +150,16 @@ getDisplayWindow = withScreenBufferInfo $ \p -> do
     cvt :: CShort -> Int
     cvt = fromEnum
 
+foreign import stdcall "windows.h WriteConsoleW" c_WriteConsoleW
+    :: HANDLE -> Ptr TCHAR -> DWORD -> Ptr DWORD -> Ptr () -> IO Bool
+
+writeConsole :: HANDLE -> String -> IO ()
+writeConsole h str = withArray tstr $ \t_arr -> alloca $ \numWritten -> do
+    failIfFalse_ "WriteConsole" 
+        $ c_WriteConsoleW h t_arr (toEnum $ length str) numWritten nullPtr
+  where
+    tstr = map (toEnum . fromEnum) str
+
 ----------------------------
 -- Drawing
 
@@ -181,12 +192,10 @@ setPos c = do
     h <- getOutputHandle
     liftIO (setPosition h c)
 
--- TODO: is it bad to be using putStr here?
--- 
--- NOTE: we need to call hflush explicitly here, so that getPos/setPos are synced
--- with the character output.
 printText :: MonadIO m => String -> Draw m ()
-printText txt = liftIO (putStr txt >> hFlush stdout)
+printText txt = do
+    h <- getOutputHandle
+    liftIO (writeConsole h txt)
     
 printAfter :: MonadIO m => String -> Draw (InputCmdT m) ()
 printAfter str = do
