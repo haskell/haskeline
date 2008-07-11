@@ -1,7 +1,8 @@
-module System.Console.Haskeline(InputT,
+module System.Console.Haskeline(
                     -- * Main functions
                     --
                     -- $maindoc
+                    InputT,
                     runInputT,
                     runInputTWithPrefs,
                     getInputLine,
@@ -45,8 +46,11 @@ import System.Console.Haskeline.Backend.DumbTerm as DumbTerm
 
 {- $maindoc
 
-TODO: some intro for this section (maybe explain why inputt is needed
-An example usage of these functions is:
+Programs using haskeline will run under the 'InputT' monad transformer which keeps
+track of the user interface state (for example, user preferences or the input
+history).
+
+An example usage of this library for a simple read-eval-print loop is the following:
 
 
 > readEvalPrintLoop :: IO ()

@@ -11,7 +11,7 @@ import System.Directory(getHomeDirectory)
 import System.FilePath
 
 -- | Application-specific customizations to the user interface.
-data Settings m = Settings {complete :: CompletionFunc m,
+data Settings m = Settings {complete :: CompletionFunc m, -- ^ Custom tab completion
                             historyFile :: Maybe FilePath,
                             handleSigINT :: Bool -- ^ Throw an 'Interrupt'
                             -- exception if the user presses Ctrl-C

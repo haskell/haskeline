@@ -3,7 +3,7 @@
 read by default from @~/.haskeline@; to override that behavior, use
 'readPrefs' and 'runInputTWithPrefs'.  
 
-Each line of a @.haskeline@ file may define
+Each line of a @.haskeline@ file defines
 one field of the 'Prefs' datatype; field names are case-insensitive and
 unparseable lines are ignored.  For example:
 
