@@ -53,3 +53,5 @@ keyEventLoop readKey eventChan = do
 tryReadTChan :: TChan a -> STM (Maybe a)
 tryReadTChan chan = fmap Just (readTChan chan) `orElse` return Nothing
 
+class (MonadReader Layout m, MonadIO m) => MonadLayout m where
+instance (MonadReader Layout m, MonadIO m) => MonadLayout m where

@@ -13,7 +13,6 @@ import qualified Control.Exception as Exception
 import System.Console.Haskeline.Monads as Monads
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Command
-import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.Backend.Posix
 import qualified Codec.Binary.UTF8.String as UTF8
@@ -104,7 +103,7 @@ instance MonadException m => MonadException (Draw m) where
 instance MonadTrans Draw where
     lift = Draw . lift . lift . lift
     
-runTerminfoDraw :: MonadException m => IO (Maybe (RunTerm (InputCmdT m)))
+runTerminfoDraw :: (MonadException m, MonadReader Layout m) => IO (Maybe (RunTerm m))
 runTerminfoDraw = do
     mterm <- Exception.try setupTermFromEnv
     case mterm of
@@ -129,7 +128,7 @@ output f = do
 
 
 
-changeRight, changeLeft :: (MonadIO m) => Int -> Draw (InputCmdT m) ()
+changeRight, changeLeft :: MonadLayout m => Int -> Draw m ()
 changeRight n = do
     w <- asks width
     TermPos {termRow=r,termCol=c} <- get
@@ -159,13 +158,13 @@ changeLeft n = do
                 output $ cr <#> up linesUp <#> right newCol
                 
 -- TODO: I think if we wrap this all up in one call to output, it'll be faster...
-printText :: (MonadIO m) => String -> Draw (InputCmdT m) ()
+printText :: MonadLayout m => String -> Draw m ()
 printText "" = return ()
 printText xs = fillLine xs >>= printText
 
 -- Draws as much of the string as possible in the line, and returns the rest.
 -- If we fill up the line completely, wrap to the next row.
-fillLine :: (MonadIO m) => String -> Draw (InputCmdT m) String
+fillLine :: MonadLayout m => String -> Draw m String
 fillLine str = do
     w <- asks width
     TermPos {termRow=r,termCol=c} <- get
@@ -181,8 +180,8 @@ fillLine str = do
                 put TermPos {termRow=r+1,termCol=0}
                 return rest
 
-drawLineDiffT :: (LineState s, LineState t, MonadIO m) 
-                        => String -> s -> t -> Draw (InputCmdT m) ()
+drawLineDiffT :: (LineState s, LineState t, MonadLayout m) 
+                        => String -> s -> t -> Draw m ()
 drawLineDiffT prefix s1 s2 = let 
     xs1 = beforeCursor prefix s1
     ys1 = afterCursor s1
@@ -207,7 +206,7 @@ linesLeft Layout {width=w} TermPos {termCol = c} n
 lsLinesLeft :: LineState s => Layout -> TermPos -> s -> Int
 lsLinesLeft layout pos s = linesLeft layout pos (lengthToEnd s)
 
-clearDeadText :: (MonadIO m) => Int -> Draw (InputCmdT m) ()
+clearDeadText :: MonadLayout m => Int -> Draw m ()
 clearDeadText n
     | n <= 0    = return ()
     | otherwise = do
@@ -221,13 +220,13 @@ clearDeadText n
                     , up (numLinesToClear - 1)
                     , right (termCol pos)]
 
-clearLayoutT :: MonadIO m => Draw (InputCmdT m) ()
+clearLayoutT :: MonadLayout m => Draw m ()
 clearLayoutT = do
     h <- asks height
     output (flip clearAll h)
     put initTermPos
 
-moveToNextLineT :: (LineState s, MonadIO m) => s -> Draw (InputCmdT m) ()
+moveToNextLineT :: (LineState s, MonadLayout m) => s -> Draw m ()
 moveToNextLineT s = do
     pos <- get
     layout <- ask
@@ -247,7 +246,7 @@ reposition :: Layout -> Layout -> TermPos -> TermPos
 reposition oldLayout newLayout oldPos = posFromLength newLayout $ 
                                             posToLength oldLayout oldPos
 
-withRepositionT :: Monad m => Layout -> Draw (InputCmdT m) a -> Draw (InputCmdT m) a
+withRepositionT :: MonadReader Layout m => Layout -> Draw m a -> Draw m a
 withRepositionT newLayout f = do
     oldPos <- get
     oldLayout <- ask
@@ -255,7 +254,7 @@ withRepositionT newLayout f = do
     put newPos
     local newLayout f
 
-instance MonadIO m => Term (Draw (InputCmdT m)) where
+instance MonadLayout m => Term (Draw m) where
     drawLineDiff = drawLineDiffT
     withReposition = withRepositionT
     

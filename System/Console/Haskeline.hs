@@ -29,9 +29,8 @@ import System.Console.Haskeline.Prefs
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.MonadException
 import System.Console.Haskeline.InputT
-import System.Console.Haskeline.Term
-import System.Console.Haskeline.Backend
 import System.Console.Haskeline.Completion
+import System.Console.Haskeline.Term
 
 import System.IO
 import Data.Char (isSpace)
@@ -98,9 +97,9 @@ bracketSet getState set newState f = do
 
 -- | Write a string to the console output.  Allows cross-platform display of
 -- Unicode characters.
-putOutputStr :: MonadIO m => String -> InputT m ()
+putOutputStr :: forall m . MonadIO m => String -> InputT m ()
 putOutputStr xs = do
-    run :: RunTerm (InputCmdT IO) <- liftIO myRunTerm
+    run :: RunTerm (InputCmdT m) <- ask
     liftIO $ putStrTerm run xs
 
 -- | Write a string to the console output, followed by a newline.  Allows
@@ -143,10 +142,8 @@ getInputCmdLine prefix = do
     settings :: Settings m <- ask
     wrapTerminalOps $ do
         let ls = emptyIM
-        run@RunTerm {withGetEvent = withGetEvent', runTerm=runTerm'} <- liftIO $ myRunTerm
-        layout <- liftIO $ getLayout run
-        result <- runInputCmdT layout $ do
-                    runTerm' $ withGetEvent' (handleSigINT settings) 
+        RunTerm {withGetEvent = withGetEvent', runTerm=runTerm'} <- ask
+        result <- runInputCmdT $ runTerm' $ withGetEvent' (handleSigINT settings) 
                         $ \getEvent -> do
                             drawLine prefix ls 
                             repeatTillFinish getEvent prefix ls emode

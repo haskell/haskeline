@@ -20,7 +20,6 @@ import Control.Concurrent.STM
 import System.Console.Haskeline.Command
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.LineState
-import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Term
 
 #include "win_console.h"
@@ -197,14 +196,14 @@ printText txt = do
     h <- getOutputHandle
     liftIO (writeConsole h txt)
     
-printAfter :: MonadIO m => String -> Draw (InputCmdT m) ()
+printAfter :: MonadLayout m => String -> Draw m ()
 printAfter str = do
     p <- getPos
     printText str
     setPos p
     
-drawLineDiffWin :: (LineState s, LineState t, MonadIO m)
-                        => String -> s -> t -> Draw (InputCmdT m) ()
+drawLineDiffWin :: (LineState s, LineState t, MonadLayout m)
+                        => String -> s -> t -> Draw m ()
 drawLineDiffWin prefix s1 s2 = let
     xs1 = beforeCursor prefix s1
     ys1 = afterCursor s1
@@ -221,7 +220,7 @@ drawLineDiffWin prefix s1 s2 = let
             printText xs2'
             printAfter (ys2 ++ deadText)
 
-movePos :: MonadIO m => Int -> Draw (InputCmdT m) ()
+movePos :: MonadLayout m => Int -> Draw m ()
 movePos n = do
     Coord {coordX = x, coordY = y} <- getPos
     w <- asks width
@@ -231,7 +230,7 @@ movePos n = do
 crlf :: String
 crlf = "\r\n"
 
-instance MonadIO m => Term (Draw (InputCmdT m)) where
+instance MonadLayout m => Term (Draw m) where
     drawLineDiff = drawLineDiffWin
     withReposition _ = id -- TODO
 
@@ -250,7 +249,7 @@ instance MonadIO m => Term (Draw (InputCmdT m)) where
     
     ringBell _ = return () -- TODO
 
-win32Term :: MonadException m => RunTerm (InputCmdT m)
+win32Term :: (MonadLayout m, MonadException m) => RunTerm m
 win32Term = RunTerm {
     getLayout = getDisplaySize,
     runTerm = runDraw,

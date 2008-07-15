@@ -38,7 +38,8 @@ Library
     Extensions:     ForeignFunctionInterface, Rank2Types, FlexibleInstances,
                 FlexibleContexts, ExistentialQuantification
                 ScopedTypeVariables, GeneralizedNewtypeDeriving
-                MultiParamTypeClasses, OverlappingInstances
+                MultiParamTypeClasses, OverlappingInstances, 
+                UndecidableInstances
                 PatternSignatures, CPP, DeriveDataTypeable,
                 PatternGuards, TemplateHaskell, StandaloneDeriving
                 -- Note: GADTs are needed to allow contexts of different

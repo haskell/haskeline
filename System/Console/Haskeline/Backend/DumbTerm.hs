@@ -1,7 +1,6 @@
 module System.Console.Haskeline.Backend.DumbTerm where
 
 import System.Console.Haskeline.Backend.Posix
-import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Monads as Monads
@@ -33,7 +32,7 @@ instance MonadException m => MonadException (DumbTerm m) where
     unblock = DumbTerm . unblock . unDumbTerm
     catch (DumbTerm f) g = DumbTerm $ Monads.catch f (unDumbTerm . g)
 
-runDumbTerm :: MonadException m => RunTerm (InputCmdT m)
+runDumbTerm :: (MonadLayout m, MonadException m) => RunTerm m
 runDumbTerm = RunTerm {
     getLayout = getPosixLayout,
     withGetEvent = withPosixGetEvent Nothing,
@@ -45,7 +44,7 @@ runDumbTerm = RunTerm {
 instance MonadTrans DumbTerm where
     lift = DumbTerm . lift
 
-instance MonadIO m => Term (DumbTerm (InputCmdT m)) where
+instance MonadLayout m => Term (DumbTerm m) where
     withReposition _ = id
     drawLineDiff = drawLineDiff'
     
@@ -68,17 +67,17 @@ backs n = replicate n '\b'
 spaces n = replicate n ' '
 
 
-clearLayoutD :: MonadIO m => DumbTerm (InputCmdT m) ()
+clearLayoutD :: MonadLayout m => DumbTerm m ()
 clearLayoutD = do
     w <- maxWidth
     printText (cr ++ spaces w ++ cr)
 
 -- Don't want to print in the last column, as that may wrap to the next line.
-maxWidth :: Monad m => DumbTerm (InputCmdT m) Int
+maxWidth :: MonadLayout m => DumbTerm m Int
 maxWidth = asks (\lay -> width lay - 1)
 
-drawLineDiff' :: (LineState s, LineState t, MonadIO m)
-                => String -> s -> t -> DumbTerm (InputCmdT m) ()
+drawLineDiff' :: (LineState s, LineState t, MonadLayout m)
+                => String -> s -> t -> DumbTerm m ()
 drawLineDiff' prefix s1 s2 = do
     let xs1 = beforeCursor prefix s1
     let ys1 = afterCursor s1
@@ -106,7 +105,7 @@ drawLineDiff' prefix s1 s2 = do
                         ++ xs2' ++ ys2' ++ clearDeadText extraLength
                         ++ backs (length ys2')
 
-refitLine :: MonadIO m => (String,String) -> DumbTerm (InputCmdT m) ()
+refitLine :: MonadLayout m => (String,String) -> DumbTerm m ()
 refitLine (xs,ys) = do
     w <- maxWidth
     let xs' = dropFrames w xs

@@ -6,6 +6,8 @@ import System.Console.Haskeline.Monads as Monads
 import System.Console.Haskeline.Prefs
 import System.Console.Haskeline.Command(Layout)
 import System.Console.Haskeline.Completion
+import System.Console.Haskeline.Backend
+import System.Console.Haskeline.Term
 
 import System.Directory(getHomeDirectory)
 import System.FilePath
@@ -28,13 +30,16 @@ setComplete f s = s {complete = f}
 
 -- | A monad transformer which carries all of the state and settings
 -- relevant to a line-reading application.
-newtype InputT m a = InputT {unInputT :: StateT History (ReaderT Prefs 
-                                (ReaderT (Settings m) m)) a}
+newtype InputT m a = InputT {unInputT :: ReaderT (RunTerm (InputCmdT m))
+                                (StateT History (ReaderT Prefs 
+                                (ReaderT (Settings m) m))) a}
                             deriving (Monad,MonadIO, MonadState History,
-                                        MonadReader Prefs, MonadReader (Settings m))
+                                        MonadReader Prefs, MonadReader (Settings m),
+                                        MonadReader (RunTerm (InputCmdT m)))
+
 
 instance MonadTrans InputT where
-    lift = InputT . lift . lift . lift
+    lift = InputT . lift . lift . lift . lift
 
 instance MonadException m => MonadException (InputT m) where
     block = InputT . block . unInputT
@@ -44,20 +49,25 @@ instance MonadException m => MonadException (InputT m) where
 -- for internal use only
 type InputCmdT m = ReaderT Layout (StateT HistLog (ReaderT Prefs (ReaderT (Settings m) m)))
 
-runInputCmdT :: Monad m => Layout -> InputCmdT m a -> InputT m a
-runInputCmdT layout = InputT . runHistLog . runReaderT' layout
+runInputCmdT :: forall m a . MonadIO m => InputCmdT m a -> InputT m a
+runInputCmdT f = InputT $ do
+    run :: RunTerm (InputCmdT m) <- ask
+    layout <- liftIO $ getLayout run
+    lift $ runHistLog $ runReaderT' layout f
+
 
 liftCmdT :: Monad m => m a -> InputCmdT m a
 liftCmdT = lift  . lift . lift . lift
 
-runInputTWithPrefs :: MonadIO m => Prefs -> Settings m -> InputT m a -> m a
-runInputTWithPrefs prefs settings (InputT f) 
-    = runReaderT' settings $ runReaderT' prefs 
-        $ runHistoryFromFile (historyFile settings) (maxHistorySize prefs) f
+runInputTWithPrefs :: MonadException m => Prefs -> Settings m -> InputT m a -> m a
+runInputTWithPrefs prefs settings (InputT f) = liftIO myRunTerm >>= \run -> 
+    runReaderT' settings $ runReaderT' prefs 
+        $ runHistoryFromFile (historyFile settings) (maxHistorySize prefs) 
+        $ runReaderT f run
         
 -- | Run a line-reading application, reading user 'Prefs' from 
 -- @~/.haskeline@
-runInputT :: MonadIO m => Settings m -> InputT m a -> m a
+runInputT :: MonadException m => Settings m -> InputT m a -> m a
 runInputT settings f = do
     prefs <- liftIO readPrefsFromHome
     runInputTWithPrefs prefs settings f
