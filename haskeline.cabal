@@ -50,6 +50,7 @@ Library
                 System.Console.Haskeline.Prefs
                 System.Console.Haskeline.MonadException
     Other-Modules:
+                System.Console.Haskeline.Backend
                 System.Console.Haskeline.Command
                 System.Console.Haskeline.Command.Completion
                 System.Console.Haskeline.Command.History
