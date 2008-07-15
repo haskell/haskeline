@@ -114,6 +114,7 @@ runTerminfoDraw = do
             Just actions -> return $ Just $ RunTerm {
                 getLayout = getPosixLayout,
                 withGetEvent = withPosixGetEvent (Just term),
+                putStrTerm = putStr . UTF8.encodeString,
                 runTerm = \(Draw f) -> evalStateT' initTermPos 
                                     $ runReaderT' term
                                     $ runReaderT' actions f

@@ -37,7 +37,8 @@ runDumbTerm :: MonadException m => RunTerm (InputCmdT m)
 runDumbTerm = RunTerm {
     getLayout = getPosixLayout,
     withGetEvent = withPosixGetEvent Nothing,
-    runTerm = evalStateT' initWindow . unDumbTerm
+    runTerm = evalStateT' initWindow . unDumbTerm,
+    putStrTerm = UTF8.putStr
     }
     
 

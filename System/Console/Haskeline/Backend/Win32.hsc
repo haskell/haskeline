@@ -192,7 +192,7 @@ setPos c = do
     h <- getOutputHandle
     liftIO (setPosition h c)
 
-printText :: MonadIO m => String -> Draw m ()
+printText :: MonadIO m => String -> m ()
 printText txt = do
     h <- getOutputHandle
     liftIO (writeConsole h txt)
@@ -258,7 +258,8 @@ win32Term = RunTerm {
         h <- getInputHandle
 	eventChan <- liftIO $ newTChanIO
         withCtrlCHandler useSigINT eventChan
-		$ f $ liftIO $ getEvent h eventChan
+		$ f $ liftIO $ getEvent h eventChan,
+    putStrTerm = printText
     }
 
 type Handler = DWORD -> IO BOOL
