@@ -49,6 +49,8 @@ instance MonadException m => MonadException (InputT m) where
 -- for internal use only
 type InputCmdT m = ReaderT Layout (StateT HistLog (ReaderT Prefs (ReaderT (Settings m) m)))
 
+instance MonadIO m => MonadLayout (InputCmdT m) where
+
 runInputCmdT :: forall m a . MonadIO m => InputCmdT m a -> InputT m a
 runInputCmdT f = InputT $ do
     run :: RunTerm (InputCmdT m) <- ask

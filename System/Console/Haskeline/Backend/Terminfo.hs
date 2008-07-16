@@ -103,7 +103,7 @@ instance MonadException m => MonadException (Draw m) where
 instance MonadTrans Draw where
     lift = Draw . lift . lift . lift
     
-runTerminfoDraw :: (MonadException m, MonadReader Layout m) => IO (Maybe (RunTerm m))
+runTerminfoDraw :: (MonadException m, MonadLayout m) => IO (Maybe (RunTerm m))
 runTerminfoDraw = do
     mterm <- Exception.try setupTermFromEnv
     case mterm of
