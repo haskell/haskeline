@@ -6,8 +6,8 @@ module System.Console.Haskeline(
                     runInputT,
                     runInputTWithPrefs,
                     getInputLine,
-                    putOutputStr,
-                    putOutputStrLn,
+                    outputStr,
+                    outputStrLn,
                     -- * Settings
                     Settings(..),
                     defaultSettings,
@@ -58,7 +58,7 @@ following.
 >            case minput of
 >                Nothing -> return ()
 >                Just "quit" -> return ()
->                Just input -> do putOutputStrLn $ "Input was: " ++ input
+>                Just input -> do outputStrLn $ "Input was: " ++ input
 >                                 loop
 
 -}
@@ -97,15 +97,15 @@ bracketSet getState set newState f = do
 
 -- | Write a string to the console output.  Allows cross-platform display of
 -- Unicode characters.
-putOutputStr :: forall m . MonadIO m => String -> InputT m ()
-putOutputStr xs = do
+outputStr :: forall m . MonadIO m => String -> InputT m ()
+outputStr xs = do
     run :: RunTerm (InputCmdT m) <- ask
     liftIO $ putStrTerm run xs
 
 -- | Write a string to the console output, followed by a newline.  Allows
 -- cross-platform display of Unicode characters.
-putOutputStrLn :: MonadIO m => String -> InputT m ()
-putOutputStrLn xs = putOutputStr (xs++"\n")
+outputStrLn :: MonadIO m => String -> InputT m ()
+outputStrLn xs = outputStr (xs++"\n")
 
 {- | Read one line of input from the user, with a rich line-editing
 user interface.  Returns 'Nothing' if the user presses Ctrl-D when the input

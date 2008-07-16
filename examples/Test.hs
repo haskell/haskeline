@@ -21,5 +21,5 @@ main = runInputT mySettings (loop 0)
                 Nothing -> return ()
                 Just "quit" -> return ()
                 Just s -> do
-                            putOutputStrLn ("line " ++ show n ++ ":" ++ s)
+                            outputStrLn ("line " ++ show n ++ ":" ++ s)
                             loop (n+1)
