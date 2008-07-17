@@ -17,7 +17,7 @@ Description:
                 .
                 Haskeline runs both on POSIX-compatible systems and on Windows
                 (under MinGW).
-Homepage:       http://code.haskell.org/haskeline
+Homepage:       http://trac.haskell.org/haskeline
 Stability:      Experimental
 Build-Type:     Simple
 
