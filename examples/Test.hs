@@ -7,9 +7,6 @@ mySettings :: MonadIO m => Settings m
 mySettings = defaultSettings {historyFile = Just "myhist",
                         handleSigINT = True}
 
-myComplete :: Monad m => CompletionFunc m
-myComplete s = return (s,[])
-
 main :: IO ()
 main = runInputT mySettings (loop 0)
     where
