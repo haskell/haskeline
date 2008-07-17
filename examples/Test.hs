@@ -1,7 +1,7 @@
 module Main where
 
 import System.Console.Haskeline
-import System.Console.Haskeline.Monads
+import Control.Monad.Trans
 
 mySettings :: MonadIO m => Settings m
 mySettings = defaultSettings {historyFile = Just "myhist",
