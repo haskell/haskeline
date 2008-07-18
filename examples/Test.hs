@@ -1,9 +1,8 @@
 module Main where
 
 import System.Console.Haskeline
-import Control.Monad.Trans
 
-mySettings :: MonadIO m => Settings m
+mySettings :: Settings IO
 mySettings = defaultSettings {historyFile = Just "myhist",
                         handleSigINT = True}
 
