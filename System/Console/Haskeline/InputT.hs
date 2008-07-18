@@ -11,6 +11,8 @@ import System.Console.Haskeline.Term
 
 import System.Directory(getHomeDirectory)
 import System.FilePath
+import Control.Applicative
+import Control.Monad(liftM, ap)
 
 -- | Application-specific customizations to the user interface.
 data Settings m = Settings {complete :: CompletionFunc m, -- ^ Custom tab completion
@@ -37,6 +39,12 @@ newtype InputT m a = InputT {unInputT :: ReaderT (RunTerm (InputCmdT m))
                                         MonadReader Prefs, MonadReader (Settings m),
                                         MonadReader (RunTerm (InputCmdT m)))
 
+instance Monad m => Functor (InputT m) where
+    fmap = liftM
+
+instance Monad m => Applicative (InputT m) where
+    pure = return
+    (<*>) = ap
 
 instance MonadTrans InputT where
     lift = InputT . lift . lift . lift . lift
