@@ -66,16 +66,16 @@ prevHistory s h = let (s',h') = fromMaybe (toResult s,h) $ prevHistoryM (toResul
 historyBack, historyForward :: (FromString s, MonadState HistLog m) => 
                         Key -> Command m s s
 historyBack = simpleCommand $ histUpdate prevHistory
-historyForward = simpleCommand $ reverseHist $ histUpdate prevHistory
+historyForward = simpleCommand $ reverseHist . histUpdate prevHistory
 
 histUpdate :: MonadState HistLog m => (s -> HistLog -> (t,HistLog))
                         -> s -> m (Effect t)
 histUpdate f = liftM Change . update . f
 
-reverseHist :: MonadState HistLog m => (a -> m b) -> a -> m b
-reverseHist f x = do
+reverseHist :: MonadState HistLog m => m b -> m b
+reverseHist f = do
     modify reverser
-    y <- f x
+    y <- f
     modify reverser
     return y
   where
@@ -131,17 +131,22 @@ prepSearch sm h = let
     l = toResult sm
     in (text,prevHistories l h)
 
-searchBackwards :: Bool -> SearchMode -> HistLog -> (SearchMode, HistLog)
+searchBackwards :: Bool -> SearchMode -> HistLog -> Maybe (SearchMode, HistLog)
 searchBackwards useCurrent s h = let
     (text,hists) = prepSearch s h
     hists' = if useCurrent then (toResult s,h):hists else hists
-    in fromMaybe (s,h) $ searchHistories (direction s) text hists'
+    in searchHistories (direction s) text hists'
 
 doSearch :: MonadState HistLog m => Bool -> SearchMode -> m (Effect SearchMode)
 doSearch useCurrent sm = case direction sm of
-    Reverse -> histUpdate (searchBackwards useCurrent) sm
-    Forward -> reverseHist (histUpdate (searchBackwards useCurrent)) sm
-
+    Reverse -> searchHist
+    Forward -> reverseHist searchHist
+  where
+    searchHist = do
+        hist <- get
+        case searchBackwards useCurrent sm hist of
+            Just (sm',hist') -> put hist' >> return (Change sm')
+            Nothing -> return (RingBell sm)
 
 searchHistory :: MonadState HistLog m => Command m InsertMode InsertMode
 searchHistory = choiceCmd [
