@@ -83,29 +83,39 @@ reverseHist f x = do
                             pastHistory=futureHistory h}
 
 data SearchMode = SearchMode {searchTerm :: String,
-                              foundHistory :: InsertMode}
+                              foundHistory :: InsertMode,
+                              direction :: Direction}
                         deriving Show
+
+data Direction = Forward | Reverse
+                    deriving (Show,Eq)
+
+directionName :: Direction -> String
+directionName Forward = "i-search"
+directionName Reverse = "reverse-i-search"
 
 instance LineState SearchMode where
     beforeCursor _ sm = beforeCursor prefix (foundHistory sm)
-        where prefix = "(reverse-i-search)`" ++ searchTerm sm ++ "': "
+        where 
+            prefix = "(" ++ directionName (direction sm) ++ ")`" 
+                    ++ searchTerm sm ++ "': "
     afterCursor = afterCursor . foundHistory
 
 instance Result SearchMode where
     toResult = toResult . foundHistory
 
-startSearchMode :: InsertMode -> SearchMode
-startSearchMode im = SearchMode {searchTerm = "",foundHistory=im}
+startSearchMode :: Direction -> InsertMode -> SearchMode
+startSearchMode dir im = SearchMode {searchTerm = "",foundHistory=im, direction=dir}
 
 addChar :: Char -> SearchMode -> SearchMode
 addChar c s = s {searchTerm = searchTerm s ++ [c]}
 
-searchHistories :: String -> [(String,HistLog)] -> Maybe (SearchMode,HistLog)
-searchHistories text = foldr mplus Nothing . map findIt
+searchHistories :: Direction -> String -> [(String,HistLog)] -> Maybe (SearchMode,HistLog)
+searchHistories dir text = foldr mplus Nothing . map findIt
     where
         findIt (l,h) = do 
             im <- findInLine text l
-            return (SearchMode text im,h)
+            return (SearchMode text im dir,h)
 
 findInLine :: String -> String -> Maybe InsertMode
 findInLine text l = find' [] l
@@ -121,25 +131,37 @@ prepSearch sm h = let
     l = toResult sm
     in (text,prevHistories l h)
 
+searchBackwards :: Bool -> SearchMode -> HistLog -> (SearchMode, HistLog)
+searchBackwards useCurrent s h = let
+    (text,hists) = prepSearch s h
+    hists' = if useCurrent then (toResult s,h):hists else hists
+    in fromMaybe (s,h) $ searchHistories (direction s) text hists'
+
+doSearch :: MonadState HistLog m => Bool -> SearchMode -> m (Effect SearchMode)
+doSearch useCurrent sm = case direction sm of
+    Reverse -> histUpdate (searchBackwards useCurrent) sm
+    Forward -> reverseHist (histUpdate (searchBackwards useCurrent)) sm
+
+
 searchHistory :: MonadState HistLog m => Command m InsertMode InsertMode
-searchHistory = controlKey 'r' +> change startSearchMode >|> backSearching
+searchHistory = choiceCmd [
+                 backKey +> change (startSearchMode Reverse)
+                 , forwardKey +> change (startSearchMode Forward)
+                 ] >|> keepSearching
     where
         backKey = controlKey 'r'
-        backSearching = choiceCmd [
+        forwardKey = controlKey 's'
+        keepSearching = choiceCmd [
                             choiceCmd [
                                 charCommand oneMoreChar
-                                , backKey +> simpleCommand searchBackMore
+                                , backKey +> simpleCommand (searchMore Reverse)
+                                , forwardKey +> simpleCommand (searchMore Forward)
                                 , Backspace +> change delLastChar
                                 , KeyChar '\b' +> change delLastChar
-                                ] >|> backSearching
+                                ] >|> keepSearching
                             , changeWithoutKey foundHistory -- abort
                             ]
         delLastChar s = s {searchTerm = minit (searchTerm s)}
         minit xs = if null xs then "" else init xs
-        oneMoreChar c = histUpdate (\s h -> let
-            (text,hists) = prepSearch s h
-            in fromMaybe (s,h) $ searchHistories text ((toResult s,h):hists)
-            ) . addChar c
-        searchBackMore = histUpdate $ \s h -> let
-            (text,hists) = prepSearch s h
-            in fromMaybe (s,h) $ searchHistories text hists
+        oneMoreChar c = doSearch True . addChar c
+        searchMore d s = doSearch False s {direction=d}
