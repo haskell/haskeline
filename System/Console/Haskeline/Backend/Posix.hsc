@@ -52,9 +52,9 @@ getPosixLayout = allocaBytes (#size struct winsize) $ \ws -> do
 getKeySequences :: Maybe Terminal -> IO (TreeMap Char Key)
 getKeySequences term = do
     sttys <- sttyKeys
-    let tinfos = fromMaybe ansiKeys (term >>= terminfoKeys)
+    let tinfos = maybe [] terminfoKeys term
     -- note ++ acts as a union; so the below favors sttys over tinfos
-    return $ listToTree $ tinfos ++ sttys
+    return $ listToTree $ ansiKeys ++ tinfos ++ sttys
 
 
 ansiKeys :: [(String, Key)]
@@ -64,11 +64,11 @@ ansiKeys = [("\ESC[D",  KeyLeft)
             ,("\ESC[B",  KeyDown)
             ,("\b",      Backspace)]
 
-terminfoKeys :: Terminal -> Maybe [(String,Key)]
-terminfoKeys term = getCapability term $ mapM getSequence keyCapabilities
+terminfoKeys :: Terminal -> [(String,Key)]
+terminfoKeys term = catMaybes $ map getSequence keyCapabilities
     where 
         getSequence (cap,x) = do 
-                            keys <- cap
+                            keys <- getCapability term cap
                             return (keys,x)
         keyCapabilities = 
                 [(keyLeft,KeyLeft),
