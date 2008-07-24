@@ -144,7 +144,7 @@ withPosixGetEvent term useSigINT f = do
 wrapKeypad :: MonadException m => Maybe Terminal -> m a -> m a
 wrapKeypad Nothing f = f
 wrapKeypad (Just term) f = (maybeOutput keypadOn >> f) 
-                            `finally` maybeOutput keypadOn
+                            `finally` maybeOutput keypadOff
   where
     maybeOutput cap = liftIO $ runTermOutput term $
                             fromMaybe mempty (getCapability term cap)
