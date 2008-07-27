@@ -153,6 +153,9 @@ foreign import stdcall "windows.h WriteConsoleW" c_WriteConsoleW
     :: HANDLE -> Ptr TCHAR -> DWORD -> Ptr DWORD -> Ptr () -> IO Bool
 
 writeConsole :: HANDLE -> String -> IO ()
+-- For some reason, Wine returns False when WriteConsoleW is called on an empty
+-- string.  Easiest fix: just don't call that function.
+writeConsole _ "" = return ()
 writeConsole h str = withArray tstr $ \t_arr -> alloca $ \numWritten -> do
     failIfFalse_ "WriteConsole" 
         $ c_WriteConsoleW h t_arr (toEnum $ length str) numWritten nullPtr
