@@ -36,11 +36,11 @@ controlActions = choiceCmd
             , controlKey 'c' +> change goRight
             , controlKey 'd' +> deleteCharOrEOF
             , controlKey 'l' +> clearScreenCmd
-            , KeyMeta 'f' +> change wordRight
-            , KeyMeta 'b' +> change wordLeft
+            , metaChar 'f' +> change wordRight
+            , metaChar 'b' +> change wordLeft
             , controlKey 'w' +> change (deleteFromMove bigWordLeft)
-            -- TODO: M-DELETE +> change (deleteFromMove wordLeft)
-            , KeyMeta 'd' +> change (deleteFromMove wordRight)
+            , KeyMeta Backspace +> change (deleteFromMove wordLeft)
+            , metaChar 'd' +> change (deleteFromMove wordRight)
             , controlKey 'k' +> change (deleteFromMove moveToEnd)
             ]
 

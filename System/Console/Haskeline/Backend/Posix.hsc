@@ -116,7 +116,9 @@ lexKeys _ [] = []
 lexKeys baseMap cs
     | Just (k,ds) <- lookupChars baseMap cs
             = k : lexKeys baseMap ds
-lexKeys baseMap ('\ESC':c:cs) = KeyMeta c : lexKeys baseMap cs
+lexKeys baseMap ('\ESC':cs)
+    | (k:ks) <- lexKeys baseMap cs
+            = KeyMeta k : ks
 lexKeys baseMap (c:cs) = KeyChar c : lexKeys baseMap cs
 
 lookupChars :: TreeMap Char Key -> [Char] -> Maybe (Key,[Char])

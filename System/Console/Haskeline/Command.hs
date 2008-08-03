@@ -2,6 +2,7 @@ module System.Console.Haskeline.Command(
                         Event(..),
                         Key(..),
                         controlKey,
+                        metaChar,
                         Layout(..),
                         -- * Commands
                         Effect(..),
@@ -40,7 +41,7 @@ import System.Console.Haskeline.LineState
 data Layout = Layout {width, height :: Int}
                     deriving Show
 
-data Key = KeyChar Char | KeyMeta Char
+data Key = KeyChar Char | KeyMeta Key
             | KeyLeft | KeyRight | KeyUp | KeyDown
             | Backspace | DeleteForward | KillLine
                 deriving (Eq,Ord,Show)
@@ -54,6 +55,8 @@ controlKey :: Char -> Key
 controlKey '?' = KeyChar (toEnum 127)
 controlKey c = KeyChar $ toEnum $ fromEnum c .&. complement (bit 5 .|. bit 6)
 
+metaChar :: Char -> Key
+metaChar = KeyMeta . KeyChar
 
 data Effect s = Change {effectState :: s} 
               | PrintLines {linesToPrint :: [String], effectState :: s}
