@@ -106,15 +106,18 @@ replaceChar :: Char -> CommandMode -> CommandMode
 replaceChar c (CMode xs _ ys) = CMode xs c ys
 replaceChar _ CEmpty = CEmpty
 
-
-
 ------------------------
 -- Transitioning between modes
 
-enterCommandMode :: InsertMode -> CommandMode
+enterCommandMode, enterCommandModeRight :: InsertMode -> CommandMode
 enterCommandMode (IMode (x:xs) ys) = CMode xs x ys
 enterCommandMode (IMode [] (y:ys)) = CMode [] y ys
 enterCommandMode _ = CEmpty
+
+enterCommandModeRight (IMode xs (y:ys)) = CMode xs y ys
+enterCommandModeRight (IMode (x:xs) []) = CMode xs x []
+enterCommandModeRight _ = CEmpty
+
 
 insertFromCommandMode, appendFromCommandMode :: CommandMode -> InsertMode
 
@@ -124,11 +127,16 @@ insertFromCommandMode (CMode xs c ys) = IMode xs (c:ys)
 appendFromCommandMode CEmpty = emptyIM
 appendFromCommandMode (CMode xs c ys) = IMode (c:xs) ys
 
+withCommandMode :: (InsertMode -> InsertMode) -> CommandMode -> CommandMode
+withCommandMode f = enterCommandModeRight . f . insertFromCommandMode
 
 ----------------------
 -- Supplementary modes
 
 data ArgMode s = ArgMode {arg :: Int, argState :: s}
+
+instance Functor ArgMode where
+    fmap f (ArgMode n s) = ArgMode n (f s)
 
 instance LineState s => LineState (ArgMode s) where
     beforeCursor _ am = beforeCursor ("(arg: " ++ show (arg am) ++ ") ")
@@ -166,3 +174,12 @@ instance LineState s => LineState (Message s) where
     beforeCursor _ = messageText
     afterCursor _ = ""
     isTemporary _ = True
+
+-----------------
+deleteFromDiff :: InsertMode -> InsertMode -> InsertMode
+deleteFromDiff (IMode xs1 ys1) (IMode xs2 ys2)
+    | length xs1 < length xs2 = IMode xs1 ys2
+    | otherwise = IMode xs2 ys1
+
+deleteFromMove :: (InsertMode -> InsertMode) -> InsertMode -> InsertMode
+deleteFromMove f = \x -> deleteFromDiff x (f x)

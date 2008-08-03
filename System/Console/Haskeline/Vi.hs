@@ -6,6 +6,7 @@ import System.Console.Haskeline.Command.History
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.InputT
 
+import Data.Char(isAlphaNum,isSpace)
 
 type InputCmd s t = forall m . Monad m => Command (InputCmdT m) s t
 
@@ -66,7 +67,7 @@ simpleCmdActions = choiceCmd [ KeyChar '\n'  +> finish
                     , KeyUp +> historyBack
                     , KeyDown +> historyForward
                     , deleteOnce
-                    , useMovements id
+                    , useMovements withCommandMode
                     ]
 
 replaceOnce :: Key -> InputCmd CommandMode CommandMode
@@ -88,8 +89,9 @@ repeated = let
     deleteIR = KeyChar 'c'
                 >+> choiceCmd [useMovements deleteAndInsertR,
                              KeyChar 'c' +> change (const emptyIM)]
+    applyArg' f am = enterCommandModeRight $ applyArg f $ fmap insertFromCommandMode am
     loop = choiceCmd [addDigit >|> loop
-                     , useMovements applyArg >|> viCommandActions
+                     , useMovements applyArg' >|> viCommandActions
                      , deleteR >|> viCommandActions
                      , deleteIR
                      , KeyChar 'x' +> change (applyArg deleteChar)
@@ -98,9 +100,13 @@ repeated = let
                      ]
     in start >|> loop
 
-movements :: [(Key,CommandMode -> CommandMode)]
+movements :: [(Key,InsertMode -> InsertMode)]
 movements = [ (KeyChar 'h', goLeft)
             , (KeyChar 'l', goRight)
+            , (KeyChar 'w', skipRight isSpace . (\s -> skipRight (cmdChar s) s))
+            , (KeyChar 'b', (\s -> skipLeft (cmdChar s) s) . goLeft . skipLeft isSpace)
+            , (KeyChar 'W', skipRight isSpace . skipRight (not . isSpace))
+            , (KeyChar 'B', skipLeft (not . isSpace) . skipLeft isSpace)
             , (KeyChar ' ', goRight)
             , (KeyLeft, goLeft)
             , (KeyRight, goRight)
@@ -108,14 +114,22 @@ movements = [ (KeyChar 'h', goLeft)
             , (KeyChar '$', moveToEnd)
             ]
 
-useMovements :: LineState t => ((CommandMode -> CommandMode) -> s -> t) 
+cmdChar :: InsertMode -> (Char -> Bool)
+cmdChar (IMode _ (c:_))
+    | isWordChar c = isWordChar
+cmdChar _ = \d -> not (isWordChar d) && not (isSpace d)
+
+isWordChar :: Char -> Bool
+isWordChar d = isAlphaNum d || d == '_'
+
+useMovements :: LineState t => ((InsertMode -> InsertMode) -> s -> t) 
                 -> InputCmd s t
 useMovements f = choiceCmd $ map (\(k,g) -> k +> change (f g))
                                 movements
 
 deleteOnce :: InputCmd CommandMode CommandMode
 deleteOnce = KeyChar 'd'
-            >+> choiceCmd [useMovements deleteFromMove,
+            >+> choiceCmd [useMovements deleteFromCmdMove,
                          KeyChar 'd' +> change (const CEmpty)]
 
 deleteIOnce :: InputCmd CommandMode InsertMode
@@ -123,10 +137,10 @@ deleteIOnce = KeyChar 'c'
               >+> choiceCmd [useMovements deleteAndInsert,
                             KeyChar 'c' +> change (const emptyIM)]
 
-deleteAndInsert :: (CommandMode -> CommandMode) -> CommandMode -> InsertMode
-deleteAndInsert f = insertFromCommandMode . deleteFromMove f
+deleteAndInsert :: (InsertMode -> InsertMode) -> CommandMode -> InsertMode
+deleteAndInsert f = insertFromCommandMode . deleteFromCmdMove f
 
-deleteAndInsertR :: (CommandMode -> CommandMode) 
+deleteAndInsertR :: (InsertMode -> InsertMode) 
                 -> ArgMode CommandMode -> InsertMode
 deleteAndInsertR f = insertFromCommandMode . deleteFromRepeatedMove f
 
@@ -138,15 +152,12 @@ foreachDigit f ds = choiceCmd $ map digitCmd ds
           toDigit d = fromEnum d - fromEnum '0'
 
 
-deleteFromMove :: (CommandMode -> CommandMode) -> CommandMode -> CommandMode
-deleteFromMove f = \x -> deleteFromDiff x (f x)
+deleteFromCmdMove :: (InsertMode -> InsertMode) -> CommandMode -> CommandMode
+deleteFromCmdMove f = withCommandMode $ \x -> deleteFromDiff x (f x)
 
-deleteFromRepeatedMove :: (CommandMode -> CommandMode)
+deleteFromRepeatedMove :: (InsertMode -> InsertMode)
             -> ArgMode CommandMode -> CommandMode
-deleteFromRepeatedMove f am = deleteFromDiff (argState am) (applyArg f am)
-
-deleteFromDiff :: CommandMode -> CommandMode -> CommandMode
-deleteFromDiff (CMode xs1 c1 ys1) (CMode xs2 _ ys2)
-    | length xs1 < length xs2 = enterCommandMode (IMode xs1 ys2)
-    | otherwise = CMode xs2 c1 ys1
-deleteFromDiff _ after = after
+deleteFromRepeatedMove f am = let
+    am' = fmap insertFromCommandMode am
+    in enterCommandModeRight $ 
+                deleteFromDiff (argState am') (applyArg f am')

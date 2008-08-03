@@ -36,10 +36,12 @@ controlActions = choiceCmd
             , controlKey 'c' +> change goRight
             , controlKey 'd' +> deleteCharOrEOF
             , controlKey 'l' +> clearScreenCmd
-            , KeyMeta 'f' +> change (skipRight isAlphaNum
-                                     . skipRight (not . isAlphaNum))
-            , KeyMeta 'b' +> change (skipLeft isAlphaNum
-                                     . skipLeft (not . isAlphaNum))
+            , KeyMeta 'f' +> change wordRight
+            , KeyMeta 'b' +> change wordLeft
+            , controlKey 'w' +> change (deleteFromMove bigWordLeft)
+            -- TODO: M-DELETE +> change (deleteFromMove wordLeft)
+            , KeyMeta 'd' +> change (deleteFromMove wordRight)
+            , controlKey 'k' +> change (deleteFromMove moveToEnd)
             ]
 
 deleteCharOrEOF :: Key -> InputCmd InsertMode InsertMode
@@ -48,3 +50,8 @@ deleteCharOrEOF k = k +> acceptKeyOrFail (\s -> if s == emptyIM
             else Just $ Change (deleteNext s) >=> justDelete)
     where
         justDelete = try (change deleteNext k >|> justDelete)
+
+wordRight, wordLeft, bigWordLeft :: InsertMode -> InsertMode
+wordRight = skipRight isAlphaNum . skipRight (not . isAlphaNum)
+wordLeft = skipLeft isAlphaNum . skipLeft (not . isAlphaNum)
+bigWordLeft = skipLeft (not . isSpace) . skipLeft isSpace
