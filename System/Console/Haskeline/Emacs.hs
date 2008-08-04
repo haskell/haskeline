@@ -33,7 +33,7 @@ controlActions = choiceCmd
             [ controlKey 'a' +> change moveToStart 
             , controlKey 'e' +> change moveToEnd
             , controlKey 'b' +> change goLeft
-            , controlKey 'c' +> change goRight
+            , controlKey 'f' +> change goRight
             , controlKey 'd' +> deleteCharOrEOF
             , controlKey 'l' +> clearScreenCmd
             , metaChar 'f' +> change wordRight
