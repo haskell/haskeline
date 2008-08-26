@@ -40,6 +40,7 @@ controlActions = choiceCmd
             , metaChar 'b' +> change wordLeft
             , controlKey 'w' +> change (deleteFromMove bigWordLeft)
             , KeyMeta Backspace +> change (deleteFromMove wordLeft)
+            , KeyMeta (KeyChar '\b') +> change (deleteFromMove wordLeft)
             , metaChar 'd' +> change (deleteFromMove wordRight)
             , controlKey 'k' +> change (deleteFromMove moveToEnd)
             ]

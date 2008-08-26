@@ -16,6 +16,7 @@ import Graphics.Win32.Misc(getStdHandle, sTD_INPUT_HANDLE, sTD_OUTPUT_HANDLE)
 import Data.List(intercalate)
 import Control.Concurrent
 import Control.Concurrent.STM
+import Data.Bits
 
 import System.Console.Haskeline.Command
 import System.Console.Haskeline.Monads
@@ -47,9 +48,15 @@ getEvent h = keyEventLoop readKeyEvents
 
             
 eventToKey :: InputEvent -> Maybe Key
-eventToKey KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc}
-    | c /= '\NUL' = Just (KeyChar c)
-    | otherwise = keyFromCode vc -- special character; see below.
+eventToKey KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc,
+                    controlKeyState = cstate}
+        = if isMeta then fmap KeyMeta maybeKey else maybeKey
+  where
+    maybeKey = if c /= '\NUL' 
+                    then Just (KeyChar c)
+                    else keyFromCode vc
+    isMeta = 0 /= (cstate .&. (#const RIGHT_ALT_PRESSED
+                                    .|. #const LEFT_ALT_PRESSED) )
 eventToKey _ = Nothing
 
 keyFromCode :: WORD -> Maybe Key
@@ -59,7 +66,7 @@ keyFromCode (#const VK_RIGHT) = Just KeyRight
 keyFromCode (#const VK_UP) = Just KeyUp
 keyFromCode (#const VK_DOWN) = Just KeyDown
 keyFromCode (#const VK_DELETE) = Just DeleteForward
--- TODO: KeyMeta (option-x), KillLine
+-- TODO: KillLine
 keyFromCode _ = Nothing
     
 data InputEvent = KeyEvent {keyDown :: BOOL,
