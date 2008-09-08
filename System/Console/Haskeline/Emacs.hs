@@ -43,6 +43,7 @@ controlActions = choiceCmd
             , KeyMeta (KeyChar '\b') +> change (deleteFromMove wordLeft)
             , metaChar 'd' +> change (deleteFromMove wordRight)
             , controlKey 'k' +> change (deleteFromMove moveToEnd)
+            , KillLine +> change (deleteFromMove moveToStart)
             ]
 
 deleteCharOrEOF :: Key -> InputCmd InsertMode InsertMode
