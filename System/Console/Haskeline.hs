@@ -85,7 +85,7 @@ wrapTerminalOps:: MonadException m => m a -> m a
 wrapTerminalOps =
     bracketSet (hGetBuffering stdin) (hSetBuffering stdin) NoBuffering
     . bracketSet (hGetBuffering stdout) (hSetBuffering stdout) LineBuffering
-    . bracketSet (hGetEcho stdout) (hSetEcho stdout) False
+    . bracketSet (hGetEcho stdin) (hSetEcho stdin) False
 
 bracketSet :: (Eq a, MonadException m) => IO a -> (a -> IO ()) -> a -> m b -> m b
 bracketSet getState set newState f = do
