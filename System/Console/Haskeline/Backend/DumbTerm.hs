@@ -34,7 +34,7 @@ instance MonadException m => MonadException (DumbTerm m) where
 
 runDumbTerm :: (MonadLayout m, MonadException m) => RunTerm m
 runDumbTerm = RunTerm {
-    getLayout = getPosixLayout,
+    getLayout = getPosixLayout Nothing,
     withGetEvent = withPosixGetEvent Nothing,
     runTerm = evalStateT' initWindow . unDumbTerm,
     putStrTerm = UTF8.putStr

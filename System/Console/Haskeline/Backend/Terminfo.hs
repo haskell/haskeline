@@ -111,7 +111,7 @@ runTerminfoDraw = do
         Right term -> case getCapability term getActions of
             Nothing -> return Nothing
             Just actions -> return $ Just $ RunTerm {
-                getLayout = getPosixLayout,
+                getLayout = getPosixLayout (Just term),
                 withGetEvent = withPosixGetEvent (Just term),
                 putStrTerm = putStr . UTF8.encodeString,
                 runTerm = \(Draw f) -> evalStateT' initTermPos 

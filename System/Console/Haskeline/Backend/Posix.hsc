@@ -20,6 +20,7 @@ import Data.List
 import System.IO
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as UTF8
+import System.Environment
 
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.Command
@@ -30,19 +31,40 @@ import System.Console.Haskeline.Term
 -------------------
 -- Window size
 
-foreign import ccall ioctl :: CInt -> CULong -> Ptr a -> IO ()
+foreign import ccall ioctl :: CInt -> CULong -> Ptr a -> IO CInt
 
-getPosixLayout :: IO Layout
-getPosixLayout = allocaBytes (#size struct winsize) $ \ws -> do
-                            ioctl 1 (#const TIOCGWINSZ) ws
-                            rows :: CUShort <- (#peek struct winsize,ws_row) ws
-                            cols :: CUShort <- (#peek struct winsize,ws_col) ws
-                            return Layout {height=fromEnum rows,width=fromEnum cols}
+getPosixLayout :: Maybe Terminal -> IO Layout
+getPosixLayout term = tryGetLayouts [ioctlLayout, envLayout, tinfoLayout term]
 
--- todo: make sure >=2
--- TODO: other ways of getting it:
--- env vars ROWS/COLUMNS
--- terminfo capabilities
+ioctlLayout, envLayout :: IO (Maybe Layout)
+ioctlLayout = allocaBytes (#size struct winsize) $ \ws -> do
+                ret <- ioctl 1 (#const TIOCGWINSZ) ws
+                rows :: CUShort <- (#peek struct winsize,ws_row) ws
+                cols :: CUShort <- (#peek struct winsize,ws_col) ws
+                if ret >= 0
+                    then return $ Just Layout {height=fromEnum rows,width=fromEnum cols}
+                    else return Nothing
+
+envLayout = handle (\_ -> return Nothing) $ do
+    -- note the handle catches both undefined envs and bad reads
+    r <- getEnv "ROWS"
+    c <- getEnv "COLUMNS"
+    return $ Just $ Layout {height=read r,width=read c}
+
+tinfoLayout :: Maybe Terminal -> IO (Maybe Layout)
+tinfoLayout Nothing = return Nothing
+tinfoLayout (Just t) = return $ getCapability t $ do
+                        r <- termColumns
+                        c <- termLines
+                        return Layout {height=r,width=c}
+
+tryGetLayouts :: [IO (Maybe Layout)] -> IO Layout
+tryGetLayouts [] = return Layout {height=20,width=75}
+tryGetLayouts (f:fs) = do
+    ml <- f
+    case ml of
+        Just l | rows l > 2 && cols l > 2 -> return l
+        _ -> tryGetLayouts fs
 
 
 --------------------
@@ -138,7 +160,7 @@ withPosixGetEvent term useSigINT f = do
     baseMap <- liftIO (getKeySequences term)
     eventChan <- liftIO $ newTChanIO
     wrapKeypad term 
-        $ withWindowHandler eventChan
+        $ withWindowHandler term eventChan
         $ withSigIntHandler useSigINT eventChan
         $ f $ liftIO $ getEvent baseMap eventChan
 
@@ -151,9 +173,9 @@ wrapKeypad (Just term) f = (maybeOutput keypadOn >> f)
     maybeOutput cap = liftIO $ runTermOutput term $
                             fromMaybe mempty (getCapability term cap)
 
-withWindowHandler :: MonadException m => TChan Event -> m a -> m a
-withWindowHandler eventChan = withHandler windowChange $ Catch $
-    getPosixLayout >>= atomically . writeTChan eventChan . WindowResize
+withWindowHandler :: MonadException m => Maybe Terminal -> TChan Event -> m a -> m a
+withWindowHandler term eventChan = withHandler windowChange $ Catch $
+    getPosixLayout term >>= atomically . writeTChan eventChan . WindowResize
 
 withSigIntHandler :: MonadException m => Bool -> TChan Event -> m a -> m a
 withSigIntHandler False _ = id
