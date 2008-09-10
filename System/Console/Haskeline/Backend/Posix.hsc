@@ -59,11 +59,11 @@ tinfoLayout (Just t) = return $ getCapability t $ do
                         return Layout {height=r,width=c}
 
 tryGetLayouts :: [IO (Maybe Layout)] -> IO Layout
-tryGetLayouts [] = return Layout {height=20,width=75}
+tryGetLayouts [] = return Layout {height=24,width=80}
 tryGetLayouts (f:fs) = do
     ml <- f
     case ml of
-        Just l | rows l > 2 && cols l > 2 -> return l
+        Just l | height l > 2 && width l > 2 -> return l
         _ -> tryGetLayouts fs
 
 
