@@ -102,7 +102,7 @@ terminfoKeys term = catMaybes $ map getSequence keyCapabilities
 
 sttyKeys :: IO [(String, Key)]
 sttyKeys = do
-    attrs <- getTerminalAttributes stdOutput
+    attrs <- getTerminalAttributes stdInput
     let getStty (k,c) = do {str <- controlChar attrs k; return ([str],c)}
     return $ catMaybes $ map getStty [(Erase,Backspace),(Kill,KillLine)]
                         
