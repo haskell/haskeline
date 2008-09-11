@@ -8,7 +8,6 @@ import Foreign
 import Foreign.C.Types
 import qualified Data.Map as Map
 import System.Console.Terminfo
-import System.Posix (stdOutput)
 import System.Posix.Terminal
 import Control.Monad
 import Control.Concurrent
