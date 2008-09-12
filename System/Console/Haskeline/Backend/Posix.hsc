@@ -173,8 +173,13 @@ wrapKeypad (Just term) f = (maybeOutput keypadOn >> f)
                             fromMaybe mempty (getCapability term cap)
 
 withWindowHandler :: MonadException m => Maybe Terminal -> TChan Event -> m a -> m a
-withWindowHandler term eventChan = withHandler windowChange $ Catch $
-    getPosixLayout term >>= atomically . writeTChan eventChan . WindowResize
+withWindowHandler term eventChan act = do
+    outIsTerm <- liftIO $ hIsTerminalDevice stdout
+    let withH = if outIsTerm
+                    then withHandler windowChange $ Catch $ 
+                        getPosixLayout term >>= atomically . writeTChan eventChan . WindowResize
+                    else id
+    withH act
 
 withSigIntHandler :: MonadException m => Bool -> TChan Event -> m a -> m a
 withSigIntHandler False _ = id
