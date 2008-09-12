@@ -32,12 +32,12 @@ setComplete f s = s {complete = f}
 
 -- | A monad transformer which carries all of the state and settings
 -- relevant to a line-reading application.
-newtype InputT m a = InputT {unInputT :: ReaderT (RunTerm (InputCmdT m))
+newtype InputT m a = InputT {unInputT :: ReaderT RunTerm
                                 (StateT History (ReaderT Prefs 
                                 (ReaderT (Settings m) m))) a}
                             deriving (Monad,MonadIO, MonadState History,
                                         MonadReader Prefs, MonadReader (Settings m),
-                                        MonadReader (RunTerm (InputCmdT m)))
+                                        MonadReader RunTerm)
 
 instance Monad m => Functor (InputT m) where
     fmap = liftM
@@ -61,7 +61,7 @@ instance MonadIO m => MonadLayout (InputCmdT m) where
 
 runInputCmdT :: forall m a . MonadIO m => InputCmdT m a -> InputT m a
 runInputCmdT f = InputT $ do
-    run :: RunTerm (InputCmdT m) <- ask
+    run <- ask
     layout <- liftIO $ getLayout run
     lift $ runHistLog $ runReaderT' layout f
 

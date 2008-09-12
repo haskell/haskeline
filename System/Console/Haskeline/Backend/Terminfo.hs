@@ -103,7 +103,7 @@ instance MonadException m => MonadException (Draw m) where
 instance MonadTrans Draw where
     lift = Draw . lift . lift . lift
     
-runTerminfoDraw :: (MonadException m, MonadLayout m) => IO (Maybe (RunTerm m))
+runTerminfoDraw :: IO (Maybe RunTerm)
 runTerminfoDraw = do
     mterm <- Exception.try setupTermFromEnv
     case mterm of
@@ -113,10 +113,10 @@ runTerminfoDraw = do
             Just actions -> return $ Just $ RunTerm {
                 getLayout = getPosixLayout (Just term),
                 withGetEvent = withPosixGetEvent (Just term),
-                putStrTerm = putStr . UTF8.encodeString,
-                runTerm = \(Draw f) -> evalStateT' initTermPos 
-                                    $ runReaderT' term
-                                    $ runReaderT' actions f
+                putStrTerm = \str -> putStr (UTF8.encodeString str) >> hFlush stdout,
+                runTerm = \f -> evalStateT' initTermPos 
+                                    (runReaderT' term
+                                    (runReaderT' actions (unDraw f)))
                 }
     
 output :: MonadIO m => (Actions -> TermOutput) -> Draw m ()

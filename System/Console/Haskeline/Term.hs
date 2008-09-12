@@ -7,10 +7,6 @@ import System.Console.Haskeline.Command
 import Control.Concurrent
 import Control.Concurrent.STM
 
--- TODO: Cache the RunTerm in between runs?
--- If do this, should make sure in Terminfo and dumb terms that they 
--- cache the input keymaps too.
-
 class MonadIO m => Term m where
     withReposition :: Layout -> m a -> m a
     moveToNextLine :: LineState s => s -> m ()
@@ -21,12 +17,16 @@ class MonadIO m => Term m where
     ringBell :: Bool -> m ()
     
 
-data RunTerm m = forall t . (Term (t m), MonadTrans t) => RunTerm {
+data RunTerm = RunTerm {
             getLayout :: IO Layout,
-            withGetEvent :: forall a . Bool -> (t m Event -> t m a) -> t m a,
-            runTerm :: forall a . t m a -> m a,
+            withGetEvent :: forall m a . MonadException m => Bool -> (m Event -> m a) -> m a,
+            runTerm :: RunTermType,
             putStrTerm :: String -> IO ()
     }
+
+type RunTermType = forall m a . (MonadLayout m, MonadException m) 
+                    => (forall t . (MonadTrans t, Term (t m), MonadException (t m)) => t m a) 
+                        -> m a
 
 -- Utility function for drawLineDiff instances.
 matchInit :: Eq a => [a] -> [a] -> ([a],[a])

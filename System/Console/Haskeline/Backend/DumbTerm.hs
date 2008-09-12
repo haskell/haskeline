@@ -32,12 +32,12 @@ instance MonadException m => MonadException (DumbTerm m) where
     unblock = DumbTerm . unblock . unDumbTerm
     catch (DumbTerm f) g = DumbTerm $ Monads.catch f (unDumbTerm . g)
 
-runDumbTerm :: (MonadLayout m, MonadException m) => RunTerm m
+runDumbTerm :: RunTerm
 runDumbTerm = RunTerm {
     getLayout = getPosixLayout Nothing,
     withGetEvent = withPosixGetEvent Nothing,
-    runTerm = evalStateT' initWindow . unDumbTerm,
-    putStrTerm = UTF8.putStr
+    runTerm = \f -> evalStateT' initWindow (unDumbTerm f),
+    putStrTerm = printText
     }
     
 

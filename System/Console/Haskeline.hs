@@ -1,7 +1,31 @@
+{- | 
+
+A user interface for line input in command-line programs.  When run in the terminal,
+Haskeline provides a 
+Haskeline provides a user in
+
+An example use of this library for a simple read-eval-print loop is the
+following.
+
+> import System.Console.Haskeline
+> 
+> main :: IO ()
+> main = runInputT defaultSettings loop
+>    where 
+>        loop :: InputT IO ()
+>        loop = do
+>            minput <- getInputLine "% "
+>            case minput of
+>                Nothing -> return ()
+>                Just "quit" -> return ()
+>                Just input -> do outputStrLn $ "Input was: " ++ input
+>                                 loop
+
+-}
+
+
 module System.Console.Haskeline(
                     -- * Main functions
-                    --
-                    -- $maindoc
                     InputT,
                     runInputT,
                     runInputTWithPrefs,
@@ -33,35 +57,13 @@ import System.Console.Haskeline.Completion
 import System.Console.Haskeline.Term
 
 import System.IO
+import qualified System.IO.UTF8 as UTF8
 import Data.Char (isSpace)
 import Control.Monad
 import qualified Control.Exception as Exception
 import Data.Dynamic
 
 
-
-{- $maindoc
-
-
-An example use of this library for a simple read-eval-print loop is the
-following.
-
-> import System.Console.Haskeline
-> import Control.Monad.Trans
-> 
-> main :: IO ()
-> main = runInputT defaultSettings loop
->    where 
->        loop :: InputT IO ()
->        loop = do
->            minput <- getInputLine "% "
->            case minput of
->                Nothing -> return ()
->                Just "quit" -> return ()
->                Just input -> do outputStrLn $ "Input was: " ++ input
->                                 loop
-
--}
 
 
 -- | A useful default.  In particular:
@@ -83,9 +85,15 @@ defaultSettings = Settings {complete = completeFilename,
 -- monad manually flush outputs that don't print a newline.
 wrapTerminalOps:: MonadException m => m a -> m a
 wrapTerminalOps =
-    bracketSet (hGetBuffering stdin) (hSetBuffering stdin) NoBuffering
-    . bracketSet (hGetBuffering stdout) (hSetBuffering stdout) LineBuffering
-    . bracketSet (hGetEcho stdin) (hSetEcho stdin) False
+    bracketBuffering stdin NoBuffering
+    . bracketBuffering stdout LineBuffering
+    . bracketEcho False
+
+bracketBuffering :: MonadException m => Handle -> BufferMode -> m a -> m a
+bracketBuffering h = bracketSet (hGetBuffering h) (hSetBuffering h)
+
+bracketEcho :: MonadException m => Bool -> m a -> m a
+bracketEcho = bracketSet (hGetEcho stdin) (hSetEcho stdin)
 
 bracketSet :: (Eq a, MonadException m) => IO a -> (a -> IO ()) -> a -> m b -> m b
 bracketSet getState set newState f = do
@@ -97,10 +105,14 @@ bracketSet getState set newState f = do
 
 -- | Write a string to the console output.  Allows cross-platform display of
 -- Unicode characters.
-outputStr :: forall m . MonadIO m => String -> InputT m ()
+outputStr :: MonadIO m => String -> InputT m ()
 outputStr xs = do
-    run :: RunTerm (InputCmdT m) <- ask
-    liftIO $ putStrTerm run xs
+    outIsTerm <- liftIO $ hIsTerminalDevice stdout
+    if outIsTerm
+        then do
+            putter <- asks putStrTerm
+            liftIO $ putter xs
+        else filePut xs
 
 -- | Write a string to the console output, followed by a newline.  Allows
 -- cross-platform display of Unicode characters.
@@ -111,42 +123,44 @@ outputStrLn xs = outputStr (xs++"\n")
 user interface.  Returns 'Nothing' if the user presses Ctrl-D when the input
 text is empty.  Otherwise, it returns the input line with the final newline
 removed.  
- 
-If 'stdin' is not connected to a terminal (for example, piped from
-another process), then this function is equivalent to 'getLine', except that
-it returns 'Nothing' if an EOF is encountered before any characters are
-read.
 
 If signal handling is enabled in the 'Settings', then 'getInputLine' will
 throw an 'Interrupt' exception when the user presses Ctrl-C.
 
+'getInputLine' will treat the input and output handles as UTF8-encoded files if either:
+
+ - 'stdin' is not connected to a terminal (for example piped from another process), or
+
+ - 'stdout' is not connected to a terminal and we are running on Windows
+
+In that case it returns 'Nothing' if an EOF is encountered before any characters are read.  
 -}
 getInputLine :: forall m . MonadException m => String -- ^ The input prompt
                             -> InputT m (Maybe String)
 getInputLine prefix = do
-    isTerm <- liftIO $ hIsTerminalDevice stdin
-    if isTerm
-        then getInputCmdLine prefix
-        else do
-            atEOF <- liftIO $ hIsEOF stdin
-            if atEOF
-                then return Nothing
-                else liftM Just $ liftIO $ hGetLine stdin
+    inIsTerm <- liftIO $ hIsTerminalDevice stdin
+    outIsTerm <- liftIO $ hIsTerminalDevice stdout
+    case (inIsTerm, outIsTerm) of
+        (True,True) -> getInputCmdLine prefix
+        (False,False) -> simpleFileLoop prefix filePut
+        (False,True) -> simpleFileLoop prefix outputStr
+        (True,False) -> simpleEventLoop prefix
 
 getInputCmdLine :: forall m . MonadException m => String -> InputT m (Maybe String)
+
 getInputCmdLine prefix = do
--- TODO: Cache the terminal, actions
+    rterm <- ask
+    -- TODO: Cache the actions
     emode <- asks (\prefs -> case editMode prefs of
                     Vi -> viActions
                     Emacs -> emacsCommands)
     settings :: Settings m <- ask
     wrapTerminalOps $ do
         let ls = emptyIM
-        RunTerm {withGetEvent = withGetEvent', runTerm=runTerm'} <- ask
-        result <- runInputCmdT $ runTerm' $ withGetEvent' (handleSigINT settings) 
+        result <- runInputCmdT $ runTerm rterm (withGetEvent rterm (handleSigINT settings)
                         $ \getEvent -> do
                             drawLine prefix ls 
-                            repeatTillFinish getEvent prefix ls emode
+                            repeatTillFinish getEvent prefix ls emode)
         case result of 
             Just line | not (all isSpace line) -> addHistory line
             _ -> return ()
@@ -166,7 +180,7 @@ repeatTillFinish getEvent prefix = loop
                 case event of
                     SigInt -> do
                         moveToNextLine s
-                        liftIO $ Exception.evaluate (Exception.throwDyn Interrupt)
+                        throwInterrupt
                     WindowResize newLayout -> 
                         withReposition newLayout (loop s processor)
                     KeyInput k -> case lookupKM processor k of
@@ -177,6 +191,52 @@ repeatTillFinish getEvent prefix = loop
                                         KeyAction effect next <- lift f
                                         drawEffect prefix s effect
                                         loop (effectState effect) next
+
+-- NOTE: I DO want to use terminfo if possible because it will lex away arrow keys, for example.
+
+-- for when stdin is a console but stdout is not.
+simpleEventLoop :: forall m . MonadException m => String -> InputT m (Maybe String)
+simpleEventLoop prefix = do
+    settings :: Settings m <- ask
+    rterm <- ask
+    wrapTerminalOps $ withGetEvent rterm (handleSigINT settings) $ \getEvent -> do
+        filePut prefix
+        runSimpleEventLoop getEvent
+
+runSimpleEventLoop :: MonadIO m => m Event -> m (Maybe String)
+runSimpleEventLoop getEvent = do
+    c <- getter
+    l <- case c of
+        '\EOT' -> return Nothing
+        '\n' -> return (Just "")
+        _ -> filePut [c] >> liftM Just (loop [c])
+    filePut "\n"
+    return l
+  where
+    loop cs = do
+        c <- getter
+        if c == '\n'
+            then return (reverse cs)
+            else filePut [c] >> loop (c:cs)
+    getter = do
+        e <- getEvent
+        case e of
+            KeyInput (KeyChar c) -> return c
+            SigInt -> filePut "\n" >> throwInterrupt
+            _ -> getter 
+        
+    
+filePut :: MonadIO m => String -> m ()
+filePut str = liftIO (UTF8.putStr str >> hFlush stdout)
+
+-- for when stdin is not a console, but stdout might be.
+simpleFileLoop :: MonadIO m => String -> (String -> m ()) -> m (Maybe String)
+simpleFileLoop prefix putter = do
+    putter prefix
+    atEOF <- liftIO $ hIsEOF stdin
+    if atEOF
+        then return Nothing
+        else liftM Just $ liftIO UTF8.getLine
 
 {-- 
 Note why it is necessary to integrate ctrl-c handling with this module:
@@ -196,6 +256,8 @@ handleInterrupt f = handle $ \e -> case Exception.dynExceptions e of
                     Just dyn | Just Interrupt <- fromDynamic dyn -> f
                     _ -> throwIO e
 
+throwInterrupt :: MonadIO m => m a
+throwInterrupt = liftIO $ Exception.evaluate $ Exception.throwDyn Interrupt
 
 
 drawEffect :: (LineState s, LineState t, Term (d m), 

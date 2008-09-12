@@ -257,12 +257,13 @@ instance MonadLayout m => Term (Draw m) where
         movePos (lengthToEnd s)
         printText "\r\n" -- make the console take care of creating a new line
     
-    ringBell _ = return () -- TODO
+    ringBell True = printText "\a"
+    ringBell False = return () -- TODO
 
-win32Term :: (MonadLayout m, MonadException m) => RunTerm m
+win32Term :: RunTerm
 win32Term = RunTerm {
     getLayout = getDisplaySize,
-    runTerm = runDraw,
+    runTerm = \f -> runDraw f,
     withGetEvent = \useSigINT f -> do 
         h <- getInputHandle
 	eventChan <- liftIO $ newTChanIO
