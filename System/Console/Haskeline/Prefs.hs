@@ -1,7 +1,7 @@
 {- |
 'Prefs' allow the user to customize the line-editing interface.  They are
 read by default from @~/.haskeline@; to override that behavior, use
-'readPrefs' and 'runInputTWithPrefs'.  
+'readPrefs' and @runInputTWithPrefs@.  
 
 Each line of a @.haskeline@ file defines
 one field of the 'Prefs' datatype; field names are case-insensitive and
@@ -12,7 +12,14 @@ unparseable lines are ignored.  For example:
 > maxhistorysize: Just 40
 
 -}
-module System.Console.Haskeline.Prefs where
+module System.Console.Haskeline.Prefs(
+                        Prefs(..),
+                        defaultPrefs,
+                        readPrefs,
+                        CompletionType(..),
+                        BellStyle(..),
+                        EditMode(..)
+                        ) where
 
 import Language.Haskell.TH
 import Data.Char(isSpace,toLower)

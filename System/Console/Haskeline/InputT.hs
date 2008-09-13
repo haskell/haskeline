@@ -23,7 +23,7 @@ data Settings m = Settings {complete :: CompletionFunc m, -- ^ Custom tab comple
 
 -- | Because 'complete' is the only field of 'Settings' depending on @m@,
 -- the expression @defaultSettings {completionFunc = f}@ leads to a type error
--- from being too general.  This function may become unnecessary if another field
+-- from being too general.  This function works around that issue, and may become unnecessary if another field
 -- depending on @m@ is added.
 
 setComplete :: CompletionFunc m -> Settings m -> Settings m

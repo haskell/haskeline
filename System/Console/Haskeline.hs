@@ -1,8 +1,10 @@
 {- | 
 
-A user interface for line input in command-line programs.  When run in the terminal,
-Haskeline provides a 
-Haskeline provides a user in
+A rich user interface for line input in command-line programs.  Haskeline is
+Unicode-aware and runs both on POSIX-compatible systems and on Windows.  
+
+Users may customize the interface using a @~/.haskeline@ file; see the
+"System.Console.Haskeline.Prefs" module for more details.
 
 An example use of this library for a simple read-eval-print loop is the
 following.
@@ -20,6 +22,9 @@ following.
 >                Just "quit" -> return ()
 >                Just input -> do outputStrLn $ "Input was: " ++ input
 >                                 loop
+
+If either 'stdin' or 'stdout' is not connected to a terminal (for example, piped from another
+process), then Haskeline will treat it as a UTF-8-encoded file handle.  
 
 -}
 
@@ -124,16 +129,9 @@ user interface.  Returns 'Nothing' if the user presses Ctrl-D when the input
 text is empty.  Otherwise, it returns the input line with the final newline
 removed.  
 
-If signal handling is enabled in the 'Settings', then 'getInputLine' will
-throw an 'Interrupt' exception when the user presses Ctrl-C.
-
-'getInputLine' will treat the input and output handles as UTF8-encoded files if either:
-
- - 'stdin' is not connected to a terminal (for example piped from another process), or
-
- - 'stdout' is not connected to a terminal and we are running on Windows
-
-In that case it returns 'Nothing' if an EOF is encountered before any characters are read.  
+If 'stdin' is not connected to a terminal, then 'getLine' will also return 'Nothing' 
+if an EOF
+is encountered before any characters are read.
 -}
 getInputLine :: forall m . MonadException m => String -- ^ The input prompt
                             -> InputT m (Maybe String)
