@@ -158,9 +158,11 @@ withPosixGetEvent :: MonadException m => Maybe Terminal -> Bool -> (m Event -> m
 withPosixGetEvent term useSigINT f = do
     baseMap <- liftIO (getKeySequences term)
     eventChan <- liftIO $ newTChanIO
-    wrapKeypad term 
-        $ withWindowHandler term eventChan
-        $ withSigIntHandler useSigINT eventChan
+    outIsTerm <- liftIO $ hIsTerminalDevice stdout
+    let wrapper = if outIsTerm
+                    then wrapKeypad term . withWindowHandler term eventChan
+                    else id
+    wrapper $ withSigIntHandler useSigINT eventChan
         $ f $ liftIO $ getEvent baseMap eventChan
 
 -- If the keypad on/off capabilities are defined, wrap the computation with them.
