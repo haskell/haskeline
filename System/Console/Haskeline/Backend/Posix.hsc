@@ -1,7 +1,9 @@
 module System.Console.Haskeline.Backend.Posix (
                         withPosixGetEvent,
                         getPosixLayout,
-                        mapLines
+                        mapLines,
+                        putTerm,
+                        posixRunTerm
                  ) where
 
 import Foreign
@@ -25,6 +27,9 @@ import System.Console.Haskeline.Monads
 import System.Console.Haskeline.Command
 import System.Console.Haskeline.Term
 
+import GHC.IOBase (haFD,FD)
+import GHC.Handle (withHandle_)
+
 #include <sys/ioctl.h>
 
 -------------------
@@ -32,18 +37,23 @@ import System.Console.Haskeline.Term
 
 foreign import ccall ioctl :: CInt -> CULong -> Ptr a -> IO CInt
 
-getPosixLayout :: Maybe Terminal -> IO Layout
-getPosixLayout term = tryGetLayouts [ioctlLayout, envLayout, tinfoLayout term]
+getPosixLayout :: Handle -> Maybe Terminal -> IO Layout
+getPosixLayout h term = tryGetLayouts [ioctlLayout h, envLayout, tinfoLayout term]
 
-ioctlLayout, envLayout :: IO (Maybe Layout)
-ioctlLayout = allocaBytes (#size struct winsize) $ \ws -> do
-                ret <- ioctl 1 (#const TIOCGWINSZ) ws
+ioctlLayout :: Handle -> IO (Maybe Layout)
+ioctlLayout h = allocaBytes (#size struct winsize) $ \ws -> do
+                fd <- unsafeHandleToFD h
+                ret <- ioctl fd (#const TIOCGWINSZ) ws
                 rows :: CUShort <- (#peek struct winsize,ws_row) ws
                 cols :: CUShort <- (#peek struct winsize,ws_col) ws
                 if ret >= 0
                     then return $ Just Layout {height=fromEnum rows,width=fromEnum cols}
                     else return Nothing
 
+unsafeHandleToFD :: Handle -> IO FD
+unsafeHandleToFD h = withHandle_ "unsafeHandleToFd" h (return . haFD)
+
+envLayout :: IO (Maybe Layout)
 envLayout = handle (\_ -> return Nothing) $ do
     -- note the handle catches both undefined envs and bad reads
     r <- getEnv "ROWS"
@@ -69,7 +79,6 @@ tryGetLayouts (f:fs) = do
 --------------------
 -- Key sequences
 
--- TODO: What if term not found?
 getKeySequences :: Maybe Terminal -> IO (TreeMap Char Key)
 getKeySequences term = do
     sttys <- sttyKeys
@@ -154,34 +163,27 @@ lookupChars (TreeMap tm) (c:cs) = case Map.lookup c tm of
 
 -----------------------------
 
-withPosixGetEvent :: MonadException m => Maybe Terminal -> Bool -> (m Event -> m a) -> m a
-withPosixGetEvent term useSigINT f = do
+withPosixGetEvent :: MonadException m => Handle -> Maybe Terminal -> Bool -> (m Event -> m a) -> m a
+withPosixGetEvent h term useSigINT f = do
     baseMap <- liftIO (getKeySequences term)
     eventChan <- liftIO $ newTChanIO
-    outIsTerm <- liftIO $ hIsTerminalDevice stdout
-    let wrapper = if outIsTerm
-                    then wrapKeypad term . withWindowHandler term eventChan
-                    else id
-    wrapper $ withSigIntHandler useSigINT eventChan
+    wrapKeypad h term . withWindowHandler h term eventChan
+        $ withSigIntHandler useSigINT eventChan
         $ f $ liftIO $ getEvent baseMap eventChan
 
 -- If the keypad on/off capabilities are defined, wrap the computation with them.
-wrapKeypad :: MonadException m => Maybe Terminal -> m a -> m a
-wrapKeypad Nothing f = f
-wrapKeypad (Just term) f = (maybeOutput keypadOn >> f) 
+wrapKeypad :: MonadException m => Handle -> Maybe Terminal -> m a -> m a
+wrapKeypad _ Nothing f = f
+wrapKeypad h (Just term) f = (maybeOutput keypadOn >> f) 
                             `finally` maybeOutput keypadOff
   where
-    maybeOutput cap = liftIO $ runTermOutput term $
+    maybeOutput cap = liftIO $ hRunTermOutput h term $
                             fromMaybe mempty (getCapability term cap)
 
-withWindowHandler :: MonadException m => Maybe Terminal -> TChan Event -> m a -> m a
-withWindowHandler term eventChan act = do
-    outIsTerm <- liftIO $ hIsTerminalDevice stdout
-    let withH = if outIsTerm
-                    then withHandler windowChange $ Catch $ 
-                        getPosixLayout term >>= atomically . writeTChan eventChan . WindowResize
-                    else id
-    withH act
+withWindowHandler :: MonadException m => Handle -> Maybe Terminal -> TChan Event -> m a -> m a
+withWindowHandler h term eventChan = withHandler windowChange $ 
+    Catch $ getPosixLayout h term 
+                >>= atomically . writeTChan eventChan . WindowResize
 
 withSigIntHandler :: MonadException m => Bool -> TChan Event -> m a -> m a
 withSigIntHandler False _ = id
@@ -208,4 +210,56 @@ getEvent baseMap = keyEventLoop readKeyEvents
         if null ks
             then readKeyEvents eventChan
             else atomically $ mapM_ (writeTChan eventChan) ks
+
+-- fails if stdin is not a handle or if we couldn't access /dev/tty.
+openTTY :: IO (Maybe Handle)
+openTTY = do
+    inIsTerm <- hIsTerminalDevice stdin
+    if inIsTerm
+        then handle (\_ -> return Nothing) $ do
+                h <- openFile "/dev/tty" WriteMode
+                return (Just h)
+        else return Nothing
+
+posixRunTerm :: (Handle -> TermOps) -> IO RunTerm
+posixRunTerm tOps = do
+    ttyH <- openTTY
+    case ttyH of
+        Nothing -> return fileRunTerm
+        Just h -> return RunTerm {
+                    putStrOut = putTerm stdout,
+                    closeTerm = hClose h,
+                    termOps = Just (wrapRunTerm (wrapTerminalOps h) (tOps h))
+                }
+
+putTerm :: Handle -> String -> IO ()
+putTerm h str = B.hPutStr h (UTF8.fromString str) >> hFlush h
+
+fileRunTerm :: RunTerm
+fileRunTerm = RunTerm {putStrOut = putTerm stdout,
+                closeTerm = return (),
+                termOps = Nothing
+                }
+
+
+-- NOTE: If we set stdout to NoBuffering, there can be a flicker effect when many
+-- characters are printed at once.  We'll keep it buffered here, and let the Draw
+-- monad manually flush outputs that don't print a newline.
+wrapTerminalOps:: MonadException m => Handle -> m a -> m a
+wrapTerminalOps outH =
+    bracketSet (hGetBuffering stdin) (hSetBuffering stdin) NoBuffering
+    . bracketSet (hGetBuffering outH) (hSetBuffering outH) LineBuffering
+    . bracketSet (hGetEcho stdin) (hSetEcho stdin) False
+
+wrapRunTerm :: (forall m a . MonadException m => m a -> m a) -> TermOps -> TermOps
+wrapRunTerm wrap tops = tops {runTerm = \getE useSigINT -> 
+                                            wrap (runTerm tops getE useSigINT)
+                                }
+
+bracketSet :: (Eq a, MonadException m) => IO a -> (a -> IO ()) -> a -> m b -> m b
+bracketSet getState set newState f = do
+    oldState <- liftIO getState
+    if oldState == newState
+        then f
+        else finally (liftIO (set newState) >> f) (liftIO (set oldState))
 

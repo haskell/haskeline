@@ -16,17 +16,21 @@ class MonadIO m => Term m where
     clearLayout :: m ()
     ringBell :: Bool -> m ()
     
-
+-- putStrOut is the right way to send unicode chars to stdout.
+-- termOps being Nothing means we should read the input as a UTF-8 file.
 data RunTerm = RunTerm {
-            getLayout :: IO Layout,
-            withGetEvent :: forall m a . MonadException m => Bool -> (m Event -> m a) -> m a,
-            runTerm :: RunTermType,
-            putStrTerm :: String -> IO ()
+            putStrOut :: String -> IO (),
+            termOps :: Maybe TermOps,
+            closeTerm :: IO ()
     }
 
+data TermOps = TermOps {runTerm :: RunTermType,
+                        getLayout :: IO Layout}
+
 type RunTermType = forall m a . (MonadLayout m, MonadException m) 
-                    => (forall t . (MonadTrans t, Term (t m), MonadException (t m)) => t m a) 
-                        -> m a
+                    => (forall t . (MonadTrans t, Term (t m), MonadException (t m)) 
+                            => (t m Event -> t m a)) -> Bool -> m a
+
 
 -- Utility function for drawLineDiff instances.
 matchInit :: Eq a => [a] -> [a] -> ([a],[a])

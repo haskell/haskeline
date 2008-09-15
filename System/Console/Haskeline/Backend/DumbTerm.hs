@@ -7,10 +7,8 @@ import System.Console.Haskeline.Monads as Monads
 import System.Console.Haskeline.Command
 
 import System.IO
-import qualified System.IO.UTF8 as UTF8
 
 -- TODO: 
----- Make this unicode-aware, too.
 ---- Put "<" and ">" at end of term if scrolls off.
 ---- Have a margin at the ends
 
@@ -20,8 +18,8 @@ data Window = Window {pos :: Int -- ^ # of visible chars to left of cursor
 initWindow :: Window
 initWindow = Window {pos=0}
 
-newtype DumbTerm m a = DumbTerm {unDumbTerm :: StateT Window m a}
-                deriving (Monad,MonadIO, MonadState Window)
+newtype DumbTerm m a = DumbTerm {unDumbTerm :: ReaderT Handle (StateT Window m) a}
+                deriving (Monad,MonadIO, MonadState Window,MonadReader Handle)
 
 instance MonadReader Layout m => MonadReader Layout (DumbTerm m) where
     ask = lift ask
@@ -32,17 +30,18 @@ instance MonadException m => MonadException (DumbTerm m) where
     unblock = DumbTerm . unblock . unDumbTerm
     catch (DumbTerm f) g = DumbTerm $ Monads.catch f (unDumbTerm . g)
 
-runDumbTerm :: RunTerm
-runDumbTerm = RunTerm {
-    getLayout = getPosixLayout Nothing,
-    withGetEvent = withPosixGetEvent Nothing,
-    runTerm = \f -> evalStateT' initWindow (unDumbTerm f),
-    putStrTerm = printText
-    }
-    
-
+runDumbTerm :: IO RunTerm
+runDumbTerm = posixRunTerm $ \h -> 
+                TermOps {
+                        getLayout = getPosixLayout h Nothing,
+                        runTerm = \f useSigINT -> 
+                                        evalStateT' initWindow
+                                        (runReaderT' h (unDumbTerm
+                                         (withPosixGetEvent h Nothing useSigINT f)))
+                        }
+                                
 instance MonadTrans DumbTerm where
-    lift = DumbTerm . lift
+    lift = DumbTerm . lift . lift
 
 instance MonadLayout m => Term (DumbTerm m) where
     withReposition _ = id
@@ -54,8 +53,8 @@ instance MonadLayout m => Term (DumbTerm m) where
     ringBell True = printText "\a"
     ringBell False = return ()
       
-printText :: MonadIO m => String -> m ()
-printText str = liftIO $ UTF8.putStr str >> hFlush stdout
+printText :: MonadIO m => String -> DumbTerm m ()
+printText str = ask >>= liftIO . flip putTerm str
 
 -- Things we can assume a dumb terminal knows how to do
 cr,crlf :: String

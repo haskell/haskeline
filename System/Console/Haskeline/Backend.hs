@@ -12,11 +12,11 @@ import System.Console.Haskeline.Backend.DumbTerm as DumbTerm
 myRunTerm :: IO RunTerm
 
 #ifdef MINGW
-myRunTerm = return win32Term
+myRunTerm = win32Term
 #else
 myRunTerm = do
     mRun <- runTerminfoDraw
     case mRun of 
-        Nothing -> return runDumbTerm
+        Nothing -> runDumbTerm
         Just run -> return run
 #endif

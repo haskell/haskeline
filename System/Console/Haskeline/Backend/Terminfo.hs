@@ -7,7 +7,7 @@ module System.Console.Haskeline.Backend.Terminfo(
 import System.Console.Terminfo
 import Control.Monad
 import Data.List(intersperse)
-import System.IO (hFlush,stdout)
+import System.IO
 import qualified Control.Exception as Exception
 
 import System.Console.Haskeline.Monads as Monads
@@ -86,9 +86,10 @@ initTermPos = TermPos {termRow = 0, termCol = 0}
 
 --------------
 
-newtype Draw m a = Draw {unDraw :: ReaderT Actions (ReaderT Terminal (StateT TermPos m)) a}
+newtype Draw m a = Draw {unDraw :: ReaderT Handle (ReaderT Actions 
+                                    (ReaderT Terminal (StateT TermPos m))) a}
     deriving (Monad,MonadIO,MonadReader Actions,MonadReader Terminal,
-        MonadState TermPos)
+        MonadState TermPos, MonadReader Handle)
 
 instance MonadReader Layout m => MonadReader Layout (Draw m) where
     ask = lift ask
@@ -101,7 +102,7 @@ instance MonadException m => MonadException (Draw m) where
 
 
 instance MonadTrans Draw where
-    lift = Draw . lift . lift . lift
+    lift = Draw . lift . lift . lift . lift
     
 runTerminfoDraw :: IO (Maybe RunTerm)
 runTerminfoDraw = do
@@ -110,21 +111,23 @@ runTerminfoDraw = do
         Left _ -> return Nothing
         Right term -> case getCapability term getActions of
             Nothing -> return Nothing
-            Just actions -> return $ Just $ RunTerm {
-                getLayout = getPosixLayout (Just term),
-                withGetEvent = withPosixGetEvent (Just term),
-                putStrTerm = \str -> putStr (UTF8.encodeString str) >> hFlush stdout,
-                runTerm = \f -> evalStateT' initTermPos 
-                                    (runReaderT' term
-                                    (runReaderT' actions (unDraw f)))
-                }
+            Just actions -> fmap Just $ posixRunTerm $ \h -> 
+                TermOps {
+                    getLayout = getPosixLayout h (Just term),
+                    runTerm = \f useSigINT -> 
+                             evalStateT' initTermPos
+                              (runReaderT' term
+                               (runReaderT' actions
+                                (runReaderT' h (unDraw 
+                                 (withPosixGetEvent h (Just term) useSigINT f)))))
+                    }
     
 output :: MonadIO m => (Actions -> TermOutput) -> Draw m ()
 output f = do
     toutput <- asks f
     term <- ask
-    liftIO $ runTermOutput term toutput
-    liftIO $ hFlush stdout
+    ttyh <- ask
+    liftIO $ hRunTermOutput ttyh term toutput
 
 
 

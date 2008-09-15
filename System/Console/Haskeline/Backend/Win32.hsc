@@ -1,10 +1,10 @@
 module System.Console.Haskeline.Backend.Win32(
-                Draw(),
                 win32Term
                 )where
 
 
 import System.IO
+import qualified System.IO.UTF8 as UTF8
 import Foreign.Ptr
 import Foreign.Storable
 import Foreign.Marshal.Alloc
@@ -13,6 +13,7 @@ import Foreign.C.Types
 import Foreign.Marshal.Utils
 import System.Win32.Types
 import Graphics.Win32.Misc(getStdHandle, sTD_INPUT_HANDLE, sTD_OUTPUT_HANDLE)
+import System.Win32.File
 import Data.List(intercalate)
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -46,7 +47,18 @@ getEvent h = keyEventLoop readKeyEvents
 	            Just k -> atomically $ writeTChan eventChan (KeyInput k)
     	            Nothing -> readKeyEvents eventChan
 
-            
+getConOut :: IO (Maybe HANDLE)
+getConOut = handle (\_ -> return Nothing) $ fmap Just $ do
+    putStrLn "About to create..."
+    h <- createFile "CONOUT$" (gENERIC_READ .|. gENERIC_WRITE)
+                        (fILE_SHARE_READ .|. fILE_SHARE_WRITE) Nothing
+                    oPEN_EXISTING 0 Nothing
+    writeConsole h "Opened!\n"
+    putStrLn "Creating..."
+    return h
+
+
+
 eventToKey :: InputEvent -> Maybe Key
 eventToKey KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc,
                     controlKeyState = cstate}
@@ -172,38 +184,33 @@ writeConsole h str = withArray tstr $ \t_arr -> alloca $ \numWritten -> do
 ----------------------------
 -- Drawing
 
-newtype Draw m a = Draw {runDraw :: m a}
-    deriving (Monad,MonadIO,MonadException)
+newtype Draw m a = Draw {runDraw :: ReaderT HANDLE m a}
+    deriving (Monad,MonadIO,MonadException, MonadReader HANDLE)
 
 instance MonadTrans Draw where
-    lift = Draw
+    lift = Draw . lift
 
 instance MonadReader Layout m => MonadReader Layout (Draw m) where
     ask = lift ask
     local r = Draw . local r . runDraw
 
-getInputHandle, getOutputHandle :: MonadIO m => m HANDLE
-getInputHandle = liftIO $ getStdHandle sTD_INPUT_HANDLE
-getOutputHandle = liftIO $ getStdHandle sTD_OUTPUT_HANDLE
-
-getDisplaySize :: IO Layout
-getDisplaySize = do
-    h <- getOutputHandle
+getDisplaySize :: HANDLE -> IO Layout
+getDisplaySize h = do
     (topLeft,bottomRight) <- getDisplayWindow h
     return Layout {width = coordX bottomRight - coordX topLeft+1, 
                     height = coordY bottomRight - coordY topLeft+1 }
     
 getPos :: MonadIO m => Draw m Coord
-getPos = getOutputHandle >>= liftIO . getPosition
+getPos = ask >>= liftIO . getPosition
     
 setPos :: MonadIO m => Coord -> Draw m ()
 setPos c = do
-    h <- getOutputHandle
+    h <- ask
     liftIO (setPosition h c)
 
-printText :: MonadIO m => String -> m ()
+printText :: MonadIO m => String -> Draw m ()
 printText txt = do
-    h <- getOutputHandle
+    h <- ask
     liftIO (writeConsole h txt)
     
 printAfter :: MonadLayout m => String -> Draw m ()
@@ -260,17 +267,50 @@ instance MonadLayout m => Term (Draw m) where
     ringBell True = printText "\a"
     ringBell False = return () -- TODO
 
-win32Term :: RunTerm
-win32Term = RunTerm {
-    getLayout = getDisplaySize,
-    runTerm = \f -> runDraw f,
-    withGetEvent = \useSigINT f -> do 
-        h <- getInputHandle
-	eventChan <- liftIO $ newTChanIO
-        withCtrlCHandler useSigINT eventChan
-		$ f $ liftIO $ getEvent h eventChan,
-    putStrTerm = printText
-    }
+win32Term :: IO RunTerm
+win32Term = do
+    inIsTerm <- hIsTerminalDevice stdin
+    putter <- putOut
+    if not inIsTerm
+        then fileRunTerm
+        else do
+            oterm <- getConOut
+            case oterm of
+                Nothing -> fileRunTerm
+                Just h -> return RunTerm {
+                            putStrOut = putter,
+                            termOps = Just TermOps {
+                                            getLayout = getDisplaySize h,
+                                            runTerm = consoleRunTerm h},
+                            closeTerm = closeHandle h}
+
+consoleRunTerm :: HANDLE -> RunTermType
+consoleRunTerm conOut f useSigINT = do
+    inH <- liftIO $ getStdHandle sTD_INPUT_HANDLE
+    eventChan <- liftIO $ newTChanIO
+    runReaderT' conOut $ runDraw $ withCtrlCHandler useSigINT eventChan
+        $ f $ liftIO $ getEvent inH eventChan
+
+-- stdin is not a terminal, but we still need to check the right way to output unicode to stdout.
+fileRunTerm :: IO RunTerm
+fileRunTerm = do
+    putter <- putOut
+    return RunTerm {termOps = Nothing,
+                                 closeTerm = return (),
+                                 putStrOut = putter}
+
+-- On Windows, Unicode written to the console must be written with the WriteConsole API call.
+-- And to make the API cross-platform consistent, Unicode to a file should be UTF-8.
+putOut :: IO (String -> IO ())
+putOut = do
+    outIsTerm <- hIsTerminalDevice stdout
+    if outIsTerm
+        then do
+            h <- getStdHandle sTD_OUTPUT_HANDLE
+            return (writeConsole h)
+        else return $ \str -> UTF8.putStr str >> hFlush stdout
+                
+    
 
 type Handler = DWORD -> IO BOOL
 

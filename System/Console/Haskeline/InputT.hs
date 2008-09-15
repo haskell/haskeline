@@ -59,10 +59,9 @@ type InputCmdT m = ReaderT Layout (StateT HistLog (ReaderT Prefs (ReaderT (Setti
 
 instance MonadIO m => MonadLayout (InputCmdT m) where
 
-runInputCmdT :: forall m a . MonadIO m => InputCmdT m a -> InputT m a
-runInputCmdT f = InputT $ do
-    run <- ask
-    layout <- liftIO $ getLayout run
+runInputCmdT :: forall m a . MonadIO m => TermOps -> InputCmdT m a -> InputT m a
+runInputCmdT tops f = InputT $ do
+    layout <- liftIO $ getLayout tops
     lift $ runHistLog $ runReaderT' layout f
 
 
@@ -70,8 +69,9 @@ liftCmdT :: Monad m => m a -> InputCmdT m a
 liftCmdT = lift  . lift . lift . lift
 
 runInputTWithPrefs :: MonadException m => Prefs -> Settings m -> InputT m a -> m a
-runInputTWithPrefs prefs settings (InputT f) = liftIO myRunTerm >>= \run -> 
-    runReaderT' settings $ runReaderT' prefs 
+runInputTWithPrefs prefs settings (InputT f) = bracket (liftIO myRunTerm)
+    (liftIO . closeTerm)
+    $ \run -> runReaderT' settings $ runReaderT' prefs 
         $ runHistoryFromFile (historyFile settings) (maxHistorySize prefs) 
         $ runReaderT f run
         
