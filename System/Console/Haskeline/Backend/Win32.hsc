@@ -176,6 +176,11 @@ writeConsole h str = withArray tstr $ \t_arr -> alloca $ \numWritten -> do
   where
     tstr = map (toEnum . fromEnum) str
 
+foreign import stdcall "windows.h MessageBeep" c_messageBeep :: UINT -> IO Bool
+
+messageBeep :: IO ()
+messageBeep = c_messageBeep (-1) >> return ()-- intentionally ignore failures.
+
 ----------------------------
 -- Drawing
 
@@ -259,7 +264,7 @@ instance MonadLayout m => Term (Draw m) where
         movePos (lengthToEnd s)
         printText "\r\n" -- make the console take care of creating a new line
     
-    ringBell True = printText "\a"
+    ringBell True = liftIO messageBeep
     ringBell False = return () -- TODO
 
 win32Term :: IO RunTerm
