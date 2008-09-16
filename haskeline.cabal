@@ -22,10 +22,6 @@ Stability:      Experimental
 Build-Type:     Simple
 extra-source-files: examples/Test.hs
 
-flag target-mingw
-    Description: Use native Win32 Console functionality (suitable for MinGW)
-    Default: False
-
 flag old-base
     Description: Use the base packages from before version 6.8
 
@@ -63,7 +59,7 @@ Library
                 System.Console.Haskeline.Term
                 System.Console.Haskeline.Vi
     include-dirs: includes
-    if flag(target-mingw) {
+    if os(windows) {
         Build-depends: Win32>=2.0
         Other-modules: System.Console.Haskeline.Backend.Win32
         c-sources: cbits/win_console.c
