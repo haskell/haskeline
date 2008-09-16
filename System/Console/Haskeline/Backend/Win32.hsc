@@ -48,15 +48,10 @@ getEvent h = keyEventLoop readKeyEvents
     	            Nothing -> readKeyEvents eventChan
 
 getConOut :: IO (Maybe HANDLE)
-getConOut = handle (\_ -> return Nothing) $ fmap Just $ do
-    putStrLn "About to create..."
-    h <- createFile "CONOUT$" (gENERIC_READ .|. gENERIC_WRITE)
+getConOut = handle (\_ -> return Nothing) $ fmap Just
+    $ createFile "CONOUT$" (gENERIC_READ .|. gENERIC_WRITE)
                         (fILE_SHARE_READ .|. fILE_SHARE_WRITE) Nothing
                     oPEN_EXISTING 0 Nothing
-    writeConsole h "Opened!\n"
-    putStrLn "Creating..."
-    return h
-
 
 
 eventToKey :: InputEvent -> Maybe Key
