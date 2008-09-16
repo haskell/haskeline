@@ -20,6 +20,7 @@ Description:
 Homepage:       http://trac.haskell.org/haskeline
 Stability:      Experimental
 Build-Type:     Simple
+extra-source-files: examples/Test.hs
 
 flag target-mingw
     Description: Use native Win32 Console functionality (suitable for MinGW)
