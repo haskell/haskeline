@@ -9,6 +9,7 @@ import Prelude hiding (catch)
 import Control.Exception(Exception)
 import Control.Monad.Reader
 import Control.Monad.State
+import Data.Dynamic
 
 class MonadIO m => MonadException m where
     catch :: m a -> (Exception -> m a) -> m a
@@ -39,6 +40,15 @@ bracket before after thing =
     after a
     return r
  )
+
+throwDynIO :: (Typeable exception, MonadIO m) => exception -> m a
+throwDynIO = liftIO . E.evaluate . E.throwDyn
+
+handleDyn :: (Typeable exception, MonadException m) => (exception -> m a)
+                    -> m a -> m a
+handleDyn f = handle $ \ex -> case E.dynExceptions ex of
+                        Just dyn | Just e <- fromDynamic dyn -> f e
+                        _ -> throwIO ex
 
 
 instance MonadException IO where

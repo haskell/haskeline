@@ -65,7 +65,6 @@ import System.IO
 import qualified System.IO.UTF8 as UTF8
 import Data.Char (isSpace)
 import Control.Monad
-import qualified Control.Exception as Exception
 import Data.Dynamic
 
 
@@ -200,12 +199,10 @@ handleInterrupt :: MonadException m => m a
                         -- ^ Handler to run if Ctrl-C is pressed
                      -> m a -- ^ Computation to run
                      -> m a
-handleInterrupt f = handle $ \e -> case Exception.dynExceptions e of
-                    Just dyn | Just Interrupt <- fromDynamic dyn -> f
-                    _ -> throwIO e
+handleInterrupt f = handle (const f)
 
 throwInterrupt :: MonadIO m => m a
-throwInterrupt = liftIO $ Exception.evaluate $ Exception.throwDyn Interrupt
+throwInterrupt = throwDynIO Interrupt
 
 
 drawEffect :: (LineState s, LineState t, Term (d m), 
