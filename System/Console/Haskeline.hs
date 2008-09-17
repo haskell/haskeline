@@ -3,11 +3,11 @@
 A rich user interface for line input in command-line programs.  Haskeline is
 Unicode-aware and runs both on POSIX-compatible systems and on Windows.  
 
-Users may customize the interface using a @~/.haskeline@ file; see the
+Users may customize the interface with a @~/.haskeline@ file; see the
 "System.Console.Haskeline.Prefs" module for more details.
 
 An example use of this library for a simple read-eval-print loop is the
-following.
+following:
 
 > import System.Console.Haskeline
 > 
@@ -24,7 +24,7 @@ following.
 >                                 loop
 
 If either 'stdin' or 'stdout' is not connected to a terminal (for example, piped from another
-process), then Haskeline will treat it as a UTF-8-encoded file handle.  
+process), Haskeline will treat it as a UTF-8-encoded file handle.  
 
 -}
 
@@ -97,7 +97,7 @@ outputStr xs = do
 outputStrLn :: MonadIO m => String -> InputT m ()
 outputStrLn xs = outputStr (xs++"\n")
 
-{- | Read one line of input, with the final newline removed.
+{- | Read one line of input.  The final newline (if any) is removed.
 
 If 'stdin' is connected to a terminal, 'getInputLine' provides a rich line-editing
 user interface.  It returns 'Nothing' if the user presses @Ctrl-D@ when the input
