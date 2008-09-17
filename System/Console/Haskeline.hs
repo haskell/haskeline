@@ -111,6 +111,9 @@ encountered before any characters are read.
 getInputLine :: forall m . MonadException m => String -- ^ The input prompt
                             -> InputT m (Maybe String)
 getInputLine prefix = do
+    -- If other parts of the program have written text, make sure that it 
+    -- appears before we interact with the user on the terminal.
+    liftIO $ hFlush stdout
     rterm <- ask
     case termOps rterm of
         Nothing -> simpleFileLoop prefix rterm
