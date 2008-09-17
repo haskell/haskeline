@@ -118,16 +118,19 @@ getInputLine prefix = do
 
 getInputCmdLine :: forall m . MonadException m => TermOps -> String -> InputT m (Maybe String)
 getInputCmdLine tops prefix = do
+    -- Load the necessary settings/prefs
     -- TODO: Cache the actions
     emode <- asks (\prefs -> case editMode prefs of
                     Vi -> viActions
                     Emacs -> emacsCommands)
     settings :: Settings m <- ask
-    let ls = emptyIM
+    -- Run the main event processing loop
     result <- runInputCmdT tops $ flip (runTerm tops) (handleSigINT settings)
                         $ \getEvent -> do
+                            let ls = emptyIM
                             drawLine prefix ls 
                             repeatTillFinish getEvent prefix ls emode
+    -- Add the line to the history if it's nonempty.
     case result of 
         Just line | not (all isSpace line) -> addHistory line
         _ -> return ()
