@@ -42,7 +42,7 @@ bracket before after thing =
  )
 
 throwDynIO :: (Typeable exception, MonadIO m) => exception -> m a
-throwDynIO = liftIO . E.evaluate . E.throwDyn
+throwDynIO = liftIO . E.throwIO . E.DynException . toDyn
 
 handleDyn :: (Typeable exception, MonadException m) => (exception -> m a)
                     -> m a -> m a
