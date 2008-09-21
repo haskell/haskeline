@@ -66,6 +66,7 @@ import qualified System.IO.UTF8 as UTF8
 import Data.Char (isSpace)
 import Control.Monad
 import Data.Dynamic
+import Control.Concurrent.MVar
 
 
 
@@ -131,18 +132,28 @@ getInputCmdLine tops prefix = do
                         $ \getEvent -> do
                             let ls = emptyIM
                             drawLine prefix ls 
-                            repeatTillFinish getEvent prefix ls emode
+                            mv <- liftIO $ newMVar (LSCache ls)
+                            repeatTillFinish mv getEvent prefix ls emode
+                                `finally` finishLine mv
     -- Add the line to the history if it's nonempty.
     case result of 
         Just line | not (all isSpace line) -> addHistory line
         _ -> return ()
     return result
 
+data LSCache = forall s . LineState s => LSCache s
+
+finishLine :: Term m => MVar LSCache -> m ()
+finishLine mv = do
+    LSCache s <- liftIO $ takeMVar mv
+    moveToNextLine s
+
+
 repeatTillFinish :: forall m s d 
-    . (MonadTrans d, Term (d m), MonadIO m, LineState s, MonadReader Prefs m)
-            => d m Event -> String -> s -> KeyMap m s 
+    . (MonadTrans d, Term (d m), MonadIO m, MonadState Layout m, LineState s, MonadReader Prefs m)
+            => MVar LSCache -> d m Event -> String -> s -> KeyMap m s 
             -> d m (Maybe String)
-repeatTillFinish getEvent prefix = loop
+repeatTillFinish mv getEvent prefix = loop
     where 
         -- NOTE: since the functions in this mutually recursive binding group do not have the 
         -- same contexts, we need the -XGADTs flag (or -fglasgow-exts)
@@ -150,19 +161,21 @@ repeatTillFinish getEvent prefix = loop
         loop s processor = do
                 event <- getEvent
                 case event of
-                    SigInt -> do
-                        moveToNextLine s
-                        throwInterrupt
-                    WindowResize newLayout -> 
-                        withReposition newLayout (loop s processor)
+                    SigInt -> throwInterrupt
+                    WindowResize newLayout -> do
+                        doReposition newLayout s
+                        lift (put newLayout)
+                        loop s processor
                     KeyInput k -> case lookupKM processor k of
                         Nothing -> actBell >> loop s processor
                         Just g -> case g s of
-                            Left r -> moveToNextLine s >> return r
+                            Left r -> return r
                             Right f -> do
                                         KeyAction effect next <- lift f
                                         drawEffect prefix s effect
-                                        loop (effectState effect) next
+                                        let t = effectState effect
+                                        liftIO $ swapMVar mv (LSCache t)
+                                        loop t next
 
 {-- 
 When stdin is not a console, just read in one line of input.

@@ -9,6 +9,7 @@ import Control.Monad
 import Data.List(intersperse)
 import System.IO
 import qualified Control.Exception as Exception
+import Data.IORef
 
 import System.Console.Haskeline.Monads as Monads
 import System.Console.Haskeline.LineState
@@ -87,13 +88,12 @@ initTermPos = TermPos {termRow = 0, termCol = 0}
 --------------
 
 newtype Draw m a = Draw {unDraw :: ReaderT Handle (ReaderT Actions 
-                                    (ReaderT Terminal (StateT TermPos m))) a}
+                                    (ReaderT Terminal (ReaderT (IORef TermPos) m))) a}
     deriving (Monad,MonadIO,MonadReader Actions,MonadReader Terminal,
         MonadState TermPos, MonadReader Handle)
 
 instance MonadReader Layout m => MonadReader Layout (Draw m) where
     ask = lift ask
-    local r = Draw . local r . unDraw
 
 instance MonadException m => MonadException (Draw m) where
     block = Draw . block . unDraw
@@ -114,8 +114,8 @@ runTerminfoDraw = do
             Just actions -> fmap Just $ posixRunTerm $ \h -> 
                 TermOps {
                     getLayout = getPosixLayout h (Just term),
-                    runTerm = \f useSigINT -> 
-                             evalStateT' initTermPos
+                    runTerm = \f useSigINT -> liftIO (newIORef initTermPos) 
+                            >>= runReaderT
                               (runReaderT' term
                                (runReaderT' actions
                                 (runReaderT' h (unDraw 
@@ -249,17 +249,15 @@ reposition :: Layout -> Layout -> TermPos -> TermPos
 reposition oldLayout newLayout oldPos = posFromLength newLayout $ 
                                             posToLength oldLayout oldPos
 
-withRepositionT :: MonadReader Layout m => Layout -> Draw m a -> Draw m a
-withRepositionT newLayout f = do
+repositionT :: (LineState s, MonadLayout m) => Layout -> s -> Draw m ()
+repositionT newLayout _ = do
     oldPos <- get
     oldLayout <- ask
-    let newPos = reposition oldLayout newLayout oldPos
-    put newPos
-    local newLayout f
+    put $ reposition oldLayout newLayout oldPos
 
 instance MonadLayout m => Term (Draw m) where
     drawLineDiff = drawLineDiffT
-    withReposition = withRepositionT
+    doReposition = repositionT
     
     printLines [] = return ()
     printLines ls = output $ mconcat $ intersperse nl (map text ls) ++ [nl] 
