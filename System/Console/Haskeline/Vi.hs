@@ -31,6 +31,7 @@ simpleInsertions = choiceCmd
                    , KeyUp +> historyBack
                    , KeyDown +> historyForward
                    , controlKey 'd' +> eofIfEmpty
+                   , KillLine +> change (deleteFromMove moveToStart)
                    , searchHistory
                    ]
 
@@ -67,6 +68,8 @@ simpleCmdActions = choiceCmd [ KeyChar '\n'  +> finish
                     , KeyChar 'x' +> change deleteChar
                     , KeyUp +> historyBack
                     , KeyDown +> historyForward
+                    , KillLine +> change (withCommandMode
+                                        $ deleteFromMove moveToStart)
                     , deleteOnce
                     , useMovements withCommandMode
                     ]
