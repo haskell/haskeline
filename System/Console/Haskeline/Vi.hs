@@ -28,6 +28,7 @@ simpleInsertions = choiceCmd
                    , DeleteForward +> change deleteNext 
                    , changeFromChar insertChar
                    , KeyChar '\t' +> completionCmd
+                   , controlKey 'l' +> clearScreenCmd
                    , KeyUp +> historyBack
                    , KeyDown +> historyForward
                    , controlKey 'd' +> eofIfEmpty
@@ -70,6 +71,7 @@ simpleCmdActions = choiceCmd [ KeyChar '\n'  +> finish
                     , KeyDown +> historyForward
                     , KillLine +> change (withCommandMode
                                         $ deleteFromMove moveToStart)
+                    , controlKey 'l' +> clearScreenCmd
                     , deleteOnce
                     , useMovements withCommandMode
                     ]
