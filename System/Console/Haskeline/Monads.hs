@@ -14,24 +14,27 @@ module System.Console.Haskeline.Monads(
 
 import Control.Monad.Trans
 import System.Console.Haskeline.MonadException
-import Data.IORef
 
-import Control.Monad.Reader hiding (MonadReader,ask,asks)
+import Control.Monad.Reader hiding (MonadReader,ask,asks,local)
 import qualified Control.Monad.Reader as Reader
 import Control.Monad.State hiding (MonadState,get,put,modify)
 import qualified Control.Monad.State as State
 
 class Monad m => MonadReader r m where
     ask :: m r
+    local :: r -> m a -> m a
 
 instance Monad m => MonadReader r (ReaderT r m) where
     ask = Reader.ask
+    local r = Reader.local (const r)
 
 instance MonadReader r m => MonadReader r (ReaderT t m) where
     ask = lift ask
+    local r = mapReaderT (local r)
     
 instance MonadReader r m => MonadReader r (StateT s m) where
     ask = lift ask
+    local r = mapStateT (local r)
 
 asks :: MonadReader r m => (r -> a) -> m a
 asks f = liftM f ask
@@ -43,13 +46,6 @@ class Monad m => MonadState s m where
 instance Monad m => MonadState s (StateT s m) where
     get = State.get
     put = State.put
-
-instance MonadIO m => MonadState s (ReaderT (IORef s) m) where
-    get = ask >>= liftIO . readIORef
-    put x = ask >>= liftIO . flip writeIORef x
-
-instance MonadIO m => MonadReader r (ReaderT (IORef r) m) where
-    ask = get
 
 instance MonadState s m => MonadState s (StateT t m) where
     get = lift get

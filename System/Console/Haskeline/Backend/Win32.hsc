@@ -192,6 +192,7 @@ instance MonadTrans Draw where
 
 instance MonadReader Layout m => MonadReader Layout (Draw m) where
     ask = lift ask
+    local r = Draw . local r . runDraw
 
 getDisplaySize :: HANDLE -> IO Layout
 getDisplaySize h = do
@@ -248,7 +249,7 @@ crlf = "\r\n"
 
 instance MonadLayout m => Term (Draw m) where
     drawLineDiff = drawLineDiffWin
-    doReposition _ _ = return () -- TODO
+    withReposition _ = id -- TODO
 
     printLines [] = return ()
     printLines ls = printText $ intercalate crlf ls ++ crlf

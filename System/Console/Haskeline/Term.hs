@@ -8,7 +8,7 @@ import Control.Concurrent
 import Control.Concurrent.STM
 
 class MonadIO m => Term m where
-    doReposition :: LineState s => Layout -> s -> m ()
+    withReposition :: Layout -> m a -> m a
     moveToNextLine :: LineState s => s -> m ()
     printLines :: [String] -> m ()
     drawLineDiff :: (LineState s, LineState r)

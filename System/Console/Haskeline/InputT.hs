@@ -14,7 +14,6 @@ import System.Directory(getHomeDirectory)
 import System.FilePath
 import Control.Applicative
 import Control.Monad(liftM, ap)
-import Data.IORef
 
 -- | Application-specific customizations to the user interface.
 data Settings m = Settings {complete :: CompletionFunc m, -- ^ Custom tab completion
@@ -57,15 +56,13 @@ instance MonadException m => MonadException (InputT m) where
     catch f h = InputT $ Monads.catch (unInputT f) (unInputT . h)
 
 -- for internal use only
-type InputCmdT m = ReaderT (IORef Layout) (UndoT (StateT HistLog 
-                (ReaderT Prefs (ReaderT (Settings m) m))))
-
+type InputCmdT m = ReaderT (IORef Layout) (StateT HistLog (ReaderT Prefs (ReaderT (Settings m) m)))
 
 instance MonadIO m => MonadLayout (InputCmdT m) where
 
 runInputCmdT :: MonadIO m => TermOps -> InputCmdT m a -> InputT m a
 runInputCmdT tops f = InputT $ do
-    layout <- liftIO $ getLayout tops >>= newIORef
+    layout <- liftIO $ getLayout tops
     lift $ runHistLog $ runUndoT $ runReaderT' layout f
 
 

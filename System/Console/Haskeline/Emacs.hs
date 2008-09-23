@@ -6,13 +6,12 @@ import System.Console.Haskeline.Command.History
 import System.Console.Haskeline.Command.Undo
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.InputT
-import Control.Monad.Trans(MonadIO)
 
 import Data.Char
 
-type InputCmd s t = forall m . MonadIO m => Command (InputCmdT m) s t
+type InputCmd s t = forall m . Monad m => Command (InputCmdT m) s t
 
-emacsCommands :: MonadIO m => KeyMap (InputCmdT m) InsertMode
+emacsCommands :: Monad m => KeyMap (InputCmdT m) InsertMode
 emacsCommands = runCommand $ choiceCmd [simpleActions, controlActions]
 
 simpleActions, controlActions :: InputCmd InsertMode InsertMode

@@ -21,7 +21,7 @@ makeCompletion (IMode xs ys) = do
     return (IMode rest ys,completions)
 
 -- | Create a 'Command' for word completion.
-completionCmd :: MonadIO m => Key -> Command (InputCmdT m) InsertMode InsertMode
+completionCmd :: Monad m => Key -> Command (InputCmdT m) InsertMode InsertMode
 completionCmd k = k +> acceptKeyM (\s -> do
     prefs <- ask
     (rest,completions) <- makeCompletion s
@@ -31,7 +31,7 @@ completionCmd k = k +> acceptKeyM (\s -> do
         ListCompletion -> 
                 pagingCompletion prefs s rest completions k)
 
-pagingCompletion :: MonadIO m => Prefs
+pagingCompletion :: Monad m => Prefs
                 -> InsertMode -> InsertMode -> [Completion] 
                 -> Key -> InputCmdT m (CmdAction (InputCmdT m) InsertMode)
 pagingCompletion _ oldIM _ [] _ = return $ RingBell oldIM >=> continue
@@ -71,12 +71,12 @@ askFirst mlimit numCompletions im printingCmd = case mlimit of
                             ]
     _ -> printingCmd
 
-printOneLine :: MonadIO m => [String] -> Message InsertMode -> CmdAction (InputCmdT m) InsertMode
+printOneLine :: Monad m => [String] -> Message InsertMode -> CmdAction (InputCmdT m) InsertMode
 printOneLine (w:ws) im | not (null ws) =
             PrintLines [w] im >=> pagingCommands ws
 printOneLine _ im = Change (messageState im) >=> continue
 
-printPage :: MonadIO m => [String] -> Message InsertMode
+printPage :: Monad m => [String] -> Message InsertMode
                     -> InputCmdT m (CmdAction (InputCmdT m) InsertMode)
 printPage ws im = do
     layout <- ask
@@ -87,7 +87,7 @@ printPage ws im = do
 
 
 -- TODO: move testing of nullity into here
-pagingCommands :: MonadIO m => [String] -> Command (InputCmdT m) (Message InsertMode) InsertMode
+pagingCommands :: Monad m => [String] -> Command (InputCmdT m) (Message InsertMode) InsertMode
 pagingCommands ws = choiceCmd [
                             KeyChar ' ' +> acceptKeyM (printPage ws)
                             ,KeyChar 'q' +> change messageState

@@ -23,6 +23,7 @@ newtype DumbTerm m a = DumbTerm {unDumbTerm :: ReaderT Handle (StateT Window m) 
 
 instance MonadReader Layout m => MonadReader Layout (DumbTerm m) where
     ask = lift ask
+    local r = DumbTerm . local r . unDumbTerm
 
 instance MonadException m => MonadException (DumbTerm m) where
     block = DumbTerm . block . unDumbTerm
@@ -43,7 +44,7 @@ instance MonadTrans DumbTerm where
     lift = DumbTerm . lift . lift
 
 instance MonadLayout m => Term (DumbTerm m) where
-    doReposition _ _ = return () -- TODO
+    withReposition _ = id
     drawLineDiff = drawLineDiff'
     
     printLines = mapM_ (\s -> printText (s ++ crlf))
