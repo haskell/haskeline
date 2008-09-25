@@ -3,6 +3,7 @@ module System.Console.Haskeline.Emacs where
 import System.Console.Haskeline.Command
 import System.Console.Haskeline.Command.Completion
 import System.Console.Haskeline.Command.History
+import System.Console.Haskeline.Command.Undo
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.InputT
 import Control.Monad.Trans(MonadIO)
@@ -24,7 +25,7 @@ simpleActions = choiceCmd
             , KeyChar '\b' +> change deletePrev
 	    , DeleteForward +> change deleteNext 
             , changeFromChar insertChar
-            , KeyChar '\t' +> completionCmd
+            , saveForUndo $ KeyChar '\t' +> completionCmd
             , KeyUp +> historyBack
             , KeyDown +> historyForward
             , searchHistory
@@ -39,12 +40,18 @@ controlActions = choiceCmd
             , controlKey 'l' +> clearScreenCmd
             , metaChar 'f' +> change wordRight
             , metaChar 'b' +> change wordLeft
-            , controlKey 'w' +> change (deleteFromMove bigWordLeft)
-            , KeyMeta Backspace +> change (deleteFromMove wordLeft)
-            , KeyMeta (KeyChar '\b') +> change (deleteFromMove wordLeft)
-            , metaChar 'd' +> change (deleteFromMove wordRight)
-            , controlKey 'k' +> change (deleteFromMove moveToEnd)
-            , KillLine +> change (deleteFromMove moveToStart)
+            , controlKey '_' +> commandUndo
+            , controlKey 'x' +> change id 
+                >|> choiceCmd [controlKey 'u' +> commandUndo
+                              , continue]
+            , saveForUndo $ choiceCmd
+                [ controlKey 'w' +> change (deleteFromMove bigWordLeft)
+                , KeyMeta Backspace +> change (deleteFromMove wordLeft)
+                , KeyMeta (KeyChar '\b') +> change (deleteFromMove wordLeft)
+                , metaChar 'd' +> change (deleteFromMove wordRight)
+                , controlKey 'k' +> change (deleteFromMove moveToEnd)
+                , KillLine +> change (deleteFromMove moveToStart)
+                ]
             ]
 
 deleteCharOrEOF :: Key -> InputCmd InsertMode InsertMode

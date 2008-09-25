@@ -2,6 +2,7 @@ module System.Console.Haskeline.InputT where
 
 
 import System.Console.Haskeline.Command.History
+import System.Console.Haskeline.Command.Undo
 import System.Console.Haskeline.Monads as Monads
 import System.Console.Haskeline.Prefs
 import System.Console.Haskeline.Command(Layout)
@@ -56,18 +57,20 @@ instance MonadException m => MonadException (InputT m) where
     catch f h = InputT $ Monads.catch (unInputT f) (unInputT . h)
 
 -- for internal use only
-type InputCmdT m = ReaderT (IORef Layout) (StateT HistLog (ReaderT Prefs (ReaderT (Settings m) m)))
+type InputCmdT m = ReaderT (IORef Layout) (UndoT (StateT HistLog 
+                (ReaderT Prefs (ReaderT (Settings m) m))))
+
 
 instance MonadIO m => MonadLayout (InputCmdT m) where
 
-runInputCmdT :: forall m a . MonadIO m => TermOps -> InputCmdT m a -> InputT m a
+runInputCmdT :: MonadIO m => TermOps -> InputCmdT m a -> InputT m a
 runInputCmdT tops f = InputT $ do
     layout <- liftIO $ getLayout tops >>= newIORef
-    lift $ runHistLog $ runReaderT' layout f
+    lift $ runHistLog $ runUndoT $ runReaderT' layout f
 
 
 liftCmdT :: Monad m => m a -> InputCmdT m a
-liftCmdT = lift  . lift . lift . lift
+liftCmdT = lift  . lift . lift . lift . lift
 
 runInputTWithPrefs :: MonadException m => Prefs -> Settings m -> InputT m a -> m a
 runInputTWithPrefs prefs settings (InputT f) = bracket (liftIO myRunTerm)

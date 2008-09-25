@@ -30,7 +30,8 @@ module System.Console.Haskeline.Command(
                         changeWithoutKey,
                         clearScreenCmd,
                         (+>),
-                        choiceCmd
+                        choiceCmd,
+                        withState
                         ) where
 
 import Data.Char(isPrint)
@@ -165,3 +166,11 @@ k +> f = f k
 choiceCmd :: [Command m s t] -> Command m s t
 choiceCmd cmds = Command $ \next -> 
     choiceKM $ map (\(Command f) -> f next) cmds
+
+withState :: Monad m => (s -> m a) -> Command m s t -> Command m s t
+withState act (Command thisCmd) = Command $ \next -> KeyMap $ \k -> 
+    case lookupKM (thisCmd next) k of
+        Nothing -> Nothing
+        Just f -> Just $ \s -> case f s of
+            Left r -> Left r
+            Right effect -> Right $ act s >> effect

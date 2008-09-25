@@ -42,6 +42,7 @@ Library
                 -- Note: GADTs are needed to allow contexts of different
                 -- lengths (see code of Haskeline.repeatTillFinish)
                 GADTs
+                FunctionalDependencies
     Exposed-Modules:
                 System.Console.Haskeline
                 System.Console.Haskeline.Completion
