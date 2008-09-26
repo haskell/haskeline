@@ -56,7 +56,8 @@ instance MonadException m => MonadException (InputT m) where
     catch f h = InputT $ Monads.catch (unInputT f) (unInputT . h)
 
 -- for internal use only
-type InputCmdT m = ReaderT (IORef Layout) (StateT HistLog (ReaderT Prefs (ReaderT (Settings m) m)))
+type InputCmdT m = ReaderT Layout (UndoT (StateT HistLog 
+                (ReaderT Prefs (ReaderT (Settings m) m))))
 
 instance MonadIO m => MonadLayout (InputCmdT m) where
 
