@@ -6,8 +6,9 @@ import System.Console.Haskeline.Command
 
 import Control.Concurrent
 import Control.Concurrent.STM
+import Data.Typeable
 
-class MonadIO m => Term m where
+class MonadException m => Term m where
     withReposition :: Layout -> m a -> m a
     moveToNextLine :: LineState s => s -> m ()
     printLines :: [String] -> m ()
@@ -21,6 +22,7 @@ class MonadIO m => Term m where
 data RunTerm = RunTerm {
             putStrOut :: String -> IO (),
             termOps :: Maybe TermOps,
+            wrapInterrupt :: MonadException m => m a -> m a,
             closeTerm :: IO ()
     }
 
@@ -29,13 +31,16 @@ data TermOps = TermOps {runTerm :: RunTermType,
 
 type RunTermType = forall m a . (MonadLayout m, MonadException m) 
                     => (forall t . (MonadTrans t, Term (t m), MonadException (t m)) 
-                            => (t m Event -> t m a)) -> Bool -> m a
+                            => (t m Event -> t m a)) -> m a
 
 
 -- Utility function for drawLineDiff instances.
 matchInit :: Eq a => [a] -> [a] -> ([a],[a])
 matchInit (x:xs) (y:ys)  | x == y = matchInit xs ys
 matchInit xs ys = (xs,ys)
+
+data Event = WindowResize Layout | KeyInput Key
+                deriving Show
 
 keyEventLoop :: (TChan Event -> IO ()) -> TChan Event -> IO Event
 keyEventLoop readKey eventChan = do
@@ -50,11 +55,13 @@ keyEventLoop readKey eventChan = do
             -- if we receive a different type of event before it's done,
             -- we'll kill it.
             tid <- forkIO (readKey eventChan)
-            e <- atomically $ readTChan eventChan -- key or other event
-            killThread tid
-            return e
+            (atomically $ readTChan eventChan)
+                `finally` killThread tid
 
 tryReadTChan :: TChan a -> STM (Maybe a)
 tryReadTChan chan = fmap Just (readTChan chan) `orElse` return Nothing
 
 class (MonadReader Layout m, MonadIO m) => MonadLayout m where
+
+data Interrupt = Interrupt
+                deriving (Show,Typeable,Eq)

@@ -1,5 +1,4 @@
 module System.Console.Haskeline.Command(
-                        Event(..),
                         Key(..),
                         controlKey,
                         metaChar,
@@ -46,10 +45,6 @@ data Key = KeyChar Char | KeyMeta Key
             | KeyLeft | KeyRight | KeyUp | KeyDown
             | Backspace | DeleteForward | KillLine
                 deriving (Eq,Ord,Show)
-
-data Event = WindowResize Layout | KeyInput Key
-            | SigInt
-                deriving Show
 
 -- Easy translation of control characters; e.g., Ctrl-G or Ctrl-g or ^G
 controlKey :: Char -> Key

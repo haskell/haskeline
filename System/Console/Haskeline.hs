@@ -65,7 +65,6 @@ import System.IO
 import qualified System.IO.UTF8 as UTF8
 import Data.Char (isSpace)
 import Control.Monad
-import Data.Dynamic
 
 
 
@@ -118,17 +117,17 @@ getInputLine prefix = do
         Nothing -> simpleFileLoop prefix rterm
         Just tops -> getInputCmdLine tops prefix
 
-getInputCmdLine :: forall m . MonadException m => TermOps -> String -> InputT m (Maybe String)
+getInputCmdLine :: MonadException m => TermOps -> String -> InputT m (Maybe String)
 getInputCmdLine tops prefix = do
     -- Load the necessary settings/prefs
     -- TODO: Cache the actions
     emode <- asks (\prefs -> case editMode prefs of
                     Vi -> viActions
                     Emacs -> emacsCommands)
-    settings :: Settings m <- ask
+    wrapper <- sigINTWrapper
     -- Run the main event processing loop
-    result <- runInputCmdT tops $ flip (runTerm tops) (handleSigINT settings)
-                        $ \getEvent -> do
+    result <- runInputCmdT tops $ wrapper $ runTerm tops
+                    $ \getEvent -> do
                             let ls = emptyIM
                             drawLine prefix ls 
                             repeatTillFinish getEvent prefix ls emode
@@ -138,8 +137,16 @@ getInputCmdLine tops prefix = do
         _ -> return ()
     return result
 
+sigINTWrapper :: forall m n a . (Monad m, MonadException n) => InputT m (n a -> n a)
+sigINTWrapper = do
+    settings :: Settings m <- ask
+    rterm <- ask
+    return $ if handleSigINT settings
+                then wrapInterrupt rterm
+                else id
+
 repeatTillFinish :: forall m s d 
-    . (MonadTrans d, Term (d m), MonadIO m, LineState s, MonadReader Prefs m)
+    . (MonadTrans d, Term (d m), LineState s, MonadReader Prefs m)
             => d m Event -> String -> s -> KeyMap m s 
             -> d m (Maybe String)
 repeatTillFinish getEvent prefix = loop
@@ -148,11 +155,8 @@ repeatTillFinish getEvent prefix = loop
         -- same contexts, we need the -XGADTs flag (or -fglasgow-exts)
         loop :: forall t . LineState t => t -> KeyMap m t -> d m (Maybe String)
         loop s processor = do
-                event <- getEvent
+                event <- handle (\e -> moveToNextLine s >> throwIO e) getEvent
                 case event of
-                    SigInt -> do
-                        moveToNextLine s
-                        throwInterrupt
                     WindowResize newLayout -> 
                         withReposition newLayout (loop s processor)
                     KeyInput k -> case lookupKM processor k of
@@ -191,19 +195,12 @@ if the user is in the middle of a few wrapped lines, we want to clean up
 by moving the cursor to the start of the following line.
 --}
 
-data Interrupt = Interrupt
-                deriving (Show,Typeable,Eq)
-
 -- | Catch and handle an exception of type 'Interrupt'.
 handleInterrupt :: MonadException m => m a 
                         -- ^ Handler to run if Ctrl-C is pressed
                      -> m a -- ^ Computation to run
                      -> m a
 handleInterrupt f = handle (const f)
-
-throwInterrupt :: MonadIO m => m a
-throwInterrupt = throwDynIO Interrupt
-
 
 drawEffect :: (LineState s, LineState t, Term (d m), 
                 MonadTrans d, MonadReader Prefs m) 

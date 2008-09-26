@@ -34,16 +34,16 @@ runDumbTerm :: IO RunTerm
 runDumbTerm = posixRunTerm $ \h -> 
                 TermOps {
                         getLayout = getPosixLayout h Nothing,
-                        runTerm = \f useSigINT -> 
+                        runTerm = \f -> 
                                         evalStateT' initWindow
                                         (runReaderT' h (unDumbTerm
-                                         (withPosixGetEvent h Nothing useSigINT f)))
+                                         (withPosixGetEvent h Nothing f)))
                         }
                                 
 instance MonadTrans DumbTerm where
     lift = DumbTerm . lift . lift
 
-instance MonadLayout m => Term (DumbTerm m) where
+instance (MonadException m, MonadLayout m) => Term (DumbTerm m) where
     withReposition _ = id
     drawLineDiff = drawLineDiff'
     

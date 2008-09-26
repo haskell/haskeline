@@ -10,7 +10,7 @@ import Foreign
 import Foreign.C.Types
 import qualified Data.Map as Map
 import System.Console.Terminfo
-import System.Posix.Terminal
+import System.Posix.Terminal hiding (Interrupt)
 import Control.Monad
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -22,6 +22,7 @@ import System.IO
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as UTF8
 import System.Environment
+import Control.Exception (throwDynTo)
 
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.Command
@@ -163,12 +164,11 @@ lookupChars (TreeMap tm) (c:cs) = case Map.lookup c tm of
 
 -----------------------------
 
-withPosixGetEvent :: MonadException m => Handle -> Maybe Terminal -> Bool -> (m Event -> m a) -> m a
-withPosixGetEvent h term useSigINT f = do
+withPosixGetEvent :: MonadException m => Handle -> Maybe Terminal -> (m Event -> m a) -> m a
+withPosixGetEvent h term f = do
     baseMap <- liftIO (getKeySequences term)
     eventChan <- liftIO $ newTChanIO
-    wrapKeypad h term . withWindowHandler h term eventChan
-        $ withSigIntHandler useSigINT eventChan
+    wrapKeypad h term $ withWindowHandler h term eventChan
         $ f $ liftIO $ getEvent baseMap eventChan
 
 -- If the keypad on/off capabilities are defined, wrap the computation with them.
@@ -185,10 +185,12 @@ withWindowHandler h term eventChan = withHandler windowChange $
     Catch $ getPosixLayout h term 
                 >>= atomically . writeTChan eventChan . WindowResize
 
-withSigIntHandler :: MonadException m => Bool -> TChan Event -> m a -> m a
-withSigIntHandler False _ = id
-withSigIntHandler True eventChan = withHandler keyboardSignal $ CatchOnce $
-            atomically $ writeTChan eventChan SigInt
+withSigIntHandler :: MonadException m => m a -> m a
+withSigIntHandler f = do
+    tid <- liftIO myThreadId 
+    withHandler keyboardSignal 
+            (CatchOnce (throwDynTo tid Interrupt))
+            f
 
 withHandler :: MonadException m => Signal -> Handler -> m a -> m a
 withHandler signal handler f = do
@@ -229,6 +231,7 @@ posixRunTerm tOps = do
         Just h -> return RunTerm {
                     putStrOut = putTerm stdout,
                     closeTerm = hClose h,
+                    wrapInterrupt = withSigIntHandler,
                     termOps = Just (wrapRunTerm (wrapTerminalOps h) (tOps h))
                 }
 
@@ -238,6 +241,7 @@ putTerm h str = B.hPutStr h (UTF8.fromString str) >> hFlush h
 fileRunTerm :: RunTerm
 fileRunTerm = RunTerm {putStrOut = putTerm stdout,
                 closeTerm = return (),
+                wrapInterrupt = withSigIntHandler,
                 termOps = Nothing
                 }
 
@@ -252,8 +256,7 @@ wrapTerminalOps outH =
     . bracketSet (hGetEcho stdin) (hSetEcho stdin) False
 
 wrapRunTerm :: (forall m a . MonadException m => m a -> m a) -> TermOps -> TermOps
-wrapRunTerm wrap tops = tops {runTerm = \getE useSigINT -> 
-                                            wrap (runTerm tops getE useSigINT)
+wrapRunTerm wrap tops = tops {runTerm = \getE -> wrap (runTerm tops getE)
                                 }
 
 bracketSet :: (Eq a, MonadException m) => IO a -> (a -> IO ()) -> a -> m b -> m b

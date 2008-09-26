@@ -114,12 +114,12 @@ runTerminfoDraw = do
             Just actions -> fmap Just $ posixRunTerm $ \h -> 
                 TermOps {
                     getLayout = getPosixLayout h (Just term),
-                    runTerm = \f useSigINT -> 
+                    runTerm = \f -> 
                              evalStateT' initTermPos
                               (runReaderT' term
                                (runReaderT' actions
                                 (runReaderT' h (unDraw 
-                                 (withPosixGetEvent h (Just term) useSigINT f)))))
+                                 (withPosixGetEvent h (Just term) f)))))
                     }
     
 output :: MonadIO m => (Actions -> TermOutput) -> Draw m ()
@@ -257,7 +257,7 @@ withRepositionT newLayout f = do
     put newPos
     local newLayout f
 
-instance MonadLayout m => Term (Draw m) where
+instance (MonadException m, MonadLayout m) => Term (Draw m) where
     drawLineDiff = drawLineDiffT
     withReposition = withRepositionT
     

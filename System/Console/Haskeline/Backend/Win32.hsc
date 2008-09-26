@@ -18,6 +18,7 @@ import Data.List(intercalate)
 import Control.Concurrent
 import Control.Concurrent.STM
 import Data.Bits
+import Control.Exception (throwDynTo)
 
 import System.Console.Haskeline.Command
 import System.Console.Haskeline.Monads
@@ -32,21 +33,25 @@ foreign import stdcall "windows.h ReadConsoleInputW" c_ReadConsoleInput
 foreign import stdcall "windows.h WaitForSingleObject" c_WaitForSingleObject
     :: HANDLE -> DWORD -> IO DWORD
 
-getEvent :: HANDLE -> TChan Event -> IO Event
-getEvent h = keyEventLoop readKeyEvents
+getEvent :: HANDLE -> IO Event
+getEvent h = newTChanIO >>= keyEventLoop eventIntoChan
   where
-    waitTime = 200 -- milliseconds
-    readKeyEvents eventChan = do
-        yield -- since the foreign call to WaitForSingleObject blocks the killThread
-        ret <- c_WaitForSingleObject h waitTime
-        if ret /= (#const WAIT_OBJECT_0)
-            then readKeyEvents eventChan
-            else do
-                e <- readEvent h
-                case eventToKey e of
-	            Just k -> atomically $ writeTChan eventChan (KeyInput k)
-    	            Nothing -> readKeyEvents eventChan
+    eventIntoChan tchan = eventLoop h >>= atomically . writeTChan tchan
 
+eventLoop :: HANDLE -> IO Event
+eventLoop h = do
+    let waitTime = 500 -- milliseconds
+    ret <- c_WaitForSingleObject h waitTime
+    yield -- otherwise, the above foreign call causes the loop to never 
+          -- respond to the killThread
+    if ret /= (#const WAIT_OBJECT_0)
+        then eventLoop h
+        else do
+            e <- readEvent h
+            case eventToKey e of
+	        Just k -> return (KeyInput k)
+    	        Nothing -> eventLoop h
+                       
 getConOut :: IO (Maybe HANDLE)
 getConOut = handle (\_ -> return Nothing) $ fmap Just
     $ createFile "CONOUT$" (gENERIC_READ .|. gENERIC_WRITE)
@@ -247,7 +252,7 @@ movePos n = do
 crlf :: String
 crlf = "\r\n"
 
-instance MonadLayout m => Term (Draw m) where
+instance (MonadException m, MonadLayout m) => Term (Draw m) where
     drawLineDiff = drawLineDiffWin
     withReposition _ = id -- TODO
 
@@ -279,25 +284,25 @@ win32Term = do
                 Nothing -> fileRunTerm
                 Just h -> return RunTerm {
                             putStrOut = putter,
+                            wrapInterrupt = withCtrlCHandler,
                             termOps = Just TermOps {
                                             getLayout = getDisplaySize h,
                                             runTerm = consoleRunTerm h},
                             closeTerm = closeHandle h}
 
 consoleRunTerm :: HANDLE -> RunTermType
-consoleRunTerm conOut f useSigINT = do
+consoleRunTerm conOut f = do
     inH <- liftIO $ getStdHandle sTD_INPUT_HANDLE
-    eventChan <- liftIO $ newTChanIO
-    runReaderT' conOut $ runDraw $ withCtrlCHandler useSigINT eventChan
-        $ f $ liftIO $ getEvent inH eventChan
+    runReaderT' conOut $ runDraw $ f $ liftIO $ getEvent inH
 
 -- stdin is not a terminal, but we still need to check the right way to output unicode to stdout.
 fileRunTerm :: IO RunTerm
 fileRunTerm = do
     putter <- putOut
     return RunTerm {termOps = Nothing,
-                                 closeTerm = return (),
-                                 putStrOut = putter}
+                    closeTerm = return (),
+                    putStrOut = putter,
+                    wrapInterrupt = withCtrlCHandler}
 
 -- On Windows, Unicode written to the console must be written with the WriteConsole API call.
 -- And to make the API cross-platform consistent, Unicode to a file should be UTF-8.
@@ -320,16 +325,16 @@ foreign import stdcall "windows.h SetConsoleCtrlHandler" c_SetConsoleCtrlHandler
     :: FunPtr Handler -> BOOL -> IO BOOL
 
 -- sets the tv to True when ctrl-c is pressed.
-withCtrlCHandler :: MonadException m => Bool -> TChan Event -> m a -> m a
-withCtrlCHandler False _ f = f
-withCtrlCHandler True eventChan f = bracket (liftIO $ do
-                                    fp <- wrapHandler handler
+withCtrlCHandler :: MonadException m => m a -> m a
+withCtrlCHandler f = bracket (liftIO $ do
+                                    tid <- myThreadId
+                                    fp <- wrapHandler (handler tid)
                                     c_SetConsoleCtrlHandler fp True
                                     return fp)
                                 (\fp -> liftIO $ c_SetConsoleCtrlHandler fp False)
                                 (const f)
   where
-    handler (#const CTRL_C_EVENT) = do
-        atomically $ writeTChan eventChan SigInt
+    handler tid (#const CTRL_C_EVENT) = do
+        throwDynTo tid Interrupt
         return True
-    handler _ = return False
+    handler _ _ = return False
