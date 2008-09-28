@@ -155,17 +155,17 @@ repeatTillFinish getEvent prefix = loop
         -- same contexts, we need the -XGADTs flag (or -fglasgow-exts)
         loop :: forall t . LineState t => t -> KeyMap m t -> d m (Maybe String)
         loop s processor = do
-                event <- handle (\e -> moveToNextLine s >> throwIO e) getEvent
+                event <- handle (\e -> movePast prefix s >> throwIO e) getEvent
                 case event of
                     WindowResize newLayout -> do
                         oldLayout <- ask
                         local newLayout $ do
-                            reposition oldLayout prefix s
+                            reposition oldLayout (lineChars prefix s)
                             loop s processor
                     KeyInput k -> case lookupKM processor k of
                         Nothing -> actBell >> loop s processor
                         Just g -> case g s of
-                            Left r -> moveToNextLine s >> return r
+                            Left r -> movePast prefix s >> return r
                             Right f -> do
                                         KeyAction effect next <- lift f
                                         drawEffect prefix s effect
@@ -211,20 +211,25 @@ drawEffect :: (LineState s, LineState t, Term (d m),
 drawEffect prefix s (Redraw shouldClear t) = if shouldClear
     then clearLayout >> drawLine prefix t
     else clearLine prefix s >> drawLine prefix t
-drawEffect prefix s (Change t) = drawLineDiff prefix s t
+drawEffect prefix s (Change t) = drawLineStateDiff prefix s t
 drawEffect prefix s (PrintLines ls t) = do
     if isTemporary s
         then clearLine prefix s
-        else moveToNextLine s
+        else movePast prefix s
     printLines ls
     drawLine prefix t
-drawEffect prefix s (RingBell t) = drawLineDiff prefix s t >> actBell
+drawEffect prefix s (RingBell t) = drawLineStateDiff prefix s t >> actBell
 
 drawLine :: (LineState s, Term m) => String -> s -> m ()
-drawLine prefix s = drawLineDiff prefix Cleared s
+drawLine prefix s = drawLineStateDiff prefix Cleared s
+
+drawLineStateDiff :: (LineState s, LineState t, Term m) 
+                        => String -> s -> t -> m ()
+drawLineStateDiff prefix s t = drawLineDiff (lineChars prefix s) 
+                                        (lineChars prefix t)
 
 clearLine :: (LineState s, Term m) => String -> s -> m ()
-clearLine prefix s = drawLineDiff prefix s Cleared
+clearLine prefix s = drawLineStateDiff prefix s Cleared
         
 actBell :: (Term (d m), MonadTrans d, MonadReader Prefs m) => d m ()
 actBell = do
@@ -233,3 +238,6 @@ actBell = do
         NoBell -> return ()
         VisualBell -> ringBell False
         AudibleBell -> ringBell True
+
+movePast :: (LineState s, Term m) => String -> s -> m ()
+movePast prefix s = moveToNextLine (lineChars prefix s)

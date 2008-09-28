@@ -9,11 +9,10 @@ import Control.Concurrent.STM
 import Data.Typeable
 
 class (MonadReader Layout m, MonadException m) => Term m where
-    reposition :: LineState s => Layout -> String -> s -> m ()
-    moveToNextLine :: LineState s => s -> m ()
+    reposition :: Layout -> LineChars -> m ()
+    moveToNextLine :: LineChars -> m ()
     printLines :: [String] -> m ()
-    drawLineDiff :: (LineState s, LineState r)
-                    => String -> s -> r -> m ()
+    drawLineDiff :: LineChars -> LineChars -> m ()
     clearLayout :: m ()
     ringBell :: Bool -> m ()
     

@@ -183,30 +183,24 @@ fillLine str = do
                 put TermPos {termRow=r+1,termCol=0}
                 return rest
 
-drawLineDiffT :: (LineState s, LineState t, MonadLayout m) 
-                        => String -> s -> t -> Draw m ()
-drawLineDiffT prefix s1 s2 = let 
-    xs1 = beforeCursor prefix s1
-    ys1 = afterCursor s1
-    xs2 = beforeCursor prefix s2
-    ys2 = afterCursor s2
-    in case matchInit xs1 xs2 of
-        ([],[])     | ys1 == ys2            -> return ()
-        (xs1',[])   | xs1' ++ ys1 == ys2    -> changeLeft (length xs1')
-        ([],xs2')   | ys1 == xs2' ++ ys2    -> changeRight (length xs2')
-        (xs1',xs2')                         -> do
-            changeLeft (length xs1')
-            printText (xs2' ++ ys2)
-            let m = length xs1' + length ys1 - (length xs2' + length ys2)
-            clearDeadText m
-            changeLeft (length ys2)
+drawLineDiffT :: MonadLayout m => LineChars -> LineChars -> Draw m ()
+drawLineDiffT (xs1,ys1) (xs2,ys2) = case matchInit xs1 xs2 of
+    ([],[])     | ys1 == ys2            -> return ()
+    (xs1',[])   | xs1' ++ ys1 == ys2    -> changeLeft (length xs1')
+    ([],xs2')   | ys1 == xs2' ++ ys2    -> changeRight (length xs2')
+    (xs1',xs2')                         -> do
+        changeLeft (length xs1')
+        printText (xs2' ++ ys2)
+        let m = length xs1' + length ys1 - (length xs2' + length ys2)
+        clearDeadText m
+        changeLeft (length ys2)
 
 linesLeft :: Layout -> TermPos -> Int -> Int
 linesLeft Layout {width=w} TermPos {termCol = c} n
     | c + n < w = 1
     | otherwise = 1 + div (c+n) w
 
-lsLinesLeft :: LineState s => Layout -> TermPos -> s -> Int
+lsLinesLeft :: Layout -> TermPos -> LineChars -> Int
 lsLinesLeft layout pos s = linesLeft layout pos (lengthToEnd s)
 
 clearDeadText :: MonadLayout m => Int -> Draw m ()
@@ -229,7 +223,7 @@ clearLayoutT = do
     output (flip clearAll h)
     put initTermPos
 
-moveToNextLineT :: (LineState s, MonadLayout m) => s -> Draw m ()
+moveToNextLineT :: MonadLayout m => LineChars -> Draw m ()
 moveToNextLineT s = do
     pos <- get
     layout <- ask
@@ -249,9 +243,9 @@ repositionPos :: Layout -> Layout -> TermPos -> TermPos
 repositionPos oldLayout newLayout oldPos = posFromLength newLayout $
                                             posToLength oldLayout oldPos
 
-repositionT :: (LineState s, MonadLayout m, MonadException m) =>
-    Layout -> String -> s -> Draw m ()
-repositionT oldLayout _ _ = do
+repositionT :: (MonadLayout m, MonadException m) =>
+                Layout -> LineChars -> Draw m ()
+repositionT oldLayout _ = do
     oldPos <- get
     newLayout <- ask
     let newPos = repositionPos oldLayout newLayout oldPos

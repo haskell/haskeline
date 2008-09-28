@@ -7,11 +7,16 @@ class LineState s where
     isTemporary :: s -> Bool
     isTemporary _ = False
 
+type LineChars = (String,String)
+
+lineChars :: LineState s => String -> s -> LineChars
+lineChars prefix s = (beforeCursor prefix s, afterCursor s)
+
+lengthToEnd :: LineChars -> Int
+lengthToEnd = length . snd
+
 class LineState s => Result s where
     toResult :: s -> String
-
-lengthToEnd :: LineState s => s -> Int
-lengthToEnd = length . afterCursor
 
 class (Result s) => FromString s where
     fromString :: String -> s

@@ -224,23 +224,17 @@ printAfter str = do
     printText str
     setPos p
     
-drawLineDiffWin :: (LineState s, LineState t, MonadLayout m)
-                        => String -> s -> t -> Draw m ()
-drawLineDiffWin prefix s1 s2 = let
-    xs1 = beforeCursor prefix s1
-    ys1 = afterCursor s1
-    xs2 = beforeCursor prefix s2
-    ys2 = afterCursor s2
-    in case matchInit xs1 xs2 of
-        ([],[])     | ys1 == ys2            -> return ()
-        (xs1',[])   | xs1' ++ ys1 == ys2    -> movePos $ negate $ length xs1'
-        ([],xs2')   | ys1 == xs2' ++ ys2    -> movePos $ length xs2'
-        (xs1',xs2')                         -> do
-            movePos (negate $ length xs1')
-            let m = length xs1' + length ys1 - (length xs2' + length ys2)
-            let deadText = replicate m ' '
-            printText xs2'
-            printAfter (ys2 ++ deadText)
+drawLineDiffWin :: MonadLayout m => LineChars -> LineChars -> Draw m ()
+drawLineDiffWin (xs1,ys1) (xs2,ys2) = case matchInit xs1 xs2 of
+    ([],[])     | ys1 == ys2            -> return ()
+    (xs1',[])   | xs1' ++ ys1 == ys2    -> movePos $ negate $ length xs1'
+    ([],xs2')   | ys1 == xs2' ++ ys2    -> movePos $ length xs2'
+    (xs1',xs2')                         -> do
+        movePos (negate $ length xs1')
+        let m = length xs1' + length ys1 - (length xs2' + length ys2)
+        let deadText = replicate m ' '
+        printText xs2'
+        printAfter (ys2 ++ deadText)
 
 movePos :: MonadLayout m => Int -> Draw m ()
 movePos n = do
@@ -254,7 +248,7 @@ crlf = "\r\n"
 
 instance (MonadException m, MonadLayout m) => Term (Draw m) where
     drawLineDiff = drawLineDiffWin
-    reposition _ _ _ = return () -- TODO when we capture resize events.
+    reposition _ _ = return () -- TODO when we capture resize events.
 
     printLines [] = return ()
     printLines ls = printText $ intercalate crlf ls ++ crlf

@@ -44,8 +44,7 @@ instance MonadTrans DumbTerm where
     lift = DumbTerm . lift . lift
 
 instance (MonadException m, MonadLayout m) => Term (DumbTerm m) where
-    reposition _ prefix s = 
-        refitLine (beforeCursor prefix s, afterCursor s)
+    reposition _ s = refitLine s
     drawLineDiff = drawLineDiff'
     
     printLines = mapM_ (\s -> printText (s ++ crlf))
@@ -76,13 +75,8 @@ clearLayoutD = do
 maxWidth :: MonadLayout m => DumbTerm m Int
 maxWidth = asks (\lay -> width lay - 1)
 
-drawLineDiff' :: (LineState s, LineState t, MonadLayout m)
-                => String -> s -> t -> DumbTerm m ()
-drawLineDiff' prefix s1 s2 = do
-    let xs1 = beforeCursor prefix s1
-    let ys1 = afterCursor s1
-    let xs2 = beforeCursor prefix s2
-    let ys2 = afterCursor s2
+drawLineDiff' :: MonadLayout m => LineChars -> LineChars -> DumbTerm m ()
+drawLineDiff' (xs1,ys1) (xs2,ys2) = do
     Window {pos=p} <- get
     w <- maxWidth
     let (xs1',xs2') = matchInit xs1 xs2
