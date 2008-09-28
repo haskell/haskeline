@@ -58,6 +58,7 @@ Library
                 System.Console.Haskeline.LineState
                 System.Console.Haskeline.Monads
                 System.Console.Haskeline.Term
+                System.Console.Haskeline.Command.Undo
                 System.Console.Haskeline.Vi
     include-dirs: includes
     if os(windows) {
