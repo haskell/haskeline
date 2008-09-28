@@ -44,7 +44,8 @@ instance MonadTrans DumbTerm where
     lift = DumbTerm . lift . lift
 
 instance (MonadException m, MonadLayout m) => Term (DumbTerm m) where
-    withReposition _ = id
+    reposition _ prefix s = 
+        refitLine (beforeCursor prefix s, afterCursor s)
     drawLineDiff = drawLineDiff'
     
     printLines = mapM_ (\s -> printText (s ++ crlf))

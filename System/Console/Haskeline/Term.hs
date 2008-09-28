@@ -8,8 +8,8 @@ import Control.Concurrent
 import Control.Concurrent.STM
 import Data.Typeable
 
-class MonadException m => Term m where
-    withReposition :: Layout -> m a -> m a
+class (MonadReader Layout m, MonadException m) => Term m where
+    reposition :: LineState s => Layout -> String -> s -> m ()
     moveToNextLine :: LineState s => s -> m ()
     printLines :: [String] -> m ()
     drawLineDiff :: (LineState s, LineState r)

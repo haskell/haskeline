@@ -254,7 +254,7 @@ crlf = "\r\n"
 
 instance (MonadException m, MonadLayout m) => Term (Draw m) where
     drawLineDiff = drawLineDiffWin
-    withReposition _ = id -- TODO
+    reposition _ _ _ = return () -- TODO when we capture resize events.
 
     printLines [] = return ()
     printLines ls = printText $ intercalate crlf ls ++ crlf

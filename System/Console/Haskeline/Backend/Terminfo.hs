@@ -245,21 +245,21 @@ posToLength :: Layout -> TermPos -> Int
 posToLength Layout {width = w} TermPos {termRow = r, termCol = c}
     = r * w + c
 
-reposition :: Layout -> Layout -> TermPos -> TermPos
-reposition oldLayout newLayout oldPos = posFromLength newLayout $ 
+repositionPos :: Layout -> Layout -> TermPos -> TermPos
+repositionPos oldLayout newLayout oldPos = posFromLength newLayout $
                                             posToLength oldLayout oldPos
 
-withRepositionT :: MonadReader Layout m => Layout -> Draw m a -> Draw m a
-withRepositionT newLayout f = do
+repositionT :: (LineState s, MonadLayout m, MonadException m) =>
+    Layout -> String -> s -> Draw m ()
+repositionT oldLayout _ _ = do
     oldPos <- get
-    oldLayout <- ask
-    let newPos = reposition oldLayout newLayout oldPos
+    newLayout <- ask
+    let newPos = repositionPos oldLayout newLayout oldPos
     put newPos
-    local newLayout f
 
 instance (MonadException m, MonadLayout m) => Term (Draw m) where
     drawLineDiff = drawLineDiffT
-    withReposition = withRepositionT
+    reposition = repositionT
     
     printLines [] = return ()
     printLines ls = output $ mconcat $ intersperse nl (map text ls) ++ [nl] 

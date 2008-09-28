@@ -157,8 +157,11 @@ repeatTillFinish getEvent prefix = loop
         loop s processor = do
                 event <- handle (\e -> moveToNextLine s >> throwIO e) getEvent
                 case event of
-                    WindowResize newLayout -> 
-                        withReposition newLayout (loop s processor)
+                    WindowResize newLayout -> do
+                        oldLayout <- ask
+                        local newLayout $ do
+                            reposition oldLayout prefix s
+                            loop s processor
                     KeyInput k -> case lookupKM processor k of
                         Nothing -> actBell >> loop s processor
                         Just g -> case g s of
