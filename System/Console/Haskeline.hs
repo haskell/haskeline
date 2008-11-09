@@ -151,8 +151,6 @@ repeatTillFinish :: forall m s d
             -> d m (Maybe String)
 repeatTillFinish getEvent prefix = loop
     where 
-        -- NOTE: since the functions in this mutually recursive binding group do not have the 
-        -- same contexts, we need the -XGADTs flag (or -fglasgow-exts)
         loop :: forall t . LineState t => t -> KeyMap m t -> d m (Maybe String)
         loop s processor = do
                 event <- handle (\e -> movePast prefix s >> throwIO e) getEvent
