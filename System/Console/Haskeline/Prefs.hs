@@ -21,7 +21,6 @@ module System.Console.Haskeline.Prefs(
                         EditMode(..)
                         ) where
 
-import Language.Haskell.TH
 import Data.Char(isSpace,toLower)
 import Data.List(foldl')
 import Control.Exception(handle)
@@ -82,17 +81,15 @@ mkSettor f str = case reads str of
                 [(x,_)] -> f x
                 _ -> id
 
-settors :: [(String,String -> Prefs -> Prefs)]
-settors = $(do
-    DataConI _ _ prefsType _ <- reify 'Prefs
-    TyConI (DataD _ _ _ [RecC _ fields] _) <- reify prefsType
-    x <- newName "x"
-    p <- newName "p"
-    -- settor f => ("f", mkSettor (\x p -> p {f=x}))
-    let settor (f,_,_) = TupE [LitE (StringL (map toLower $ nameBase f)),
-                        AppE (VarE 'mkSettor) $ LamE [VarP x,VarP p]
-                        $ RecUpdE (VarE p) [(f,VarE x)]]
-    return $ ListE $ map settor fields)
+settors = [("bellstyle", mkSettor $ \x p -> p {bellStyle = x})
+          ,("editmode", mkSettor $ \x p -> p {editMode = x})
+          ,("maxhistorysize", mkSettor $ \x p -> p {maxHistorySize = x})
+          ,("completiontype", mkSettor $ \x p -> p {completionType = x})
+          ,("completionpaging", mkSettor $ \x p -> p {completionPaging = x})
+          ,("completionpromptlimit", mkSettor $ \x p -> p {completionPromptLimit = x})
+          ,("listcompletionsimmediately", mkSettor $ \x p -> p {listCompletionsImmediately = x})
+
+          ]
 
 -- | Read 'Prefs' from a given file.  If there is an error reading the file,
 -- the 'defaultPrefs' will be returned.
