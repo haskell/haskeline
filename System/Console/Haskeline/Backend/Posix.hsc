@@ -168,7 +168,7 @@ withPosixGetEvent :: MonadException m => Handle -> Maybe Terminal -> (m Event ->
 withPosixGetEvent h term f = do
     baseMap <- liftIO (getKeySequences term)
     eventChan <- liftIO $ newTChanIO
-    wrapKeypad h term $ withWindowHandler h term eventChan
+    wrapKeypad h term $ withWindowHandler eventChan
         $ f $ liftIO $ getEvent baseMap eventChan
 
 -- If the keypad on/off capabilities are defined, wrap the computation with them.
@@ -180,10 +180,9 @@ wrapKeypad h (Just term) f = (maybeOutput keypadOn >> f)
     maybeOutput cap = liftIO $ hRunTermOutput h term $
                             fromMaybe mempty (getCapability term cap)
 
-withWindowHandler :: MonadException m => Handle -> Maybe Terminal -> TChan Event -> m a -> m a
-withWindowHandler h term eventChan = withHandler windowChange $ 
-    Catch $ getPosixLayout h term 
-                >>= atomically . writeTChan eventChan . WindowResize
+withWindowHandler :: MonadException m => TChan Event -> m a -> m a
+withWindowHandler eventChan = withHandler windowChange $ 
+    Catch $ atomically $ writeTChan eventChan WindowResize
 
 withSigIntHandler :: MonadException m => m a -> m a
 withSigIntHandler f = do

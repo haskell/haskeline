@@ -130,7 +130,7 @@ getInputCmdLine tops prefix = do
                     $ \getEvent -> do
                             let ls = emptyIM
                             drawLine prefix ls 
-                            repeatTillFinish getEvent prefix ls emode
+                            repeatTillFinish tops getEvent prefix ls emode
     -- Add the line to the history if it's nonempty.
     case result of 
         Just line | not (all isSpace line) -> addHistory line
@@ -147,19 +147,22 @@ sigINTWrapper = do
 
 repeatTillFinish :: forall m s d 
     . (MonadTrans d, Term (d m), LineState s, MonadReader Prefs m)
-            => d m Event -> String -> s -> KeyMap m s 
+            => TermOps -> d m Event -> String -> s -> KeyMap m s 
             -> d m (Maybe String)
-repeatTillFinish getEvent prefix = loop
+repeatTillFinish tops getEvent prefix = loop
     where 
         loop :: forall t . LineState t => t -> KeyMap m t -> d m (Maybe String)
         loop s processor = do
                 event <- handle (\e -> movePast prefix s >> throwIO e) getEvent
                 case event of
-                    WindowResize newLayout -> do
+                    WindowResize -> do
                         oldLayout <- ask
-                        local newLayout $ do
-                            reposition oldLayout (lineChars prefix s)
-                            loop s processor
+                        newLayout <- liftIO $ getLayout tops
+                        if oldLayout == newLayout
+                            then loop s processor
+                            else local newLayout $ do
+                                reposition oldLayout (lineChars prefix s)
+                                loop s processor
                     KeyInput k -> case lookupKM processor k of
                         Nothing -> actBell >> loop s processor
                         Just g -> case g s of

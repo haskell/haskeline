@@ -39,7 +39,7 @@ import Data.Bits
 import System.Console.Haskeline.LineState
 
 data Layout = Layout {width, height :: Int}
-                    deriving Show
+                    deriving (Show,Eq)
 
 data Key = KeyChar Char | KeyMeta Key
             | KeyLeft | KeyRight | KeyUp | KeyDown

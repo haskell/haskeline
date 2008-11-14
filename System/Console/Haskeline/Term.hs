@@ -38,7 +38,7 @@ matchInit :: Eq a => [a] -> [a] -> ([a],[a])
 matchInit (x:xs) (y:ys)  | x == y = matchInit xs ys
 matchInit xs ys = (xs,ys)
 
-data Event = WindowResize Layout | KeyInput Key
+data Event = WindowResize | KeyInput Key
                 deriving Show
 
 keyEventLoop :: (TChan Event -> IO ()) -> TChan Event -> IO Event

@@ -245,11 +245,15 @@ repositionPos oldLayout newLayout oldPos = posFromLength newLayout $
 
 repositionT :: (MonadLayout m, MonadException m) =>
                 Layout -> LineChars -> Draw m ()
-repositionT oldLayout _ = do
+repositionT oldLayout s = do
     oldPos <- get
     newLayout <- ask
     let newPos = repositionPos oldLayout newLayout oldPos
-    put newPos
+    let l = lsLinesLeft oldLayout oldPos s - 1
+    output $ cr <#> mreplicate l nl
+            <#> mreplicate (l + termRow oldPos) (clearToLineEnd <#> up 1)
+    put initTermPos
+    drawLineDiffT ("","") s
 
 instance (MonadException m, MonadLayout m) => Term (Draw m) where
     drawLineDiff = drawLineDiffT
