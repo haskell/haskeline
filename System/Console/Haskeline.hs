@@ -204,7 +204,7 @@ handleInterrupt :: MonadException m => m a
                         -- ^ Handler to run if Ctrl-C is pressed
                      -> m a -- ^ Computation to run
                      -> m a
-handleInterrupt f = handle (const f)
+handleInterrupt f = handleDyn $ \Interrupt -> f
 
 drawEffect :: (LineState s, LineState t, Term (d m), 
                 MonadTrans d, MonadReader Prefs m) 
