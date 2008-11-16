@@ -248,7 +248,6 @@ repositionT :: (MonadLayout m, MonadException m) =>
 repositionT oldLayout s = do
     oldPos <- get
     newLayout <- ask
-    let newPos = repositionPos oldLayout newLayout oldPos
     let l = lsLinesLeft oldLayout oldPos s - 1
     output $ cr <#> mreplicate l nl
             <#> mreplicate (l + termRow oldPos) (clearToLineEnd <#> up 1)
