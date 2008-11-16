@@ -81,6 +81,7 @@ mkSettor f str = case reads str of
                 [(x,_)] -> f x
                 _ -> id
 
+settors :: [(String, String -> Prefs -> Prefs)]
 settors = [("bellstyle", mkSettor $ \x p -> p {bellStyle = x})
           ,("editmode", mkSettor $ \x p -> p {editMode = x})
           ,("maxhistorysize", mkSettor $ \x p -> p {maxHistorySize = x})
