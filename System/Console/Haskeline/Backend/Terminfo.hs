@@ -230,24 +230,10 @@ moveToNextLineT s = do
     output $ mreplicate (lsLinesLeft layout pos s) nl
     put initTermPos
 
-
-posFromLength :: Layout -> Int -> TermPos
-posFromLength Layout {width = w} n = TermPos 
-                            {termRow = n `div` w, termCol = n `mod` w}
-
-posToLength :: Layout -> TermPos -> Int
-posToLength Layout {width = w} TermPos {termRow = r, termCol = c}
-    = r * w + c
-
-repositionPos :: Layout -> Layout -> TermPos -> TermPos
-repositionPos oldLayout newLayout oldPos = posFromLength newLayout $
-                                            posToLength oldLayout oldPos
-
 repositionT :: (MonadLayout m, MonadException m) =>
                 Layout -> LineChars -> Draw m ()
 repositionT oldLayout s = do
     oldPos <- get
-    newLayout <- ask
     let l = lsLinesLeft oldLayout oldPos s - 1
     output $ cr <#> mreplicate l nl
             <#> mreplicate (l + termRow oldPos) (clearToLineEnd <#> up 1)
