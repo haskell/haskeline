@@ -87,7 +87,7 @@ runInputT settings f = do
 -- | Read 'Prefs' from @~/.haskeline.@   If there is an error reading the file,
 -- the 'defaultPrefs' will be returned.
 readPrefsFromHome :: IO Prefs
-readPrefsFromHome = handle (\_ -> return defaultPrefs) $ do
+readPrefsFromHome = handle (\(_::IOException) -> return defaultPrefs) $ do
     home <- getHomeDirectory
     readPrefs (home </> ".haskeline")
 

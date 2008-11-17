@@ -12,7 +12,7 @@ import qualified Data.Map as Map
 import System.Console.Terminfo
 import System.Posix.Terminal hiding (Interrupt)
 import Control.Monad
-import Control.Concurrent
+import Control.Concurrent hiding (throwTo)
 import Control.Concurrent.STM
 import Data.Maybe
 import System.Posix.Signals.Exts
@@ -22,7 +22,6 @@ import System.IO
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as UTF8
 import System.Environment
-import Control.Exception (throwDynTo)
 
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.Command
@@ -55,7 +54,7 @@ unsafeHandleToFD :: Handle -> IO FD
 unsafeHandleToFD h = withHandle_ "unsafeHandleToFd" h (return . haFD)
 
 envLayout :: IO (Maybe Layout)
-envLayout = handle (\_ -> return Nothing) $ do
+envLayout = handle (\(_::IOException) -> return Nothing) $ do
     -- note the handle catches both undefined envs and bad reads
     r <- getEnv "ROWS"
     c <- getEnv "COLUMNS"
@@ -188,7 +187,7 @@ withSigIntHandler :: MonadException m => m a -> m a
 withSigIntHandler f = do
     tid <- liftIO myThreadId 
     withHandler keyboardSignal 
-            (CatchOnce (throwDynTo tid Interrupt))
+            (CatchOnce (throwTo tid Interrupt))
             f
 
 withHandler :: MonadException m => Signal -> Handler -> m a -> m a
@@ -217,7 +216,7 @@ openTTY :: IO (Maybe Handle)
 openTTY = do
     inIsTerm <- hIsTerminalDevice stdin
     if inIsTerm
-        then handle (\_ -> return Nothing) $ do
+        then handle (\(_::IOException) -> return Nothing) $ do
                 h <- openFile "/dev/tty" WriteMode
                 return (Just h)
         else return Nothing

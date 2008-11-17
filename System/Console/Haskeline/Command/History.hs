@@ -6,7 +6,7 @@ import Control.Monad(liftM,mplus)
 import System.Console.Haskeline.Monads
 import Data.List
 import Data.Maybe(fromMaybe)
-import Control.Exception(evaluate)
+import Control.Exception.Extensible(evaluate)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as UTF8
 

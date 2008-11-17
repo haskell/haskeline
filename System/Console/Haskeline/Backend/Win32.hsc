@@ -15,10 +15,9 @@ import System.Win32.Types
 import Graphics.Win32.Misc(getStdHandle, sTD_INPUT_HANDLE, sTD_OUTPUT_HANDLE)
 import System.Win32.File
 import Data.List(intercalate)
-import Control.Concurrent
+import Control.Concurrent hiding (throwTo)
 import Control.Concurrent.STM
 import Data.Bits
-import Control.Exception (throwDynTo)
 
 import System.Console.Haskeline.Command
 import System.Console.Haskeline.Monads
@@ -53,7 +52,7 @@ eventLoop h = do
     	        Nothing -> eventLoop h
                        
 getConOut :: IO (Maybe HANDLE)
-getConOut = handle (\_ -> return Nothing) $ fmap Just
+getConOut = handle (\(_::IOException) -> return Nothing) $ fmap Just
     $ createFile "CONOUT$" (gENERIC_READ .|. gENERIC_WRITE)
                         (fILE_SHARE_READ .|. fILE_SHARE_WRITE) Nothing
                     oPEN_EXISTING 0 Nothing
@@ -329,6 +328,6 @@ withCtrlCHandler f = bracket (liftIO $ do
                                 (const f)
   where
     handler tid (#const CTRL_C_EVENT) = do
-        throwDynTo tid Interrupt
+        throwTo tid Interrupt
         return True
     handler _ _ = return False

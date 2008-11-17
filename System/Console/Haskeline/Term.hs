@@ -64,3 +64,5 @@ class (MonadReader Layout m, MonadIO m) => MonadLayout m where
 
 data Interrupt = Interrupt
                 deriving (Show,Typeable,Eq)
+
+instance Exception Interrupt where

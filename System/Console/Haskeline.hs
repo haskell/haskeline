@@ -153,7 +153,7 @@ repeatTillFinish tops getEvent prefix = loop
     where 
         loop :: forall t . LineState t => t -> KeyMap m t -> d m (Maybe String)
         loop s processor = do
-                event <- handle (\e -> movePast prefix s >> throwIO e) getEvent
+                event <- handle (\(e::SomeException) -> movePast prefix s >> throwIO e) getEvent
                 case event of
                     WindowResize -> do
                         oldLayout <- ask

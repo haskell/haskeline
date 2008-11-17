@@ -94,7 +94,7 @@ appendIfNotDir str file | null (takeFileName file) = file
 
 findFiles :: FilePath -> IO [Completion]
 -- NOTE: 'handle' catches exceptions from getDirectoryContents and getHomeDirectory.
-findFiles path = handle (\_ -> return []) $ do
+findFiles path = handle (\(_::IOException) -> return []) $ do
     fixedDir <- fixPath dir
     dirExists <- doesDirectoryExist fixedDir
     -- get all of the files in that directory, as basenames

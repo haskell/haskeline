@@ -23,7 +23,7 @@ module System.Console.Haskeline.Prefs(
 
 import Data.Char(isSpace,toLower)
 import Data.List(foldl')
-import Control.Exception(handle)
+import System.Console.Haskeline.MonadException(handle,IOException)
 
 
 data Prefs = Prefs { bellStyle :: !BellStyle,
@@ -95,7 +95,7 @@ settors = [("bellstyle", mkSettor $ \x p -> p {bellStyle = x})
 -- | Read 'Prefs' from a given file.  If there is an error reading the file,
 -- the 'defaultPrefs' will be returned.
 readPrefs :: FilePath -> IO Prefs
-readPrefs file = handle (\_ -> return defaultPrefs) $ do
+readPrefs file = handle (\(_::IOException) -> return defaultPrefs) $ do
     ls <- fmap lines $ readFile file
     return $ foldl' applyField defaultPrefs ls
   where

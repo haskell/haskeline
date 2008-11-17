@@ -1,34 +1,49 @@
-{- | This module redefines some of the functions in "Control.Exception" to
+{- | This module redefines some of the functions in "Control.Exception.Extensible" to
 work for more general monads than only 'IO'.
 -}
 
-module System.Console.Haskeline.MonadException where
+module System.Console.Haskeline.MonadException(
+    MonadException(..),
+    handle,
+    finally,
+    throwIO,
+    throwTo,
+    bracket,
+    throwDynIO,
+    handleDyn,
+    Exception,
+    SomeException(..),
+    E.IOException())
+     where
 
-import qualified Control.Exception as E
+import qualified Control.Exception.Extensible as E
+import Control.Exception.Extensible(Exception,SomeException)
 import Prelude hiding (catch)
-import Control.Exception(Exception)
 import Control.Monad.Reader
 import Control.Monad.State
-import Data.Dynamic
+import Control.Concurrent(ThreadId)
 
 class MonadIO m => MonadException m where
-    catch :: m a -> (Exception -> m a) -> m a
+    catch :: Exception e => m a -> (e -> m a) -> m a
     block :: m a -> m a
     unblock :: m a -> m a
 
-handle :: MonadException m => (Exception -> m a) -> m a -> m a
+handle :: (MonadException m, Exception e) => (e -> m a) -> m a -> m a
 handle = flip catch
 
 finally :: MonadException m => m a -> m b -> m a
 finally f ender = block (do
     r <- catch
             (unblock f)
-            (\e -> do {ender; throwIO e})
+            (\(e::SomeException) -> do {ender; throwIO e})
     ender
     return r)
 
-throwIO :: MonadIO m => Exception -> m a
+throwIO :: (MonadIO m, Exception e) => e -> m a
 throwIO = liftIO . E.throwIO
+
+throwTo :: (MonadIO m, Exception e) => ThreadId -> e -> m ()
+throwTo tid = liftIO . E.throwTo tid
 
 bracket :: MonadException m => m a -> (a -> m b) -> (a -> m c) -> m c
 bracket before after thing =
@@ -36,19 +51,17 @@ bracket before after thing =
     a <- before 
     r <- catch 
 	   (unblock (thing a))
-	   (\e -> do { after a; throwIO e })
+	   (\(e::SomeException) -> do { after a; throwIO e })
     after a
     return r
  )
 
-throwDynIO :: (Typeable exception, MonadIO m) => exception -> m a
-throwDynIO = liftIO . E.throwIO . E.DynException . toDyn
+throwDynIO :: (Exception exception, MonadIO m) => exception -> m a
+throwDynIO = throwIO
 
-handleDyn :: (Typeable exception, MonadException m) => (exception -> m a)
+handleDyn :: (Exception exception, MonadException m) => (exception -> m a)
                     -> m a -> m a
-handleDyn f = handle $ \ex -> case E.dynExceptions ex of
-                        Just dyn | Just e <- fromDynamic dyn -> f e
-                        _ -> throwIO ex
+handleDyn = handle 
 
 
 instance MonadException IO where
