@@ -57,7 +57,7 @@ data EditMode = Vi | Emacs
 {- | The default preferences which may be overwritten in the @.haskeline@ file:
 
 > defaultPrefs = Prefs {bellStyle = AudibleBell,
->                      maxHistorySize = Nothing,
+>                      maxHistorySize = Just 100,
 >                      editMode = Emacs,
 >                      completionType = ListCompletion,
 >                      completionPaging = True,
@@ -68,7 +68,7 @@ data EditMode = Vi | Emacs
 -}
 defaultPrefs :: Prefs
 defaultPrefs = Prefs {bellStyle = AudibleBell,
-                      maxHistorySize = Nothing,
+                      maxHistorySize = Just 100,
                       editMode = Emacs,
                       completionType = ListCompletion,
                       completionPaging = True,
