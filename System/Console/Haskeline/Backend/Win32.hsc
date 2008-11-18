@@ -154,18 +154,10 @@ withScreenBufferInfo f h = allocaBytes (#size CONSOLE_SCREEN_BUFFER_INFO)
             $ c_GetScreenBufferInfo h infoPtr
         f infoPtr
 
-
-getDisplayWindow :: HANDLE -> IO (Coord,Coord)
-getDisplayWindow = withScreenBufferInfo $ \p -> do
-    let windowPtr = (#ptr CONSOLE_SCREEN_BUFFER_INFO, srWindow) p
-    left <- (#peek SMALL_RECT, Left) windowPtr
-    top <- (#peek SMALL_RECT, Top) windowPtr
-    right <- (#peek SMALL_RECT, Right) windowPtr
-    bottom <- (#peek SMALL_RECT, Bottom) windowPtr
-    return (Coord (cvt left) (cvt top), Coord (cvt right) (cvt bottom))
-  where
-    cvt :: CShort -> Int
-    cvt = fromEnum
+getBufferSize :: HANDLE -> IO Layout
+getBufferSize = withScreenBufferInfo $ \p -> do
+    c <- (#peek CONSOLE_SCREEN_BUFFER_INFO, dwSize) p
+    return Layout {width = coordX c, height = coordY c}
 
 foreign import stdcall "windows.h WriteConsoleW" c_WriteConsoleW
     :: HANDLE -> Ptr TCHAR -> DWORD -> Ptr DWORD -> Ptr () -> IO Bool
@@ -198,12 +190,6 @@ instance MonadReader Layout m => MonadReader Layout (Draw m) where
     ask = lift ask
     local r = Draw . local r . runDraw
 
-getDisplaySize :: HANDLE -> IO Layout
-getDisplaySize h = do
-    (topLeft,bottomRight) <- getDisplayWindow h
-    return Layout {width = coordX bottomRight - coordX topLeft+1, 
-                    height = coordY bottomRight - coordY topLeft+1 }
-    
 getPos :: MonadIO m => Draw m Coord
 getPos = ask >>= liftIO . getPosition
     
@@ -279,7 +265,7 @@ win32Term = do
                             putStrOut = putter,
                             wrapInterrupt = withCtrlCHandler,
                             termOps = Just TermOps {
-                                            getLayout = getDisplaySize h,
+                                            getLayout = getBufferSize h,
                                             runTerm = consoleRunTerm h},
                             closeTerm = closeHandle h}
 
