@@ -42,6 +42,7 @@ module System.Console.Haskeline(
                     defaultSettings,
                     setComplete,
                     -- * Ctrl-C handling
+                    -- $ctrlc
                     Interrupt(..),
                     withInterrupt,
                     handleInterrupt,
@@ -224,6 +225,13 @@ movePast prefix s = moveToNextLine (lineChars prefix s)
 
 ------------
 -- Interrupt
+
+{- $ctrlc
+The following functions provide portable handling of Ctrl-C events.  
+
+These functions are not necessary on GHC version 6.10 or later, which
+processes Ctrl-C events as exceptions by default.
+-}
 
 -- | If Ctrl-C is pressed during the given computation, throw an exception of type 
 -- 'Interrupt'.
