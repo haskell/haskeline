@@ -2,6 +2,7 @@ module System.Console.Haskeline.Completion(
                             CompletionFunc,
                             Completion(..),
                             completeWord,
+                            completeQuotedWord,
                             -- * Building 'CompletionFunc's
                             noCompletion,
                             simpleCompletion,
@@ -54,10 +55,10 @@ completeWord esc ws f line = do
                         Nothing -> break (`elem` ws) line
                         Just e -> escapedBreak e line
     completions <- f (reverse word)
-    return (rest,completions)
+    return (rest,map (escapeReplacement esc ws) completions)
   where
-    escapedBreak e (c:d:cs) | d == e
-            = let (xs,ys) = escapedBreak e cs in (c:d:xs,ys)
+    escapedBreak e (c:d:cs) | d == e && c `elem` (e:ws)
+            = let (xs,ys) = escapedBreak e cs in (c:xs,ys)
     escapedBreak e (c:cs) | not (elem c ws)
             = let (xs,ys) = escapedBreak e cs in (c:xs,ys)
     escapedBreak _ cs = ("",cs)
@@ -73,10 +74,9 @@ filenameWordBreakChars = " \t\n`@$><=;|&{("
 
 -- A completion command for file and folder names.
 completeFilename :: MonadIO m => CompletionFunc m
-completeFilename  = completeWord (Just '\\') filenameWordBreakChars $ 
-                        (quoteCompletion "\"\'" listFiles)
-
--- TODO: What abt quoted spaces??
+completeFilename  = completeQuotedWord (Just '\\') "\"'" listFiles
+                        $ completeWord (Just '\\') ("\"\'" ++ filenameWordBreakChars)
+                                listFiles
 
 completion :: String -> Completion
 completion str = Completion str str True
@@ -84,18 +84,56 @@ completion str = Completion str str True
 setReplacement :: (String -> String) -> Completion -> Completion
 setReplacement f c = c {replacement = f $ replacement c}
 
-
---------
--- Helper funcs for file completion
-
-quoteCompletion :: Monad m => String -> (String -> m [Completion]) -> String -> m [Completion]
-quoteCompletion quotes f (q:w) | q `elem` quotes = do
-    cs <- f w
-    return $ map addQuotes cs
+escapeReplacement :: Maybe Char -> String -> Completion -> Completion
+escapeReplacement esc ws f = case esc of
+    Nothing -> f
+    Just e -> f {replacement = escape e (replacement f)}
   where
-    addQuotes c | isFinished c  = setReplacement (\rs -> [q] ++ rs ++ [q]) c
-                | otherwise         = setReplacement  ([q]++) c
-quoteCompletion _ f w = f w
+    escape e (c:cs) | c `elem` (e:ws)     = e : c : escape e cs
+                    | otherwise = c : escape e cs
+    escape _ "" = ""
+
+
+---------
+-- Quoted completion
+completeQuotedWord :: Monad m => Maybe Char -- ^ An optional escape character
+                            -> String -- List of characters which set off quotes
+                            -> (String -> m [Completion]) -- ^ Function to produce a list of possible completions
+                            -> CompletionFunc m -- ^ Alternate completion to perform if the 
+                                            -- cursor is not at a quoted word
+                            -> CompletionFunc m
+completeQuotedWord esc qs completer alterative = \line -> case splitAtQuote esc qs line of
+    Just (w,rest) | isUnquoted esc qs rest -> do
+        cs <- completer (reverse w)
+        return (rest, map (addQuotes . escapeReplacement esc qs) cs)
+    _ -> alterative line
+
+addQuotes :: Completion -> Completion
+addQuotes c = if isFinished c
+    then c {replacement = "\"" ++ replacement c ++ "\""}
+    else c {replacement = "\"" ++ replacement c}
+
+splitAtQuote :: Maybe Char -> String -> String -> Maybe (String,String)
+splitAtQuote esc qs line = case line of
+    c:e:cs | isEscape e && isEscapable c  
+                        -> do
+                            (w,rest) <- splitAtQuote esc qs cs
+                            return (c:w,rest)
+    q:cs   | isQuote q  -> Just ("",cs)
+    c:cs                -> do
+                            (w,rest) <- splitAtQuote esc qs cs
+                            return (c:w,rest)
+    ""                  -> Nothing
+  where
+    isQuote = (`elem` qs)
+    isEscape c = Just c == esc
+    isEscapable c = isEscape c || isQuote c
+
+isUnquoted :: Maybe Char -> String -> String -> Bool
+isUnquoted esc qs s = case splitAtQuote esc qs s of
+    Just (_,s') -> not (isUnquoted esc qs s')
+    _ -> True
+
 
 -- | List all of the files or folders beginning with this path.
 listFiles :: MonadIO m => FilePath -> m [Completion]
