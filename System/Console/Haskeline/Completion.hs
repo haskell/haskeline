@@ -2,9 +2,12 @@ module System.Console.Haskeline.Completion(
                             CompletionFunc,
                             Completion(..),
                             completeWord,
-                            simpleCompletion,
+                            -- * Building 'CompletionFunc's
                             noCompletion,
+                            simpleCompletion,
+                            -- * Filename completion
                             completeFilename,
+                            listFiles,
                             filenameWordBreakChars
                         ) where
 
@@ -24,9 +27,12 @@ type CompletionFunc m = String -> m (String, [Completion])
 
 
 data Completion = Completion {replacement  :: String, -- ^ Text to insert in line.
-                        display  :: String
+                        display  :: String,
                                 -- ^ Text to display when listing
                                 -- alternatives.
+                        isFinished :: Bool
+                            -- ^ Whether this word should be followed by a
+                            -- space, end quote, etc.
                             }
                     deriving Show
 
@@ -56,9 +62,9 @@ completeWord esc ws f line = do
             = let (xs,ys) = escapedBreak e cs in (c:xs,ys)
     escapedBreak _ cs = ("",cs)
     
--- | Adds a space after the word when inserting it after expansion.
+-- | Create a finished completion out of the given word.
 simpleCompletion :: String -> Completion
-simpleCompletion = setReplacement (++ " ") . completion
+simpleCompletion = completion
 
 -- NOTE: this is the same as for readline, except that I took out the '\\'
 -- so they can be used as a path separator.
@@ -68,10 +74,12 @@ filenameWordBreakChars = " \t\n`@$><=;|&{("
 -- A completion command for file and folder names.
 completeFilename :: MonadIO m => CompletionFunc m
 completeFilename  = completeWord (Just '\\') filenameWordBreakChars $ 
-                        (liftIO . quotedFilenames (`elem` "\"\'"))
+                        (quoteCompletion "\"\'" listFiles)
+
+-- TODO: What abt quoted spaces??
 
 completion :: String -> Completion
-completion str = Completion str str
+completion str = Completion str str True
 
 setReplacement :: (String -> String) -> Completion -> Completion
 setReplacement f c = c {replacement = f $ replacement c}
@@ -80,21 +88,19 @@ setReplacement f c = c {replacement = f $ replacement c}
 --------
 -- Helper funcs for file completion
 
-quotedFilenames :: (Char -> Bool) -> String -> IO [Completion]
-quotedFilenames isQuote (q:file) | isQuote q = do
-    files <- findFiles file
-    return $ map (setReplacement ((q:) . appendIfNotDir [q,' '])) files
-quotedFilenames _ file = do
-    files <- findFiles file
-    return $ map (setReplacement (appendIfNotDir " ")) files
+quoteCompletion :: Monad m => String -> (String -> m [Completion]) -> String -> m [Completion]
+quoteCompletion quotes f (q:w) | q `elem` quotes = do
+    cs <- f w
+    return $ map addQuotes cs
+  where
+    addQuotes c | isFinished c  = setReplacement (\rs -> [q] ++ rs ++ [q]) c
+                | otherwise         = setReplacement  ([q]++) c
+quoteCompletion _ f w = f w
 
-appendIfNotDir :: String -> FilePath -> FilePath
-appendIfNotDir str file | null (takeFileName file) = file
-                        | otherwise = file ++ str
-
-findFiles :: FilePath -> IO [Completion]
+-- | List all of the files or folders beginning with this path.
+listFiles :: MonadIO m => FilePath -> m [Completion]
 -- NOTE: 'handle' catches exceptions from getDirectoryContents and getHomeDirectory.
-findFiles path = handle (\(_::IOException) -> return []) $ do
+listFiles path = liftIO $ handle (\(_::IOException) -> return []) $ do
     fixedDir <- fixPath dir
     dirExists <- doesDirectoryExist fixedDir
     -- get all of the files in that directory, as basenames
@@ -106,13 +112,14 @@ findFiles path = handle (\(_::IOException) -> return []) $ do
     -- have a trailing slash if it's itself a directory.
     forM allFiles $ \c -> do
             isDir <- doesDirectoryExist (fixedDir </> replacement c)
-            return $ setReplacement (fullName . maybeAddSlash isDir) c
+            return $ setReplacement fullName $ alterIfDir isDir c
   where
     (dir, file) = splitFileName path
     filterPrefix = filter (\f -> not (f `elem` [".",".."])
                                         && file `isPrefixOf` f)
-    maybeAddSlash False = id
-    maybeAddSlash True = addTrailingPathSeparator
+    alterIfDir False c = c
+    alterIfDir True c = c {replacement = addTrailingPathSeparator (replacement c),
+                            isFinished = False}
     -- NOTE In order for completion to work properly, all of the alternatives
     -- must have the exact same prefix.  As a result, </> is a little too clever;
     -- for example, it doesn't prepend the directory if the file looks like

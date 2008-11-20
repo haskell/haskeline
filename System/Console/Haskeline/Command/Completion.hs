@@ -14,6 +14,10 @@ import System.Console.Haskeline.Monads
 
 import Data.List(transpose, unfoldr)
 
+fullReplacement :: Completion -> String
+fullReplacement c   | isFinished c  = replacement c ++ " "
+                    | otherwise     = replacement c
+
 makeCompletion :: Monad m => InsertMode -> InputCmdT m (InsertMode, [Completion])
 makeCompletion (IMode xs ys) = do
     f <- asks complete
@@ -27,7 +31,7 @@ completionCmd k = k +> acceptKeyM (\s -> do
     (rest,completions) <- makeCompletion s
     case completionType prefs of
         MenuCompletion -> return $ menuCompletion k s
-                        $ map (\c -> insertString (replacement c) rest) completions
+                        $ map (\c -> insertString (fullReplacement c) rest) completions
         ListCompletion -> 
                 pagingCompletion prefs s rest completions k)
 
@@ -36,7 +40,7 @@ pagingCompletion :: Monad m => Prefs
                 -> Key -> InputCmdT m (CmdAction (InputCmdT m) InsertMode)
 pagingCompletion _ oldIM _ [] _ = return $ RingBell oldIM >=> continue
 pagingCompletion _ _ im [newWord] _ 
-        = return $ (Change $ insertString (replacement newWord) im) >=> continue
+        = return $ (Change $ insertString (fullReplacement newWord) im) >=> continue
 pagingCompletion prefs oldIM im completions k
     | oldIM /= withPartial = return $ Change withPartial >=> continue
     | otherwise = do
