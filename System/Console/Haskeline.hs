@@ -43,6 +43,7 @@ module System.Console.Haskeline(
                     setComplete,
                     -- * Ctrl-C handling
                     Interrupt(..),
+                    withInterrupt,
                     handleInterrupt,
                     module System.Console.Haskeline.Completion,
                     module System.Console.Haskeline.Prefs,
@@ -75,13 +76,11 @@ import Control.Monad
 -- defaultSettings = Settings {
 --           complete = completeFilename,
 --           historyFile = Nothing,
---           handleSigINT = False
 --           }
 -- @
 defaultSettings :: MonadIO m => Settings m
 defaultSettings = Settings {complete = completeFilename,
-                        historyFile = Nothing,
-                        handleSigINT = False}
+                        historyFile = Nothing}
 
 -- | Write a string to the standard output.  Allows cross-platform display of Unicode
 -- characters.
@@ -124,9 +123,8 @@ getInputCmdLine tops prefix = do
     emode <- asks (\prefs -> case editMode prefs of
                     Vi -> viActions
                     Emacs -> emacsCommands)
-    wrapper <- sigINTWrapper
     -- Run the main event processing loop
-    result <- runInputCmdT tops $ wrapper $ runTerm tops
+    result <- runInputCmdT tops $ runTerm tops
                     $ \getEvent -> do
                             let ls = emptyIM
                             drawLine prefix ls 
@@ -136,14 +134,6 @@ getInputCmdLine tops prefix = do
         Just line | not (all isSpace line) -> addHistory line
         _ -> return ()
     return result
-
-sigINTWrapper :: forall m n a . (Monad m, MonadException n) => InputT m (n a -> n a)
-sigINTWrapper = do
-    settings :: Settings m <- ask
-    rterm <- ask
-    return $ if handleSigINT settings
-                then wrapInterrupt rterm
-                else id
 
 repeatTillFinish :: forall m s d 
     . (MonadTrans d, Term (d m), LineState s, MonadReader Prefs m)
@@ -193,19 +183,6 @@ simpleFileLoop prefix rterm = liftIO $ do
                 putStrOut rterm (l++"\n")
                 return (Just l)
 
-{-- 
-Note why it is necessary to integrate ctrl-c handling with this module:
-if the user is in the middle of a few wrapped lines, we want to clean up
-by moving the cursor to the start of the following line.
---}
-
--- | Catch and handle an exception of type 'Interrupt'.
-handleInterrupt :: MonadException m => m a 
-                        -- ^ Handler to run if Ctrl-C is pressed
-                     -> m a -- ^ Computation to run
-                     -> m a
-handleInterrupt f = handleDyn $ \Interrupt -> f
-
 drawEffect :: (LineState s, LineState t, Term (d m), 
                 MonadTrans d, MonadReader Prefs m) 
     => String -> s -> Effect t -> d m ()
@@ -242,3 +219,25 @@ actBell = do
 
 movePast :: (LineState s, Term m) => String -> s -> m ()
 movePast prefix s = moveToNextLine (lineChars prefix s)
+
+
+
+------------
+-- Interrupt
+
+-- | If Ctrl-C is pressed during the given computation, throw an exception of type 
+-- 'Interrupt'.
+withInterrupt :: MonadException m => InputT m a -> InputT m a
+withInterrupt f = do
+    rterm <- ask
+    wrapInterrupt rterm f
+
+-- | Catch and handle an exception of type 'Interrupt'.
+handleInterrupt :: MonadException m => m a 
+                        -- ^ Handler to run if Ctrl-C is pressed
+                     -> m a -- ^ Computation to run
+                     -> m a
+handleInterrupt f = handleDyn $ \Interrupt -> f
+
+
+

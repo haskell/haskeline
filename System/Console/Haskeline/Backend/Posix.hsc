@@ -187,7 +187,7 @@ withSigIntHandler :: MonadException m => m a -> m a
 withSigIntHandler f = do
     tid <- liftIO myThreadId 
     withHandler keyboardSignal 
-            (CatchOnce (throwTo tid Interrupt))
+            (Catch (throwTo tid Interrupt))
             f
 
 withHandler :: MonadException m => Signal -> Handler -> m a -> m a

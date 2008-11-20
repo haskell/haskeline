@@ -17,9 +17,7 @@ import Control.Monad(liftM, ap)
 
 -- | Application-specific customizations to the user interface.
 data Settings m = Settings {complete :: CompletionFunc m, -- ^ Custom tab completion
-                            historyFile :: Maybe FilePath,
-                            handleSigINT :: Bool -- ^ Throw an 'Interrupt'
-                            -- exception if the user presses Ctrl-C
+                            historyFile :: Maybe FilePath
                             }
 
 -- | Because 'complete' is the only field of 'Settings' depending on @m@,
