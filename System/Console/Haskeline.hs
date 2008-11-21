@@ -97,7 +97,7 @@ outputStrLn xs = outputStr (xs++"\n")
 
 {- | Read one line of input.  The final newline (if any) is removed.
 
-If 'stdin' is connected to a terminal, 'getInputLine' provides a rich line-editing
+If 'stdin' is connected to a terminal with echoing turned on, 'getInputLine' provides a rich line-editing
 user interface.  It returns 'Nothing' if the user presses @Ctrl-D@ when the input
 text is empty.  All user interaction, including display of the input prompt, will occur
 on the user's output terminal (which may differ from 'stdout').
@@ -113,9 +113,10 @@ getInputLine prefix = do
     -- appears before we interact with the user on the terminal.
     liftIO $ hFlush stdout
     rterm <- ask
+    echo <- liftIO $ hGetEcho stdin
     case termOps rterm of
-        Nothing -> simpleFileLoop prefix rterm
-        Just tops -> getInputCmdLine tops prefix
+        Just tops | echo -> getInputCmdLine tops prefix
+        _ -> simpleFileLoop prefix rterm
 
 getInputCmdLine :: MonadException m => TermOps -> String -> InputT m (Maybe String)
 getInputCmdLine tops prefix = do
