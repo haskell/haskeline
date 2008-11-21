@@ -97,13 +97,13 @@ outputStrLn xs = outputStr (xs++"\n")
 
 {- | Read one line of input.  The final newline (if any) is removed.
 
-If 'stdin' is connected to a terminal with echoing turned on, 'getInputLine' provides a rich line-editing
+If 'stdin' is connected to a terminal with echoing enabled, 'getInputLine' provides a rich line-editing
 user interface.  It returns 'Nothing' if the user presses @Ctrl-D@ when the input
 text is empty.  All user interaction, including display of the input prompt, will occur
 on the user's output terminal (which may differ from 'stdout').
 
-If 'stdin' is not connected to a terminal, 'getInputLine' reads one line of input, and
-prints the prompt and input to 'stdout'. It returns 'Nothing'  if an @EOF@ is
+If 'stdin' is not connected to a terminal, 'getInputLine' prints the prompt to 'stdout'
+and reads one line of input. It returns 'Nothing'  if an @EOF@ is
 encountered before any characters are read.
 -}
 getInputLine :: forall m . MonadException m => String -- ^ The input prompt
@@ -180,10 +180,7 @@ simpleFileLoop prefix rterm = liftIO $ do
     atEOF <- hIsEOF stdin
     if atEOF
         then return Nothing
-        else do
-                l <- UTF8.getLine
-                putStrOut rterm (l++"\n")
-                return (Just l)
+        else liftM Just UTF8.getLine
 
 drawEffect :: (LineState s, LineState t, Term (d m), 
                 MonadTrans d, MonadReader Prefs m) 
