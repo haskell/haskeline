@@ -2,7 +2,7 @@ module System.Console.Haskeline.Term where
 
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.LineState
-import System.Console.Haskeline.Command
+import System.Console.Haskeline.Key
 
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -66,3 +66,7 @@ data Interrupt = Interrupt
                 deriving (Show,Typeable,Eq)
 
 instance Exception Interrupt where
+
+data Layout = Layout {width, height :: Int}
+                    deriving (Show,Eq)
+

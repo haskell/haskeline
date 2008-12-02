@@ -24,7 +24,7 @@ import qualified Data.ByteString.UTF8 as UTF8
 import System.Environment
 
 import System.Console.Haskeline.Monads
-import System.Console.Haskeline.Command
+import System.Console.Haskeline.Key
 import System.Console.Haskeline.Term
 
 import GHC.IOBase (haFD,FD)
@@ -88,11 +88,11 @@ getKeySequences term = do
 
 
 ansiKeys :: [(String, Key)]
-ansiKeys = [("\ESC[D",  KeyLeft)
-            ,("\ESC[C",  KeyRight)
-            ,("\ESC[A",  KeyUp)
-            ,("\ESC[B",  KeyDown)
-            ,("\b",      Backspace)]
+ansiKeys = [("\ESC[D",  simpleKey LeftKey)
+            ,("\ESC[C",  simpleKey RightKey)
+            ,("\ESC[A",  simpleKey UpKey)
+            ,("\ESC[B",  simpleKey DownKey)
+            ,("\b",      simpleKey Backspace)]
 
 terminfoKeys :: Terminal -> [(String,Key)]
 terminfoKeys term = catMaybes $ map getSequence keyCapabilities
@@ -101,18 +101,18 @@ terminfoKeys term = catMaybes $ map getSequence keyCapabilities
                             keys <- getCapability term cap
                             return (keys,x)
         keyCapabilities = 
-                [(keyLeft,KeyLeft),
-                (keyRight,KeyRight),
-                (keyUp,KeyUp),
-                (keyDown,KeyDown),
-                (keyBackspace,Backspace),
-                (keyDeleteChar,DeleteForward)]
+                [(keyLeft,      simpleKey LeftKey),
+                (keyRight,      simpleKey RightKey),
+                (keyUp,         simpleKey UpKey),
+                (keyDown,       simpleKey DownKey),
+                (keyBackspace,  simpleKey Backspace),
+                (keyDeleteChar, simpleKey Delete)]
 
 sttyKeys :: IO [(String, Key)]
 sttyKeys = do
     attrs <- getTerminalAttributes stdInput
     let getStty (k,c) = do {str <- controlChar attrs k; return ([str],c)}
-    return $ catMaybes $ map getStty [(Erase,Backspace),(Kill,KillLine)]
+    return $ catMaybes $ map getStty [(Erase,simpleKey Backspace),(Kill,simpleKey KillLine)]
                         
 newtype TreeMap a b = TreeMap (Map.Map a (Maybe b, TreeMap a b))
                         deriving Show
@@ -147,9 +147,10 @@ lexKeys baseMap cs
     | Just (k,ds) <- lookupChars baseMap cs
             = k : lexKeys baseMap ds
 lexKeys baseMap ('\ESC':cs)
-    | (k:ks) <- lexKeys baseMap cs
-            = KeyMeta k : ks
-lexKeys baseMap (c:cs) = KeyChar c : lexKeys baseMap cs
+-- TODO: what's the right thing ' to do here?
+    | Key _ k:ks <- lexKeys baseMap cs
+            = Key (Just Meta) k : ks
+lexKeys baseMap (c:cs) = simpleChar c : lexKeys baseMap cs
 
 lookupChars :: TreeMap Char Key -> [Char] -> Maybe (Key,[Char])
 lookupChars _ [] = Nothing

@@ -5,7 +5,6 @@ import System.Console.Haskeline.Command.History
 import System.Console.Haskeline.Command.Undo
 import System.Console.Haskeline.Monads as Monads
 import System.Console.Haskeline.Prefs
-import System.Console.Haskeline.Command(Layout)
 import System.Console.Haskeline.Completion
 import System.Console.Haskeline.Backend
 import System.Console.Haskeline.Term

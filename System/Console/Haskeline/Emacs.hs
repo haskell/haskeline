@@ -1,6 +1,7 @@
 module System.Console.Haskeline.Emacs where
 
 import System.Console.Haskeline.Command
+import System.Console.Haskeline.Key
 import System.Console.Haskeline.Command.Completion
 import System.Console.Haskeline.Command.History
 import System.Console.Haskeline.Command.Undo
@@ -16,40 +17,37 @@ emacsCommands = runCommand $ choiceCmd [simpleActions, controlActions]
 
 simpleActions, controlActions :: InputCmd InsertMode InsertMode
 simpleActions = choiceCmd 
-            [ KeyChar '\n' +> finish
-	    , KeyChar '\r' +> finish
-            , KeyLeft +> change goLeft
-            , KeyRight +> change goRight
-            , Backspace +> change deletePrev
-            , KeyChar '\b' +> change deletePrev
-	    , DeleteForward +> change deleteNext 
+            [ simpleKey Return +> finish
+            , simpleKey LeftKey +> change goLeft
+            , simpleKey RightKey +> change goRight
+            , simpleKey Backspace +> change deletePrev
+            , simpleKey Delete +> change deleteNext 
             , changeFromChar insertChar
-            , saveForUndo $ KeyChar '\t' +> completionCmd
-            , KeyUp +> historyBack
-            , KeyDown +> historyForward
+            , saveForUndo $ simpleKey Tab +> completionCmd
+            , simpleKey UpKey +> historyBack
+            , simpleKey DownKey +> historyForward
             , searchHistory
             ] 
             
 controlActions = choiceCmd
-            [ controlKey 'a' +> change moveToStart 
-            , controlKey 'e' +> change moveToEnd
-            , controlKey 'b' +> change goLeft
-            , controlKey 'f' +> change goRight
-            , controlKey 'd' +> deleteCharOrEOF
-            , controlKey 'l' +> clearScreenCmd
+            [ ctrlChar 'a' +> change moveToStart 
+            , ctrlChar 'e' +> change moveToEnd
+            , ctrlChar 'b' +> change goLeft
+            , ctrlChar 'f' +> change goRight
+            , ctrlChar 'd' +> deleteCharOrEOF
+            , ctrlChar 'l' +> clearScreenCmd
             , metaChar 'f' +> change wordRight
             , metaChar 'b' +> change wordLeft
-            , controlKey '_' +> commandUndo
-            , controlKey 'x' +> change id 
-                >|> choiceCmd [controlKey 'u' +> commandUndo
+            , ctrlChar '_' +> commandUndo
+            , ctrlChar 'x' +> change id 
+                >|> choiceCmd [ctrlChar 'u' +> commandUndo
                               , continue]
             , saveForUndo $ choiceCmd
-                [ controlKey 'w' +> change (deleteFromMove bigWordLeft)
-                , KeyMeta Backspace +> change (deleteFromMove wordLeft)
-                , KeyMeta (KeyChar '\b') +> change (deleteFromMove wordLeft)
+                [ ctrlChar 'w' +> change (deleteFromMove bigWordLeft)
+                , Key (Just Meta) Backspace +> change (deleteFromMove wordLeft)
                 , metaChar 'd' +> change (deleteFromMove wordRight)
-                , controlKey 'k' +> change (deleteFromMove moveToEnd)
-                , KillLine +> change (deleteFromMove moveToStart)
+                , ctrlChar 'k' +> change (deleteFromMove moveToEnd)
+                , simpleKey KillLine +> change (deleteFromMove moveToStart)
                 ]
             ]
 

@@ -1,8 +1,4 @@
 module System.Console.Haskeline.Command(
-                        Key(..),
-                        controlKey,
-                        metaChar,
-                        Layout(..),
                         -- * Commands
                         Effect(..),
                         KeyMap(), 
@@ -35,24 +31,9 @@ module System.Console.Haskeline.Command(
 
 import Data.Char(isPrint)
 import Control.Monad(mplus)
-import Data.Bits
 import System.Console.Haskeline.LineState
+import System.Console.Haskeline.Key
 
-data Layout = Layout {width, height :: Int}
-                    deriving (Show,Eq)
-
-data Key = KeyChar Char | KeyMeta Key
-            | KeyLeft | KeyRight | KeyUp | KeyDown
-            | Backspace | DeleteForward | KillLine
-                deriving (Eq,Ord,Show)
-
--- Easy translation of control characters; e.g., Ctrl-G or Ctrl-g or ^G
-controlKey :: Char -> Key
-controlKey '?' = KeyChar (toEnum 127)
-controlKey c = KeyChar $ toEnum $ fromEnum c .&. complement (bit 5 .|. bit 6)
-
-metaChar :: Char -> Key
-metaChar = KeyMeta . KeyChar
 
 data Effect s = Change {effectState :: s} 
               | PrintLines {linesToPrint :: [String], effectState :: s}
@@ -136,7 +117,7 @@ simpleCommand f = acceptKeyM $ \s -> do
 charCommand :: (LineState t, Monad m) => (Char -> s -> m (Effect t))
                     -> Command m s t
 charCommand f = Command $ \next -> KeyMap $ \k -> case k of
-                    KeyChar c | isPrint c -> Just $ \s -> Right $ do
+                    Key Nothing (KeyChar c) | isPrint c -> Just $ \s -> Right $ do
                                     effect <- f c s
                                     return (KeyAction effect next)
                     _ -> Nothing

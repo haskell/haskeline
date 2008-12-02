@@ -12,7 +12,6 @@ import qualified Control.Exception.Extensible as Exception
 
 import System.Console.Haskeline.Monads as Monads
 import System.Console.Haskeline.LineState
-import System.Console.Haskeline.Command
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.Backend.Posix
 import qualified Codec.Binary.UTF8.String as UTF8

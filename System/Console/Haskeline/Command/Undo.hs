@@ -1,6 +1,7 @@
 module System.Console.Haskeline.Command.Undo where
 
 import System.Console.Haskeline.Command
+import System.Console.Haskeline.Key
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Monads
 

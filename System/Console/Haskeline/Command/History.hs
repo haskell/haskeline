@@ -2,6 +2,7 @@ module System.Console.Haskeline.Command.History where
 
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Command
+import System.Console.Haskeline.Key
 import Control.Monad(liftM,mplus)
 import System.Console.Haskeline.Monads
 import Data.List
@@ -154,15 +155,14 @@ searchHistory = choiceCmd [
                  , forwardKey +> change (startSearchMode Forward)
                  ] >|> keepSearching
     where
-        backKey = controlKey 'r'
-        forwardKey = controlKey 's'
+        backKey = ctrlChar 'r'
+        forwardKey = ctrlChar 's'
         keepSearching = choiceCmd [
                             choiceCmd [
                                 charCommand oneMoreChar
                                 , backKey +> simpleCommand (searchMore Reverse)
                                 , forwardKey +> simpleCommand (searchMore Forward)
-                                , Backspace +> change delLastChar
-                                , KeyChar '\b' +> change delLastChar
+                                , simpleKey Backspace +> change delLastChar
                                 ] >|> keepSearching
                             , changeWithoutKey foundHistory -- abort
                             ]

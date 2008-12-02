@@ -6,6 +6,8 @@ module System.Console.Haskeline.Command.Completion(
                             ) where
 
 import System.Console.Haskeline.Command
+import System.Console.Haskeline.Key
+import System.Console.Haskeline.Term(Layout(..))
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Prefs
@@ -70,8 +72,8 @@ askFirst mlimit numCompletions im printingCmd = case mlimit of
         Change (Message im ("Display all " ++ show numCompletions
                             ++ " possibilities? (y or n)"))
                     >=> choiceCmd [
-                            KeyChar 'y' +> acceptKey (const printingCmd)
-                            , KeyChar 'n' +> change messageState
+                            simpleChar 'y' +> acceptKey (const printingCmd)
+                            , simpleChar 'n' +> change messageState
                             ]
     _ -> printingCmd
 
@@ -93,9 +95,10 @@ printPage ws im = do
 -- TODO: move testing of nullity into here
 pagingCommands :: Monad m => [String] -> Command (InputCmdT m) (Message InsertMode) InsertMode
 pagingCommands ws = choiceCmd [
-                            KeyChar ' ' +> acceptKeyM (printPage ws)
-                            ,KeyChar 'q' +> change messageState
-                            ,KeyChar '\n' +> acceptKey (printOneLine ws)
+                            simpleChar ' ' +> acceptKeyM (printPage ws)
+                            ,simpleChar 'q' +> change messageState
+                            ,simpleKey Return +> acceptKey (printOneLine ws)
+                            ,simpleKey DownKey +> acceptKey (printOneLine ws)
                             ]
 
 

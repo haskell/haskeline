@@ -52,6 +52,7 @@ Library
                 System.Console.Haskeline.Command.History
                 System.Console.Haskeline.Emacs
                 System.Console.Haskeline.InputT
+                System.Console.Haskeline.Key
                 System.Console.Haskeline.LineState
                 System.Console.Haskeline.Monads
                 System.Console.Haskeline.Term

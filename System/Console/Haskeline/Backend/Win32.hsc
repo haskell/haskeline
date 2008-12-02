@@ -19,7 +19,7 @@ import Control.Concurrent hiding (throwTo)
 import Control.Concurrent.STM
 import Data.Bits
 
-import System.Console.Haskeline.Command
+import System.Console.Haskeline.Key
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Term
@@ -61,7 +61,8 @@ getConOut = handle (\(_::IOException) -> return Nothing) $ fmap Just
 eventToKey :: InputEvent -> Maybe Key
 eventToKey KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc,
                     controlKeyState = cstate}
-        = if isMeta then fmap KeyMeta maybeKey else maybeKey
+        = let modifier = if isMeta then Key (Just Meta) else simpleKey
+          in fmap modifier maybeKey
   where
     maybeKey = if c /= '\NUL' 
                     then Just (KeyChar c)
@@ -70,13 +71,13 @@ eventToKey KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc,
                                     .|. #const LEFT_ALT_PRESSED) )
 eventToKey _ = Nothing
 
-keyFromCode :: WORD -> Maybe Key
+keyFromCode :: WORD -> Maybe BaseKey
 keyFromCode (#const VK_BACK) = Just Backspace
-keyFromCode (#const VK_LEFT) = Just KeyLeft
-keyFromCode (#const VK_RIGHT) = Just KeyRight
-keyFromCode (#const VK_UP) = Just KeyUp
-keyFromCode (#const VK_DOWN) = Just KeyDown
-keyFromCode (#const VK_DELETE) = Just DeleteForward
+keyFromCode (#const VK_LEFT) = Just LeftKey
+keyFromCode (#const VK_RIGHT) = Just RightKey
+keyFromCode (#const VK_UP) = Just UpKey
+keyFromCode (#const VK_DOWN) = Just DownKey
+keyFromCode (#const VK_DELETE) = Just Delete
 -- TODO: KillLine
 keyFromCode _ = Nothing
     

@@ -1,6 +1,7 @@
 module System.Console.Haskeline.Vi where
 
 import System.Console.Haskeline.Command
+import System.Console.Haskeline.Key
 import System.Console.Haskeline.Command.Completion
 import System.Console.Haskeline.Command.History
 import System.Console.Haskeline.Command.Undo
@@ -19,22 +20,20 @@ insertionCommands = choiceCmd [startCommand, simpleInsertions]
                             
 simpleInsertions :: InputCmd InsertMode InsertMode
 simpleInsertions = choiceCmd
-                [ KeyChar '\n' +> finish
-		   , KeyChar '\r' +> finish
-                   , KeyLeft +> change goLeft 
-                   , KeyRight +> change goRight
-                   , Backspace +> change deletePrev 
-		   , KeyChar '\b' +> change deletePrev
-                   , DeleteForward +> change deleteNext 
+                [ simpleKey Return +> finish
+                   , simpleKey LeftKey +> change goLeft 
+                   , simpleKey RightKey +> change goRight
+                   , simpleKey Backspace +> change deletePrev 
+                   , simpleKey Delete +> change deleteNext 
                    , changeFromChar insertChar
-                   , controlKey 'l' +> clearScreenCmd
-                   , controlKey 'd' +> eofIfEmpty
-                   , KeyUp +> historyBack
-                   , KeyDown +> historyForward
+                   , ctrlChar 'l' +> clearScreenCmd
+                   , ctrlChar 'd' +> eofIfEmpty
+                   , simpleKey UpKey +> historyBack
+                   , simpleKey DownKey +> historyForward
                    , searchHistory
                    , saveForUndo $ choiceCmd
-                        [ KillLine +> change (deleteFromMove moveToStart)
-                        , KeyChar '\t' +> completionCmd
+                        [ simpleKey KillLine +> change (deleteFromMove moveToStart)
+                        , simpleKey Tab +> completionCmd
                         ]
                    ]
 
@@ -46,41 +45,41 @@ eofIfEmpty k = k +> acceptKeyOrFail (\s -> if save s == emptyIM
                     else Just $ Change s >=> continue)
 
 startCommand :: InputCmd InsertMode InsertMode
-startCommand = KeyChar '\ESC' +> change enterCommandMode
+startCommand = simpleKey Escape +> change enterCommandMode
                     >|> viCommandActions
 
 viCommandActions :: InputCmd CommandMode InsertMode
 viCommandActions = simpleCmdActions `loopUntil` exitingCommands
 
 exitingCommands :: InputCmd CommandMode InsertMode
-exitingCommands =  choiceCmd [ KeyChar 'i' +> change insertFromCommandMode
-                    , KeyChar 'I' +> change (moveToStart . insertFromCommandMode)
-                    , KeyChar 'a' +> change appendFromCommandMode
-                    , KeyChar 'A' +> change (moveToEnd . appendFromCommandMode)
-                    , KeyChar 's' +> change (insertFromCommandMode . deleteChar)
+exitingCommands =  choiceCmd [ simpleChar 'i' +> change insertFromCommandMode
+                    , simpleChar 'I' +> change (moveToStart . insertFromCommandMode)
+                    , simpleChar 'a' +> change appendFromCommandMode
+                    , simpleChar 'A' +> change (moveToEnd . appendFromCommandMode)
+                    , simpleChar 's' +> change (insertFromCommandMode . deleteChar)
                     , repeated
                     , saveForUndo $ choiceCmd
-                        [ KeyChar 'S' +> change (const emptyIM)
+                        [ simpleChar 'S' +> change (const emptyIM)
                         , deleteIOnce
                         ]
                     ]
 
 simpleCmdActions :: InputCmd CommandMode CommandMode
-simpleCmdActions = choiceCmd [ KeyChar '\n'  +> finish
-                    , KeyChar '\ESC' +> change id -- helps break out of loops
-                    , controlKey 'd' +> eofIfEmpty
-                    , KeyChar 'r'   +> replaceOnce 
-                    , KeyChar 'R'   +> loopReplace
-                    , KeyChar 'x' +> change deleteChar
-                    , controlKey 'l' +> clearScreenCmd
-                    , KeyChar 'u' +> commandUndo
-                    , controlKey 'r' +> commandRedo
-                    , KeyChar '.' +> commandRedo
+simpleCmdActions = choiceCmd [ simpleChar '\n'  +> finish
+                    , simpleChar '\ESC' +> change id -- helps break out of loops
+                    , ctrlChar 'd' +> eofIfEmpty
+                    , simpleChar 'r'   +> replaceOnce 
+                    , simpleChar 'R'   +> loopReplace
+                    , simpleChar 'x' +> change deleteChar
+                    , ctrlChar 'l' +> clearScreenCmd
+                    , simpleChar 'u' +> commandUndo
+                    , ctrlChar 'r' +> commandRedo
+                    , simpleChar '.' +> commandRedo
                     , useMovements withCommandMode
-                    , KeyDown +> historyForward
-                    , KeyUp +> historyBack
+                    , simpleKey DownKey +> historyForward
+                    , simpleKey UpKey +> historyBack
                     , saveForUndo $ choiceCmd
-                        [ KillLine +> change (withCommandMode
+                        [ simpleKey KillLine +> change (withCommandMode
                                         $ deleteFromMove moveToStart)
                         , deleteOnce
                         ]
@@ -99,35 +98,35 @@ repeated :: InputCmd CommandMode InsertMode
 repeated = let
     start = foreachDigit startArg ['1'..'9']
     addDigit = foreachDigit addNum ['0'..'9']
-    deleteR = KeyChar 'd' 
+    deleteR = simpleChar 'd' 
                 >+> choiceCmd [useMovements (deleteFromRepeatedMove),
-                             KeyChar 'd' +> change (const CEmpty)]
-    deleteIR = KeyChar 'c'
+                             simpleChar 'd' +> change (const CEmpty)]
+    deleteIR = simpleChar 'c'
                 >+> choiceCmd [useMovements deleteAndInsertR,
-                             KeyChar 'c' +> change (const emptyIM)]
+                             simpleChar 'c' +> change (const emptyIM)]
     applyArg' f am = enterCommandModeRight $ applyArg f $ fmap insertFromCommandMode am
     loop = choiceCmd [addDigit >|> loop
                      , useMovements applyArg' >|> viCommandActions
                      , saveForUndo (deleteR >|> viCommandActions)
                      , saveForUndo deleteIR
-                     , saveForUndo (KeyChar 'x' +> change (applyArg deleteChar)
+                     , saveForUndo (simpleChar 'x' +> change (applyArg deleteChar)
                         >|> viCommandActions)
                      , changeWithoutKey argState >|> viCommandActions
                      ]
     in start >|> loop
 
 movements :: [(Key,InsertMode -> InsertMode)]
-movements = [ (KeyChar 'h', goLeft)
-            , (KeyChar 'l', goRight)
-            , (KeyChar 'w', skipRight isSpace . (\s -> skipRight (cmdChar s) s))
-            , (KeyChar 'b', (\s -> skipLeft (cmdChar s) s) . goLeft . skipLeft isSpace)
-            , (KeyChar 'W', skipRight isSpace . skipRight (not . isSpace))
-            , (KeyChar 'B', skipLeft (not . isSpace) . skipLeft isSpace)
-            , (KeyChar ' ', goRight)
-            , (KeyLeft, goLeft)
-            , (KeyRight, goRight)
-            , (KeyChar '0', moveToStart)
-            , (KeyChar '$', moveToEnd)
+movements = [ (simpleChar 'h', goLeft)
+            , (simpleChar 'l', goRight)
+            , (simpleChar 'w', skipRight isSpace . (\s -> skipRight (cmdChar s) s))
+            , (simpleChar 'b', (\s -> skipLeft (cmdChar s) s) . goLeft . skipLeft isSpace)
+            , (simpleChar 'W', skipRight isSpace . skipRight (not . isSpace))
+            , (simpleChar 'B', skipLeft (not . isSpace) . skipLeft isSpace)
+            , (simpleChar ' ', goRight)
+            , (simpleKey LeftKey, goLeft)
+            , (simpleKey RightKey, goRight)
+            , (simpleChar '0', moveToStart)
+            , (simpleChar '$', moveToEnd)
             ]
 
 cmdChar :: InsertMode -> (Char -> Bool)
@@ -144,14 +143,14 @@ useMovements f = choiceCmd $ map (\(k,g) -> k +> change (f g))
                                 movements
 
 deleteOnce :: InputCmd CommandMode CommandMode
-deleteOnce = KeyChar 'd'
+deleteOnce = simpleChar 'd'
             >+> choiceCmd [useMovements deleteFromCmdMove,
-                         KeyChar 'd' +> change (const CEmpty)]
+                         simpleChar 'd' +> change (const CEmpty)]
 
 deleteIOnce :: InputCmd CommandMode InsertMode
-deleteIOnce = KeyChar 'c'
+deleteIOnce = simpleChar 'c'
               >+> choiceCmd [useMovements deleteAndInsert,
-                            KeyChar 'c' +> change (const emptyIM)]
+                            simpleChar 'c' +> change (const emptyIM)]
 
 deleteAndInsert :: (InsertMode -> InsertMode) -> CommandMode -> InsertMode
 deleteAndInsert f = insertFromCommandMode . deleteFromCmdMove f
@@ -164,7 +163,7 @@ deleteAndInsertR f = insertFromCommandMode . deleteFromRepeatedMove f
 foreachDigit :: (Monad m, LineState t) => (Int -> s -> t) -> [Char] 
                 -> Command m s t
 foreachDigit f ds = choiceCmd $ map digitCmd ds
-    where digitCmd d = KeyChar d +> change (f (toDigit d))
+    where digitCmd d = simpleChar d +> change (f (toDigit d))
           toDigit d = fromEnum d - fromEnum '0'
 
 

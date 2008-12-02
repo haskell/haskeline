@@ -4,7 +4,6 @@ import System.Console.Haskeline.Backend.Posix
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Monads as Monads
-import System.Console.Haskeline.Command
 
 import System.IO
 
