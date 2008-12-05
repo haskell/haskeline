@@ -25,6 +25,8 @@ simpleInsertions = choiceCmd
                    , simpleKey RightKey +> change goRight
                    , simpleKey Backspace +> change deletePrev 
                    , simpleKey Delete +> change deleteNext 
+                   , simpleKey Home +> change moveToStart
+                   , simpleKey End +> change moveToEnd
                    , changeFromChar insertChar
                    , ctrlChar 'l' +> clearScreenCmd
                    , ctrlChar 'd' +> eofIfEmpty
@@ -52,10 +54,13 @@ viCommandActions :: InputCmd CommandMode InsertMode
 viCommandActions = simpleCmdActions `loopUntil` exitingCommands
 
 exitingCommands :: InputCmd CommandMode InsertMode
-exitingCommands =  choiceCmd [ simpleChar 'i' +> change insertFromCommandMode
+exitingCommands =  choiceCmd [ 
+                      simpleChar 'i' +> change insertFromCommandMode
                     , simpleChar 'I' +> change (moveToStart . insertFromCommandMode)
+                    , simpleKey Home +> change (moveToStart . insertFromCommandMode)
                     , simpleChar 'a' +> change appendFromCommandMode
                     , simpleChar 'A' +> change (moveToEnd . appendFromCommandMode)
+                    , simpleKey End +> change (moveToStart  . insertFromCommandMode)
                     , simpleChar 's' +> change (insertFromCommandMode . deleteChar)
                     , repeated
                     , saveForUndo $ choiceCmd

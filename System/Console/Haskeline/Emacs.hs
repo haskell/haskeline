@@ -40,6 +40,8 @@ controlActions = choiceCmd
             , metaChar 'b' +> change wordLeft
             , ctrlChar '_' +> commandUndo
             , ctrlChar 'x' +> change id 
+            , simpleKey Home +> change moveToStart
+            , simpleKey End +> change moveToEnd
                 >|> choiceCmd [ctrlChar 'u' +> commandUndo
                               , continue]
             , saveForUndo $ choiceCmd

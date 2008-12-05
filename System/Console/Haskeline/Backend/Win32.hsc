@@ -78,6 +78,8 @@ keyFromCode (#const VK_RIGHT) = Just RightKey
 keyFromCode (#const VK_UP) = Just UpKey
 keyFromCode (#const VK_DOWN) = Just DownKey
 keyFromCode (#const VK_DELETE) = Just Delete
+keyFromCode (#const VK_HOME) = Just Home
+keyFromCode (#const VK_END) = Just End
 -- TODO: KillLine
 keyFromCode _ = Nothing
     

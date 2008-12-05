@@ -100,12 +100,15 @@ terminfoKeys term = catMaybes $ map getSequence keyCapabilities
                             keys <- getCapability term cap
                             return (keys,x)
         keyCapabilities = 
-                [(keyLeft,      simpleKey LeftKey),
-                (keyRight,      simpleKey RightKey),
-                (keyUp,         simpleKey UpKey),
-                (keyDown,       simpleKey DownKey),
-                (keyBackspace,  simpleKey Backspace),
-                (keyDeleteChar, simpleKey Delete)]
+                [(keyLeft,      simpleKey LeftKey)
+                ,(keyRight,      simpleKey RightKey)
+                ,(keyUp,         simpleKey UpKey)
+                ,(keyDown,       simpleKey DownKey)
+                ,(keyBackspace,  simpleKey Backspace)
+                ,(keyDeleteChar, simpleKey Delete)
+                ,(keyHome,       simpleKey Home)
+                ,(keyEnd,        simpleKey End)
+                ]
 
 sttyKeys :: IO [(String, Key)]
 sttyKeys = do
