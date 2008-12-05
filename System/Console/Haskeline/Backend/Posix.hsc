@@ -61,8 +61,7 @@ envLayout = handle (\(_::IOException) -> return Nothing) $ do
     return $ Just $ Layout {height=read r,width=read c}
 
 tinfoLayout :: Maybe Terminal -> IO (Maybe Layout)
-tinfoLayout Nothing = return Nothing
-tinfoLayout (Just t) = return $ getCapability t $ do
+tinfoLayout = maybe (return Nothing) $ \t -> return $ getCapability t $ do
                         r <- termColumns
                         c <- termLines
                         return Layout {height=r,width=c}
@@ -173,11 +172,10 @@ withPosixGetEvent h term f = do
 
 -- If the keypad on/off capabilities are defined, wrap the computation with them.
 wrapKeypad :: MonadException m => Handle -> Maybe Terminal -> m a -> m a
-wrapKeypad _ Nothing f = f
-wrapKeypad h (Just term) f = (maybeOutput keypadOn >> f) 
-                            `finally` maybeOutput keypadOff
+wrapKeypad h = maybe id $ \term f -> (maybeOutput term keypadOn >> f) 
+                            `finally` maybeOutput term keypadOff
   where
-    maybeOutput cap = liftIO $ hRunTermOutput h term $
+    maybeOutput term cap = liftIO $ hRunTermOutput h term $
                             fromMaybe mempty (getCapability term cap)
 
 withWindowHandler :: MonadException m => TChan Event -> m a -> m a
