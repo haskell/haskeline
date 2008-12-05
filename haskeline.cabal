@@ -67,7 +67,7 @@ Library
         install-includes: win_console.h
         cpp-options: -DMINGW
     } else {
-        Build-depends: terminfo>=0.2.2, unix>=2.0
+        Build-depends: terminfo>=0.3 && < 4, unix>=2.0
         Other-modules: 
                 System.Console.Haskeline.Backend.Posix
                 System.Console.Haskeline.Backend.DumbTerm

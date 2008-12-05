@@ -109,7 +109,7 @@ runTerminfoDraw = do
     case mterm of
         -- XXX narrow this: either an ioexception (from getenv) or a 
         -- usererror.
-        Left (_::SomeException) -> return Nothing
+        Left (_::SetupTermError) -> return Nothing
         Right term -> case getCapability term getActions of
             Nothing -> return Nothing
             Just actions -> fmap Just $ posixRunTerm $ \h -> 
