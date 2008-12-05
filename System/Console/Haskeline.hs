@@ -62,7 +62,6 @@ import System.Console.Haskeline.MonadException
 import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Completion
 import System.Console.Haskeline.Term
-import System.Console.Haskeline.Key
 
 import System.IO
 import qualified System.IO.UTF8 as UTF8
@@ -156,8 +155,9 @@ repeatTillFinish tops getEvent prefix = loop
                             else local newLayout $ do
                                 reposition oldLayout (lineChars prefix s)
                                 loop s processor
-                    -- TODO: shouldn't this be at a lower level? (like in Command.hs)
-                    KeyInput k -> case lookupKM processor (canonicalizeKey k) of
+                    KeyInput k -> do
+                      action <- lift $ lookupKey processor k
+                      case action of
                         Nothing -> actBell >> loop s processor
                         Just g -> case g s of
                             Left r -> movePast prefix s >> return r

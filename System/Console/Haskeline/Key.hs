@@ -13,10 +13,10 @@ import Control.Monad
 
 -- TODO: should this be [Modifier]?
 data Key = Key (Maybe Modifier) BaseKey
-            deriving (Show,Eq)
+            deriving (Show,Eq,Ord)
 
 data Modifier = ControlKey | Meta | Shift
-            deriving (Show,Eq)
+            deriving (Show,Eq,Ord)
 
 data BaseKey = KeyChar Char
              | FunKey Int
@@ -28,7 +28,7 @@ data BaseKey = KeyChar Char
              | Tab
              | Clear
              | Escape
-            deriving (Show,Eq)
+            deriving (Show,Eq,Ord)
 
 simpleKey :: BaseKey -> Key
 simpleKey = Key Nothing
@@ -65,7 +65,7 @@ parseModifier str = case map toLower str of
     _ -> Nothing
 
 parseKey :: String -> Maybe Key
-parseKey str = case break (=='-') str of
+parseKey str = fmap canonicalizeKey $ case break (=='-') str of
     (ms,'-':ks) -> liftM2 (Key . Just) (parseModifier ms) (parseBaseKey ks)
     (ks,_) -> liftM (Key Nothing) (parseBaseKey ks)
 

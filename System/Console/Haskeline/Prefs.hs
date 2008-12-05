@@ -23,7 +23,9 @@ module System.Console.Haskeline.Prefs(
 
 import Data.Char(isSpace,toLower)
 import Data.List(foldl')
+import qualified Data.Map as Map
 import System.Console.Haskeline.MonadException(handle,IOException)
+import System.Console.Haskeline.Key
 
 
 data Prefs = Prefs { bellStyle :: !BellStyle,
@@ -37,12 +39,13 @@ data Prefs = Prefs { bellStyle :: !BellStyle,
                         -- ^ If more than this number of completion
                         -- possibilities are found, then ask before listing
                         -- them.
-                     listCompletionsImmediately :: !Bool
+                     listCompletionsImmediately :: !Bool,
                         -- ^ If 'False', completions with multiple possibilities
                         -- will ring the bell and only display them if the user
                         -- presses @TAB@ again.
+                     customBindings :: Map.Map Key Key
                      }
-                        deriving (Read,Show)
+                        deriving Show
 
 data CompletionType = ListCompletion | MenuCompletion
             deriving (Read,Show)
@@ -73,7 +76,8 @@ defaultPrefs = Prefs {bellStyle = AudibleBell,
                       completionType = ListCompletion,
                       completionPaging = True,
                       completionPromptLimit = Just 100,
-                      listCompletionsImmediately = True
+                      listCompletionsImmediately = True,
+                      customBindings = Map.empty
                     }
 
 mkSettor :: Read a => (a -> Prefs -> Prefs) -> String -> Prefs -> Prefs
@@ -89,8 +93,13 @@ settors = [("bellstyle", mkSettor $ \x p -> p {bellStyle = x})
           ,("completionpaging", mkSettor $ \x p -> p {completionPaging = x})
           ,("completionpromptlimit", mkSettor $ \x p -> p {completionPromptLimit = x})
           ,("listcompletionsimmediately", mkSettor $ \x p -> p {listCompletionsImmediately = x})
-
+          ,("bind", addCustomBinding)
           ]
+
+addCustomBinding :: String -> Prefs -> Prefs
+addCustomBinding str p = case map parseKey (words str) of
+    [Just k1,Just k2] -> p {customBindings = Map.insert k1 k2 (customBindings p)}
+    _ -> p
 
 -- | Read 'Prefs' from a given file.  If there is an error reading the file,
 -- the 'defaultPrefs' will be returned.

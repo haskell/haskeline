@@ -2,7 +2,7 @@ module System.Console.Haskeline.Command(
                         -- * Commands
                         Effect(..),
                         KeyMap(), 
-                        lookupKM,
+                        lookupKey,
                         KeyAction(..),
                         CmdAction(..),
                         (>=>),
@@ -33,6 +33,9 @@ import Data.Char(isPrint)
 import Control.Monad(mplus)
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Key
+import System.Console.Haskeline.Monads
+import System.Console.Haskeline.Prefs
+import qualified Data.Map as Map
 
 
 data Effect s = Change {effectState :: s} 
@@ -42,6 +45,13 @@ data Effect s = Change {effectState :: s}
 
 newtype KeyMap m s = KeyMap {lookupKM :: Key -> Maybe 
             (s -> Either (Maybe String) (m (KeyAction m)))}
+
+lookupKey :: MonadReader Prefs m => KeyMap n s -> Key
+        -> m (Maybe (s -> Either (Maybe String) (n (KeyAction n))))
+lookupKey processor k = do
+    let k' = canonicalizeKey k
+    k'' <- asks $ Map.findWithDefault k' k' . customBindings
+    return (lookupKM processor k'')
 
 useKey :: Key -> (s -> Either (Maybe String) (m (KeyAction m))) -> KeyMap m s
 useKey k f = KeyMap $ \k' -> if k==k' then Just f else Nothing
