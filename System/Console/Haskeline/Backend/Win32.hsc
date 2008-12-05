@@ -18,6 +18,7 @@ import Data.List(intercalate)
 import Control.Concurrent hiding (throwTo)
 import Control.Concurrent.STM
 import Data.Bits
+import Control.Monad
 
 import System.Console.Haskeline.Key
 import System.Console.Haskeline.Monads
@@ -61,14 +62,21 @@ getConOut = handle (\(_::IOException) -> return Nothing) $ fmap Just
 eventToKey :: InputEvent -> Maybe Key
 eventToKey KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc,
                     controlKeyState = cstate}
-        = let modifier = if isMeta then Key (Just Meta) else simpleKey
-          in fmap modifier maybeKey
+    = if c /= '\NUL'
+        then Just $ if c <= '\031' 
+                        -- in this case, a ctrl key press is already encoded
+                        -- in the KeyChar and will be extracted by canonicalizeKey.
+                        then Key metaMod (KeyChar c)
+                        else Key allMods (KeyChar c)
+        else fmap (Key allMods) (keyFromCode vc)
   where
-    maybeKey = if c /= '\NUL' 
-                    then Just (KeyChar c)
-                    else keyFromCode vc
-    isMeta = 0 /= (cstate .&. (#const RIGHT_ALT_PRESSED
-                                    .|. #const LEFT_ALT_PRESSED) )
+    testMod m ck = if (cstate .&. ck) /= 0 then Just m else Nothing
+    metaMod = testMod Meta ((#const RIGHT_ALT_PRESSED) .|. (#const LEFT_ALT_PRESSED))
+    shiftMod = testMod Shift (#const SHIFT_PRESSED)
+    ctrlMod = testMod ControlKey ((#const RIGHT_CTRL_PRESSED) 
+                                    .|. (#const LEFT_CTRL_PRESSED))
+    allMods = metaMod `mplus` shiftMod `mplus` ctrlMod
+
 eventToKey _ = Nothing
 
 keyFromCode :: WORD -> Maybe BaseKey
