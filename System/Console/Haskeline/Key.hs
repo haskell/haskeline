@@ -1,22 +1,36 @@
 module System.Console.Haskeline.Key(Key(..),
             Modifier(..),
             BaseKey(..),
+            noModifier,
             simpleKey,
             simpleChar,
             metaChar,
             ctrlChar,
-            parseKey,
-            canonicalizeKey) where
+            metaKey,
+            parseKey
+            ) where
 
 import Data.Char
 import Control.Monad
+import Data.Maybe
+import Data.Bits
 
--- TODO: should this be [Modifier]?
-data Key = Key (Maybe Modifier) BaseKey
+data Key = Key Modifier BaseKey
             deriving (Show,Eq,Ord)
 
-data Modifier = ControlKey | Meta | Shift
-            deriving (Show,Eq,Ord)
+data Modifier = Modifier {hasControl, hasMeta, hasShift :: Bool}
+            deriving (Eq,Ord)
+
+instance Show Modifier where
+    show m = show $ catMaybes [maybeUse hasControl "ctrl"
+                        , maybeUse hasMeta "meta"
+                        , maybeUse hasShift "shift"
+                        ]
+        where
+            maybeUse f str = if f m then Just str else Nothing
+
+noModifier :: Modifier
+noModifier = Modifier False False False
 
 data BaseKey = KeyChar Char
              | FunKey Int
@@ -24,19 +38,23 @@ data BaseKey = KeyChar Char
              -- TODO: is KillLine really a key?
              | KillLine | Home | End
              | Backspace | Delete
-             | Return
-             | Tab
-             | Clear
-             | Escape
             deriving (Show,Eq,Ord)
 
 simpleKey :: BaseKey -> Key
-simpleKey = Key Nothing
+simpleKey = Key noModifier
+
+metaKey :: Key -> Key
+metaKey (Key m bc) = Key m {hasMeta = True} bc
 
 simpleChar, metaChar, ctrlChar :: Char -> Key
-simpleChar = Key Nothing . KeyChar
-metaChar = Key (Just Meta) . KeyChar
-ctrlChar = Key (Just ControlKey) . KeyChar
+simpleChar = simpleKey . KeyChar
+metaChar = metaKey . simpleChar
+
+ctrlChar = simpleChar . setControlBits
+
+setControlBits :: Char -> Char
+setControlBits '?' = toEnum 127
+setControlBits c = toEnum $ fromEnum c .&. complement (bit 5 .|. bit 6)
 
 specialKeys :: [(String,BaseKey)]
 specialKeys = [("left",LeftKey)
@@ -48,26 +66,37 @@ specialKeys = [("left",LeftKey)
               ,("end",End)
               ,("backspace",Backspace)
               ,("delete",Delete)
-              ,("return",Return)
-              ,("enter",Return)
-              ,("tab",Tab)
-              ,("clear",Clear)
-              ,("esc",Escape)
-              ,("escape",Escape)
+              ,("return",KeyChar '\n')
+              ,("enter",KeyChar '\n')
+              ,("tab",KeyChar '\t')
+              ,("esc",KeyChar '\ESC')
+              ,("escape",KeyChar '\ESC')
               ]
 
-parseModifier :: String -> Maybe Modifier
-parseModifier str = case map toLower str of
-    "ctrl" -> Just ControlKey
-    "control" -> Just ControlKey
-    "meta" -> Just Meta
-    "shift" -> Just Shift
-    _ -> Nothing
+parseModifiers :: [String] -> BaseKey -> Key
+parseModifiers strs = Key mods
+    where mods = foldl1 (.) (map parseModifier strs) noModifier
+
+parseModifier :: String -> (Modifier -> Modifier)
+parseModifier str m = case map toLower str of
+    "ctrl" -> m {hasControl = True}
+    "control" -> m {hasControl = True}
+    "meta" -> m {hasMeta = True}
+    "shift" -> m {hasShift = True}
+    _ -> m
+
+breakAtDashes :: String -> [String]
+breakAtDashes "" = []
+breakAtDashes str = case break (=='-') str of
+    (xs,'-':rest) -> xs : breakAtDashes rest
+    (xs,_) -> [xs]
 
 parseKey :: String -> Maybe Key
-parseKey str = fmap canonicalizeKey $ case break (=='-') str of
-    (ms,'-':ks) -> liftM2 (Key . Just) (parseModifier ms) (parseBaseKey ks)
-    (ks,_) -> liftM (Key Nothing) (parseBaseKey ks)
+parseKey str = fmap canonicalizeKey $ 
+    case reverse (breakAtDashes str) of
+        [ks] -> liftM simpleKey (parseBaseKey ks)
+        ks:ms -> liftM (parseModifiers ms) (parseBaseKey ks)
+        [] -> Nothing
 
 parseBaseKey :: String -> Maybe BaseKey
 parseBaseKey ks = lookup (map toLower ks) specialKeys
@@ -83,22 +112,8 @@ parseBaseKey ks = lookup (map toLower ks) specialKeys
         parseFunctionKey _ = Nothing
 
 canonicalizeKey :: Key -> Key
-canonicalizeKey (Key ms (KeyChar '\b')) = Key ms Backspace
-canonicalizeKey (Key ms (KeyChar '\t')) = Key ms Tab
-canonicalizeKey (Key ms (KeyChar '\r')) = Key ms Return
-canonicalizeKey (Key ms (KeyChar '\n')) = Key ms Return
-canonicalizeKey (Key ms (KeyChar '\ESC')) = Key ms Escape
-canonicalizeKey (Key Nothing (KeyChar c))
-    | c <= '\031'   = Key (Just ControlKey) $ KeyChar $ 
-                        toEnum (fromEnum c + 96)
-canonicalizeKey (Key (Just ControlKey) (KeyChar c)) = case toLower c of
-    'h' -> Key Nothing Backspace
-    'i' -> Key Nothing Tab
-    'j' -> Key Nothing Return
-    'm' -> Key Nothing Return
-    '[' -> Key Nothing Escape
-    lc -> Key (Just ControlKey) (KeyChar lc)
-canonicalizeKey (Key (Just Shift) (KeyChar c))
-    | isPrint c && isLower c          = Key Nothing (KeyChar (toUpper c))
-canonicalizeKey k                   = k
-
+canonicalizeKey (Key m (KeyChar c))
+    | hasControl m = Key m {hasControl = False}
+                        (KeyChar (setControlBits c))
+    | hasShift m = Key m {hasShift = False} (KeyChar (toUpper c))
+canonicalizeKey k = k

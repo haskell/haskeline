@@ -154,8 +154,8 @@ lexKeys baseMap cs
             = k : lexKeys baseMap ds
 lexKeys baseMap ('\ESC':cs)
 -- TODO: what's the right thing ' to do here?
-    | Key _ k:ks <- lexKeys baseMap cs
-            = Key (Just Meta) k : ks
+    | k:ks <- lexKeys baseMap cs
+            = metaKey k : ks
 lexKeys baseMap (c:cs) = simpleChar c : lexKeys baseMap cs
 
 lookupChars :: TreeMap Char Key -> [Char] -> Maybe (Key,[Char])

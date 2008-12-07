@@ -20,7 +20,7 @@ insertionCommands = choiceCmd [startCommand, simpleInsertions]
                             
 simpleInsertions :: InputCmd InsertMode InsertMode
 simpleInsertions = choiceCmd
-                [ simpleKey Return +> finish
+                [ simpleChar '\n' +> finish
                    , simpleKey LeftKey +> change goLeft 
                    , simpleKey RightKey +> change goRight
                    , simpleKey Backspace +> change deletePrev 
@@ -35,7 +35,7 @@ simpleInsertions = choiceCmd
                    , searchHistory
                    , saveForUndo $ choiceCmd
                         [ simpleKey KillLine +> change (deleteFromMove moveToStart)
-                        , simpleKey Tab +> completionCmd
+                        , simpleChar '\t' +> completionCmd
                         ]
                    ]
 
@@ -47,7 +47,7 @@ eofIfEmpty k = k +> acceptKeyOrFail (\s -> if save s == emptyIM
                     else Just $ Change s >=> continue)
 
 startCommand :: InputCmd InsertMode InsertMode
-startCommand = simpleKey Escape +> change enterCommandMode
+startCommand = simpleChar '\ESC' +> change enterCommandMode
                     >|> viCommandActions
 
 viCommandActions :: InputCmd CommandMode InsertMode

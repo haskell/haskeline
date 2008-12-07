@@ -48,10 +48,8 @@ newtype KeyMap m s = KeyMap {lookupKM :: Key -> Maybe
 
 lookupKey :: MonadReader Prefs m => KeyMap n s -> Key
         -> m (Maybe (s -> Either (Maybe String) (n (KeyAction n))))
-lookupKey processor k = do
-    let k' = canonicalizeKey k
-    k'' <- asks $ Map.findWithDefault k' k' . customBindings
-    return (lookupKM processor k'')
+lookupKey processor k = asks $ lookupKM processor 
+                        . Map.findWithDefault k k . customBindings
 
 useKey :: Key -> (s -> Either (Maybe String) (m (KeyAction m))) -> KeyMap m s
 useKey k f = KeyMap $ \k' -> if k==k' then Just f else Nothing
@@ -127,7 +125,7 @@ simpleCommand f = acceptKeyM $ \s -> do
 charCommand :: (LineState t, Monad m) => (Char -> s -> m (Effect t))
                     -> Command m s t
 charCommand f = Command $ \next -> KeyMap $ \k -> case k of
-                    Key Nothing (KeyChar c) | isPrint c -> Just $ \s -> Right $ do
+                    Key m (KeyChar c) | isPrint c && m==noModifier-> Just $ \s -> Right $ do
                                     effect <- f c s
                                     return (KeyAction effect next)
                     _ -> Nothing

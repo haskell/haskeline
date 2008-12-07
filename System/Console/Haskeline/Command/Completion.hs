@@ -97,7 +97,7 @@ pagingCommands :: Monad m => [String] -> Command (InputCmdT m) (Message InsertMo
 pagingCommands ws = choiceCmd [
                             simpleChar ' ' +> acceptKeyM (printPage ws)
                             ,simpleChar 'q' +> change messageState
-                            ,simpleKey Return +> acceptKey (printOneLine ws)
+                            ,simpleChar '\n' +> acceptKey (printOneLine ws)
                             ,simpleKey DownKey +> acceptKey (printOneLine ws)
                             ]
 

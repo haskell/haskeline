@@ -17,13 +17,13 @@ emacsCommands = runCommand $ choiceCmd [simpleActions, controlActions]
 
 simpleActions, controlActions :: InputCmd InsertMode InsertMode
 simpleActions = choiceCmd 
-            [ simpleKey Return +> finish
+            [ simpleChar '\n' +> finish
             , simpleKey LeftKey +> change goLeft
             , simpleKey RightKey +> change goRight
             , simpleKey Backspace +> change deletePrev
             , simpleKey Delete +> change deleteNext 
             , changeFromChar insertChar
-            , saveForUndo $ simpleKey Tab +> completionCmd
+            , saveForUndo $ simpleChar '\t' +> completionCmd
             , simpleKey UpKey +> historyBack
             , simpleKey DownKey +> historyForward
             , searchHistory
@@ -46,7 +46,7 @@ controlActions = choiceCmd
                               , continue]
             , saveForUndo $ choiceCmd
                 [ ctrlChar 'w' +> change (deleteFromMove bigWordLeft)
-                , Key (Just Meta) Backspace +> change (deleteFromMove wordLeft)
+                , metaKey (simpleKey Backspace) +> change (deleteFromMove wordLeft)
                 , metaChar 'd' +> change (deleteFromMove wordRight)
                 , ctrlChar 'k' +> change (deleteFromMove moveToEnd)
                 , simpleKey KillLine +> change (deleteFromMove moveToStart)

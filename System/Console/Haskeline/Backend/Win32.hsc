@@ -18,6 +18,7 @@ import Data.List(intercalate)
 import Control.Concurrent hiding (throwTo)
 import Control.Concurrent.STM
 import Data.Bits
+import Data.Char(isUpper)
 import Control.Monad
 
 import System.Console.Haskeline.Key
@@ -58,24 +59,21 @@ getConOut = handle (\(_::IOException) -> return Nothing) $ fmap Just
                         (fILE_SHARE_READ .|. fILE_SHARE_WRITE) Nothing
                     oPEN_EXISTING 0 Nothing
 
-
 eventToKey :: InputEvent -> Maybe Key
 eventToKey KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc,
                     controlKeyState = cstate}
-    = if c /= '\NUL'
-        then Just $ if c <= '\031' 
-                        -- in this case, a ctrl key press is already encoded
-                        -- in the KeyChar and will be extracted by canonicalizeKey.
-                        then Key metaMod (KeyChar c)
-                        else Key allMods (KeyChar c)
-        else fmap (Key allMods) (keyFromCode vc)
+    = fmap (Key modifier) $ keyFromCode vc `mplus` simpleKeyChar
   where
-    testMod m ck = if (cstate .&. ck) /= 0 then Just m else Nothing
-    metaMod = testMod Meta ((#const RIGHT_ALT_PRESSED) .|. (#const LEFT_ALT_PRESSED))
-    shiftMod = testMod Shift (#const SHIFT_PRESSED)
-    ctrlMod = testMod ControlKey ((#const RIGHT_CTRL_PRESSED) 
-                                    .|. (#const LEFT_CTRL_PRESSED))
-    allMods = metaMod `mplus` shiftMod `mplus` ctrlMod
+    simpleKeyChar = guard (c /= '\NUL') >> return (KeyChar c)
+    testMod ck = (cstate .&. ck) /= 0
+    modifier = Modifier {hasMeta = testMod ((#const RIGHT_ALT_PRESSED) 
+                                        .|. (#const LEFT_ALT_PRESSED))
+                        ,hasControl = testMod ((#const RIGHT_CTRL_PRESSED) 
+                                        .|. (#const LEFT_CTRL_PRESSED))
+                                    && not (c > '\NUL' && c <= '\031')
+                        ,hasShift = testMod (#const SHIFT_PRESSED)
+                                    && not (isUpper c)
+                        }
 
 eventToKey _ = Nothing
 
@@ -88,7 +86,10 @@ keyFromCode (#const VK_DOWN) = Just DownKey
 keyFromCode (#const VK_DELETE) = Just Delete
 keyFromCode (#const VK_HOME) = Just Home
 keyFromCode (#const VK_END) = Just End
--- TODO: KillLine
+-- The Windows console will return '\r' when return is pressed.
+keyFromCode (#const VK_RETURN) = Just (KeyChar '\n')
+-- TODO: KillLine?
+-- TODO: function keys.
 keyFromCode _ = Nothing
     
 data InputEvent = KeyEvent {keyDown :: BOOL,
