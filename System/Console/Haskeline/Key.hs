@@ -70,14 +70,14 @@ parseKey str = fmap canonicalizeKey $ case break (=='-') str of
     (ks,_) -> liftM (Key Nothing) (parseBaseKey ks)
 
 parseBaseKey :: String -> Maybe BaseKey
-parseBaseKey ks = lookup ks specialKeys
+parseBaseKey ks = lookup (map toLower ks) specialKeys
                 `mplus` parseFunctionKey ks
                 `mplus` parseKeyChar ks
     where
-        parseKeyChar [c] = Just (KeyChar c)
+        parseKeyChar [c] | isPrint c = Just (KeyChar c)
         parseKeyChar _ = Nothing
 
-        parseFunctionKey ('f':ns) = case reads ns of
+        parseFunctionKey (f:ns) | f `elem` "fF" = case reads ns of
             [(n,"")]    -> Just (FunKey n)
             _           -> Nothing
         parseFunctionKey _ = Nothing
