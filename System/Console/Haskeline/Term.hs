@@ -3,6 +3,7 @@ module System.Console.Haskeline.Term where
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Key
+import System.Console.Haskeline.Prefs(Prefs)
 
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -28,7 +29,7 @@ data RunTerm = RunTerm {
 data TermOps = TermOps {runTerm :: RunTermType,
                         getLayout :: IO Layout}
 
-type RunTermType = forall m a . (MonadLayout m, MonadException m) 
+type RunTermType = forall m a . (MonadLayout m, MonadException m, MonadReader Prefs m) 
                     => (forall t . (MonadTrans t, Term (t m), MonadException (t m)) 
                             => (t m Event -> t m a)) -> m a
 

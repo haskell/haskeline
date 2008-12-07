@@ -26,6 +26,7 @@ import System.Environment
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.Key
 import System.Console.Haskeline.Term
+import System.Console.Haskeline.Prefs
 
 import GHC.IOBase (haFD,FD)
 import GHC.Handle (withHandle_)
@@ -78,12 +79,15 @@ tryGetLayouts (f:fs) = do
 --------------------
 -- Key sequences
 
-getKeySequences :: Maybe Terminal -> IO (TreeMap Char Key)
+getKeySequences :: (MonadIO m, MonadReader Prefs m)
+        => Maybe Terminal -> m (TreeMap Char Key)
 getKeySequences term = do
-    sttys <- sttyKeys
+    sttys <- liftIO sttyKeys
+    customKeySeqs <- asks customKeySequences
     let tinfos = maybe [] terminfoKeys term
     -- note ++ acts as a union; so the below favors sttys over tinfos
-    return $ listToTree $ ansiKeys ++ tinfos ++ sttys
+    return $ listToTree
+        $ ansiKeys ++ tinfos ++ sttys ++ customKeySeqs
 
 
 ansiKeys :: [(String, Key)]
@@ -166,9 +170,10 @@ lookupChars (TreeMap tm) (c:cs) = case Map.lookup c tm of
 
 -----------------------------
 
-withPosixGetEvent :: MonadException m => Handle -> Maybe Terminal -> (m Event -> m a) -> m a
+withPosixGetEvent :: (MonadTrans t, MonadIO m, MonadException (t m), MonadReader Prefs m) 
+                        => Handle -> Maybe Terminal -> (t m Event -> t m a) -> t m a
 withPosixGetEvent h term f = do
-    baseMap <- liftIO (getKeySequences term)
+    baseMap <- lift $ getKeySequences term
     eventChan <- liftIO $ newTChanIO
     wrapKeypad h term $ withWindowHandler eventChan
         $ f $ liftIO $ getEvent baseMap eventChan

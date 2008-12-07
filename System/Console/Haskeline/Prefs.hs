@@ -43,7 +43,8 @@ data Prefs = Prefs { bellStyle :: !BellStyle,
                         -- ^ If 'False', completions with multiple possibilities
                         -- will ring the bell and only display them if the user
                         -- presses @TAB@ again.
-                     customBindings :: Map.Map Key Key
+                     customBindings :: Map.Map Key Key,
+                     customKeySequences :: [(String,Key)]
                      }
                         deriving Show
 
@@ -77,13 +78,18 @@ defaultPrefs = Prefs {bellStyle = AudibleBell,
                       completionPaging = True,
                       completionPromptLimit = Just 100,
                       listCompletionsImmediately = True,
-                      customBindings = Map.empty
+                      customBindings = Map.empty,
+                      customKeySequences = []
                     }
 
 mkSettor :: Read a => (a -> Prefs -> Prefs) -> String -> Prefs -> Prefs
-mkSettor f str = case reads str of
-                [(x,_)] -> f x
-                _ -> id
+mkSettor f str = maybe id f (readMaybe str)
+
+readMaybe :: Read a => String -> Maybe a
+readMaybe str = case reads str of
+                [(x,_)] -> Just x
+                _ -> Nothing
+
 
 settors :: [(String, String -> Prefs -> Prefs)]
 settors = [("bellstyle", mkSettor $ \x p -> p {bellStyle = x})
@@ -94,12 +100,24 @@ settors = [("bellstyle", mkSettor $ \x p -> p {bellStyle = x})
           ,("completionpromptlimit", mkSettor $ \x p -> p {completionPromptLimit = x})
           ,("listcompletionsimmediately", mkSettor $ \x p -> p {listCompletionsImmediately = x})
           ,("bind", addCustomBinding)
+          ,("keyseq", addCustomKeySequence)
           ]
 
 addCustomBinding :: String -> Prefs -> Prefs
 addCustomBinding str p = case map parseKey (words str) of
     [Just k1,Just k2] -> p {customBindings = Map.insert k1 k2 (customBindings p)}
     _ -> p
+
+addCustomKeySequence :: String -> Prefs -> Prefs
+addCustomKeySequence str = maybe id addKS $ maybeParse
+    where
+        maybeParse :: Maybe (String,Key)
+        maybeParse = do
+            [cstr,kstr] <- return $ words str
+            k <- parseKey kstr
+            cs <- readMaybe cstr
+            return (cs,k)
+        addKS (cs,k) p = p {customKeySequences = (cs,k):customKeySequences p}
 
 -- | Read 'Prefs' from a given file.  If there is an error reading the file,
 -- the 'defaultPrefs' will be returned.
