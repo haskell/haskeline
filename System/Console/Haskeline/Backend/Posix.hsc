@@ -83,11 +83,19 @@ getKeySequences :: (MonadIO m, MonadReader Prefs m)
         => Maybe Terminal -> m (TreeMap Char Key)
 getKeySequences term = do
     sttys <- liftIO sttyKeys
-    customKeySeqs <- asks customKeySequences
+    customKeySeqs <- getCustomKeySeqs
     let tinfos = maybe [] terminfoKeys term
     -- note ++ acts as a union; so the below favors sttys over tinfos
     return $ listToTree
         $ ansiKeys ++ tinfos ++ sttys ++ customKeySeqs
+  where
+    getCustomKeySeqs = do
+        kseqs <- asks customKeySequences
+        termName <- liftIO $ handle (\(_::IOException) -> return "") (getEnv "TERM")
+        let isThisTerm = maybe True (==termName)
+        return $ map (\(_,cs,k) ->(cs,k))
+            $ filter (\(kseqs',_,_) -> isThisTerm kseqs')
+            $ kseqs
 
 
 ansiKeys :: [(String, Key)]

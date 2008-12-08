@@ -44,7 +44,8 @@ data Prefs = Prefs { bellStyle :: !BellStyle,
                         -- will ring the bell and only display them if the user
                         -- presses @TAB@ again.
                      customBindings :: Map.Map Key Key,
-                     customKeySequences :: [(String,Key)]
+                        -- (termName, keysequence, key)
+                     customKeySequences :: [(Maybe String, String,Key)]
                      }
                         deriving Show
 
@@ -111,13 +112,16 @@ addCustomBinding str p = case map parseKey (words str) of
 addCustomKeySequence :: String -> Prefs -> Prefs
 addCustomKeySequence str = maybe id addKS $ maybeParse
     where
-        maybeParse :: Maybe (String,Key)
-        maybeParse = do
-            [cstr,kstr] <- return $ words str
+        maybeParse :: Maybe (Maybe String, String,Key)
+        maybeParse = case words str of
+            [cstr,kstr] -> parseWords Nothing cstr kstr
+            [term,cstr,kstr] -> parseWords (Just term) cstr kstr
+            _ -> Nothing
+        parseWords mterm cstr kstr = do
             k <- parseKey kstr
             cs <- readMaybe cstr
-            return (cs,k)
-        addKS (cs,k) p = p {customKeySequences = (cs,k):customKeySequences p}
+            return (mterm,cs,k)
+        addKS ks p = p {customKeySequences = ks:customKeySequences p}
 
 -- | Read 'Prefs' from a given file.  If there is an error reading the file,
 -- the 'defaultPrefs' will be returned.
