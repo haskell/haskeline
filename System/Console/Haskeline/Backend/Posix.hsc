@@ -218,7 +218,8 @@ getEvent baseMap = keyEventLoop readKeyEvents
         -- Read at least one character of input, and more if available.
         -- In particular, the characters making up a control sequence will all
         -- be available at once, so we can process them together with lexKeys.
-        threadWaitRead stdInput
+        threadWaitRead stdInput -- hWaitForInput doesn't work with -threaded on
+                                -- ghc < 6.10 (#2363 in ghc's trac)
         bs <- B.hGetNonBlocking stdin bufferSize
         let cs = UTF8.toString bs
         let ks = map KeyInput $ lexKeys baseMap cs
