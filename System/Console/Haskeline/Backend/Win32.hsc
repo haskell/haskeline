@@ -19,6 +19,7 @@ import Control.Concurrent hiding (throwTo)
 import Control.Concurrent.STM
 import Data.Bits
 import Data.Char(isUpper)
+import Data.Maybe(mapMaybe)
 import Control.Monad
 
 import System.Console.Haskeline.Key
@@ -34,12 +35,21 @@ foreign import stdcall "windows.h ReadConsoleInputW" c_ReadConsoleInput
 foreign import stdcall "windows.h WaitForSingleObject" c_WaitForSingleObject
     :: HANDLE -> DWORD -> IO DWORD
 
+foreign import stdcall "windows.h GetNumberOfConsoleInputEvents"
+    c_GetNumberOfConsoleInputEvents :: HANDLE -> Ptr DWORD -> IO Bool
+
+getNumberOfEvents :: HANDLE -> IO Int
+getNumberOfEvents h = alloca $ \numEventsPtr -> do
+    failIfFalse_ "GetNumberOfConsoleInputEvents"
+        $ c_GetNumberOfConsoleInputEvents h numEventsPtr
+    fmap fromEnum $ peek numEventsPtr
+
 getEvent :: HANDLE -> IO Event
 getEvent h = newTChanIO >>= keyEventLoop eventIntoChan
   where
-    eventIntoChan tchan = eventLoop h >>= atomically . writeTChan tchan
+    eventIntoChan tchan = eventLoop h >>= atomically . mapM_ (writeTChan tchan)
 
-eventLoop :: HANDLE -> IO Event
+eventLoop :: HANDLE -> IO [Event]
 eventLoop h = do
     let waitTime = 500 -- milliseconds
     ret <- c_WaitForSingleObject h waitTime
@@ -48,10 +58,11 @@ eventLoop h = do
     if ret /= (#const WAIT_OBJECT_0)
         then eventLoop h
         else do
-            e <- readEvent h
-            case eventToKey e of
-	        Just k -> return (KeyInput k)
-    	        Nothing -> eventLoop h
+            es <- readEvents h
+            let es' = mapMaybe processEvent es
+            if null es'
+                then eventLoop h
+                else return es'
                        
 getConOut :: IO (Maybe HANDLE)
 getConOut = handle (\(_::IOException) -> return Nothing) $ fmap Just
@@ -59,10 +70,10 @@ getConOut = handle (\(_::IOException) -> return Nothing) $ fmap Just
                         (fILE_SHARE_READ .|. fILE_SHARE_WRITE) Nothing
                     oPEN_EXISTING 0 Nothing
 
-eventToKey :: InputEvent -> Maybe Key
-eventToKey KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc,
+processEvent :: InputEvent -> Maybe Event
+processEvent KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc,
                     controlKeyState = cstate}
-    = fmap (Key modifier) $ keyFromCode vc `mplus` simpleKeyChar
+    = fmap (KeyInput . Key modifier) $ keyFromCode vc `mplus` simpleKeyChar
   where
     simpleKeyChar = guard (c /= '\NUL') >> return (KeyChar c)
     testMod ck = (cstate .&. ck) /= 0
@@ -75,7 +86,8 @@ eventToKey KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc,
                                     && not (isUpper c)
                         }
 
-eventToKey _ = Nothing
+processEvent WindowEvent = Just WindowResize
+processEvent _ = Nothing
 
 keyFromCode :: WORD -> Maybe BaseKey
 keyFromCode (#const VK_BACK) = Just Backspace
@@ -100,21 +112,30 @@ data InputEvent = KeyEvent {keyDown :: BOOL,
                           controlKeyState :: DWORD}
             -- TODO: WINDOW_BUFFER_SIZE_RECORD
             -- I cant figure out how the user generates them.
+           | WindowEvent
            | OtherEvent
                         deriving Show
 
-readEvent :: HANDLE -> IO InputEvent
-readEvent h = allocaBytes (#size INPUT_RECORD) $ \pRecord -> 
-                        alloca $ \numEventsPtr -> do
-    failIfFalse_ "ReadConsoleInput" 
-        $ c_ReadConsoleInput h pRecord 1 numEventsPtr
-    -- useful? numEvents <- peek numEventsPtr
+peekEvent :: Ptr () -> IO InputEvent
+peekEvent pRecord = do
     eventType :: WORD <- (#peek INPUT_RECORD, EventType) pRecord
     let eventPtr = (#ptr INPUT_RECORD, Event) pRecord
     case eventType of
         (#const KEY_EVENT) -> getKeyEvent eventPtr
+        (#const WINDOW_BUFFER_SIZE_EVENT) -> return WindowEvent
         _ -> return OtherEvent
-        
+
+readEvents :: HANDLE -> IO [InputEvent]
+readEvents h = do
+    n <- getNumberOfEvents h
+    alloca $ \numEventsPtr -> 
+        allocaBytes (n * #size INPUT_RECORD) $ \pRecord -> do
+            failIfFalse_ "ReadConsoleInput" 
+                $ c_ReadConsoleInput h pRecord (toEnum n) numEventsPtr
+            numRead <- fmap fromEnum $ peek numEventsPtr
+            forM [0..toEnum numRead-1] $ \i -> peekEvent
+                $ pRecord `plusPtr` (i * #size INPUT_RECORD)
+
 getKeyEvent :: Ptr () -> IO InputEvent
 getKeyEvent p = do
     kDown' <- (#peek KEY_EVENT_RECORD, bKeyDown) p
@@ -189,6 +210,26 @@ foreign import stdcall "windows.h MessageBeep" c_messageBeep :: UINT -> IO Bool
 messageBeep :: IO ()
 messageBeep = c_messageBeep (-1) >> return ()-- intentionally ignore failures.
 
+
+----------
+-- Console mode
+foreign import stdcall "windows.h GetConsoleMode" c_GetConsoleMode
+    :: HANDLE -> Ptr DWORD -> IO Bool
+
+foreign import stdcall "windows.h SetConsoleMode" c_SetConsoleMode
+    :: HANDLE -> DWORD -> IO Bool
+
+withWindowMode :: MonadException m => m a -> m a
+withWindowMode f = do
+    h <- liftIO $ getStdHandle sTD_INPUT_HANDLE
+    bracket (getConsoleMode h) (setConsoleMode h)
+            $ \m -> setConsoleMode h (m .|. (#const ENABLE_WINDOW_INPUT)) >> f
+  where
+    getConsoleMode h = liftIO $ alloca $ \p -> do
+            failIfFalse_ "GetConsoleMode" $ c_GetConsoleMode h p
+            peek p
+    setConsoleMode h m = liftIO $ failIfFalse_ "SetConsoleMode" $ c_SetConsoleMode h m
+
 ----------------------------
 -- Drawing
 
@@ -245,7 +286,10 @@ crlf = "\r\n"
 
 instance (MonadException m, MonadLayout m) => Term (Draw m) where
     drawLineDiff = drawLineDiffWin
-    reposition _ _ = return () -- TODO when we capture resize events.
+    -- TODO now that we capture resize events.
+    -- first, looks like the cursor stays on the same line but jumps
+    -- to the beginning if cut off.
+    reposition _ _ = return ()
 
     printLines [] = return ()
     printLines ls = printText $ intercalate crlf ls ++ crlf
@@ -275,7 +319,7 @@ win32Term = do
                 Nothing -> fileRunTerm
                 Just h -> return RunTerm {
                             putStrOut = putter,
-                            wrapInterrupt = withCtrlCHandler,
+                            wrapInterrupt = withWindowMode . withCtrlCHandler,
                             termOps = Just TermOps {
                                             getLayout = getBufferSize h,
                                             runTerm = consoleRunTerm h},
