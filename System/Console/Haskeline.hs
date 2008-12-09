@@ -3,8 +3,8 @@
 A rich user interface for line input in command-line programs.  Haskeline is
 Unicode-aware and runs both on POSIX-compatible systems and on Windows.  
 
-Users may customize the interface with a @~/.haskeline@ file; see the
-"System.Console.Haskeline.Prefs" module for more details.
+Users may customize the interface with a @~/.haskeline@ file; see
+<http://trac.haskell.org/haskeline/wiki/UserPrefs> for more information.
 
 An example use of this library for a simple read-eval-print loop is the
 following:
@@ -41,13 +41,16 @@ module System.Console.Haskeline(
                     Settings(..),
                     defaultSettings,
                     setComplete,
+                    -- * User preferences
+                    Prefs(),
+                    readPrefs,
+                    defaultPrefs,
                     -- * Ctrl-C handling
                     -- $ctrlc
                     Interrupt(..),
                     withInterrupt,
                     handleInterrupt,
                     module System.Console.Haskeline.Completion,
-                    module System.Console.Haskeline.Prefs,
                     module System.Console.Haskeline.MonadException)
                      where
 

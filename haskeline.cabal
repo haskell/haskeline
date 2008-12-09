@@ -43,7 +43,6 @@ Library
     Exposed-Modules:
                 System.Console.Haskeline
                 System.Console.Haskeline.Completion
-                System.Console.Haskeline.Prefs
                 System.Console.Haskeline.MonadException
     Other-Modules:
                 System.Console.Haskeline.Backend
@@ -55,6 +54,7 @@ Library
                 System.Console.Haskeline.Key
                 System.Console.Haskeline.LineState
                 System.Console.Haskeline.Monads
+                System.Console.Haskeline.Prefs
                 System.Console.Haskeline.Term
                 System.Console.Haskeline.Command.Undo
                 System.Console.Haskeline.Vi

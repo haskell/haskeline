@@ -1,17 +1,3 @@
-{- |
-'Prefs' allow the user to customize the line-editing interface.  They are
-read by default from @~/.haskeline@; to override that behavior, use
-'readPrefs' and @runInputTWithPrefs@.  
-
-Each line of a @.haskeline@ file defines
-one field of the 'Prefs' datatype; field names are case-insensitive and
-unparseable lines are ignored.  For example:
-
-> editMode: Vi
-> completionType: MenuCompletion
-> maxhistorysize: Just 40
-
--}
 module System.Console.Haskeline.Prefs(
                         Prefs(..),
                         defaultPrefs,
@@ -27,7 +13,20 @@ import qualified Data.Map as Map
 import System.Console.Haskeline.MonadException(handle,IOException)
 import System.Console.Haskeline.Key
 
+{- |
+'Prefs' allow the user to customize the line-editing interface.  They are
+read by default from @~/.haskeline@; to override that behavior, use
+'readPrefs' and @runInputTWithPrefs@.
 
+Each line of a @.haskeline@ file defines
+one field of the 'Prefs' datatype; field names are case-insensitive and
+unparseable lines are ignored.  For example:
+
+> editMode: Vi
+> completionType: MenuCompletion
+> maxhistorysize: Just 40
+
+-}
 data Prefs = Prefs { bellStyle :: !BellStyle,
                      editMode :: !EditMode,
                      maxHistorySize :: !(Maybe Int),
@@ -59,18 +58,8 @@ data BellStyle = NoBell | VisualBell | AudibleBell
 data EditMode = Vi | Emacs
                     deriving (Show,Read)
 
-{- | The default preferences which may be overwritten in the @.haskeline@ file:
-
-> defaultPrefs = Prefs {bellStyle = AudibleBell,
->                      maxHistorySize = Just 100,
->                      editMode = Emacs,
->                      completionType = ListCompletion,
->                      completionPaging = True,
->                      completionPromptLimit = Just 100,
->                      listCompletionsImmediately = True
->                    }
-
--}
+-- | The default preferences which may be overwritten in the
+-- @.haskeline@ file.
 defaultPrefs :: Prefs
 defaultPrefs = Prefs {bellStyle = AudibleBell,
                       maxHistorySize = Just 100,
