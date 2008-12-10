@@ -23,9 +23,6 @@ following:
 >                Just input -> do outputStrLn $ "Input was: " ++ input
 >                                 loop
 
-If either 'stdin' or 'stdout' is not connected to a terminal (for example, piped from another
-process), Haskeline will treat it as a UTF-8-encoded file handle.  
-
 -}
 
 
@@ -36,9 +33,11 @@ module System.Console.Haskeline(
                     runInputT,
                     runInputTWithPrefs,
                     -- ** Reading user input
+                    -- $inputfncs
                     getInputLine,
                     getInputChar,
                     -- ** Outputting text
+                    -- $outputfncs
                     outputStr,
                     outputStrLn,
                     -- * Settings
@@ -92,28 +91,41 @@ defaultSettings :: MonadIO m => Settings m
 defaultSettings = Settings {complete = completeFilename,
                         historyFile = Nothing}
 
--- | Write a string to the standard output.  Allows cross-platform display of Unicode
--- characters.
+{- $outputfncs
+The following functions allow cross-platform output of text that may contain
+Unicode characters.
+
+If 'stdout' is not connected to a terminal (for example,
+piped to another process), Haskeline will treat it as a UTF-8-encoded file
+handle.
+-}
+
+-- | Write a string to the standard output.
 outputStr :: MonadIO m => String -> InputT m ()
 outputStr xs = do
     putter <- asks putStrOut
     liftIO $ putter xs
 
--- | Write a string to the standard output, followed by a newline.  Allows
--- cross-platform display of Unicode characters.
+-- | Write a string to the standard output, followed by a newline.
 outputStrLn :: MonadIO m => String -> InputT m ()
 outputStrLn xs = outputStr (xs++"\n")
 
-{- | Read one line of input.  The final newline (if any) is removed.
 
-If 'stdin' is connected to a terminal with echoing enabled, 'getInputLine' provides a rich line-editing
-user interface.  It returns 'Nothing' if the user presses @Ctrl-D@ when the input
-text is empty.  All user interaction, including display of the input prompt, will occur
-on the user's output terminal (which may differ from 'stdout').
+{- $inputfncs
+If 'stdin' is connected to a terminal, then these functions perform all user interaction,
+including display of the prompt text, on the user's output terminal (which may differ from
+'stdout').
+They return 'Nothing' if the user pressed @Ctrl-D@ when the
+input text was empty.
 
-If 'stdin' is not connected to a terminal, 'getInputLine' prints the prompt to 'stdout'
-and reads one line of input. It returns 'Nothing'  if an @EOF@ is
-encountered before any characters are read.
+If 'stdin' is not connected to a terminal or does not have echoing enabled, it will be
+treated as a UTF8-encoded file handle.  These functions print the prompt to 'stdout',
+and they return 'Nothing' if an @EOF@ was encountered before any characters were read.
+-}
+
+
+{- | Reads one line of input.  The final newline (if any) is removed.  Provides a rich
+line-editing user interface if 'stdin' is a terminal.
 -}
 getInputLine :: forall m . MonadException m => String -- ^ The input prompt
                             -> InputT m (Maybe String)
@@ -224,18 +236,8 @@ withReposition tops prefix s f = do
                 f
 ----------
 
-{- | Read one character of input from the user, without waiting for a newline.
-
-If 'stdin' is connected to a terminal with echoing enabled, 'getInputLine' returns
-'Nothing' if the user presses @Ctrl-D@.  All user interaction, incuding display of the
-input prompt, will occur on the user's output terminal (which may differ from 'stdout').
-
-If 'stdin' is not connected to a terminal, 'getInputChar' prints the prompt to 'stdout'
-and reads one character of input. It returns 'Nothing'  if an @EOF@ is
-encountered before any characters are read.
-
+{- | Reads one character of input, without waiting for a newline.
 -}
-
 getInputChar :: MonadException m => String -- ^ The input prompt
                     -> InputT m (Maybe Char)
 getInputChar prefix = do
