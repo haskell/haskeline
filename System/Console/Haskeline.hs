@@ -168,16 +168,6 @@ repeatTillFinish tops getEvent prefix = loop
                                         drawEffect prefix s effect
                                         loop (effectState effect) next
 
-{-- 
-When stdin is not a console, just read in one line of input.
-
-NOTE: this behavior "breaks" when we run for example "cat | Test":
-Printing the input to stdout is redundant because cat already echoes what the user has
-typed.
-Given the tradeoffs of all of the different ways of piping to/from stdin/stdout,
-I think it's fine because this case seems least likely to occur in practice.
--}
-
 simpleFileLoop :: MonadIO m => String -> RunTerm -> m (Maybe String)
 simpleFileLoop prefix rterm = liftIO $ do
     putStrOut rterm prefix
