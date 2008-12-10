@@ -45,24 +45,19 @@ getNumberOfEvents h = alloca $ \numEventsPtr -> do
     fmap fromEnum $ peek numEventsPtr
 
 getEvent :: HANDLE -> IO Event
-getEvent h = newTChanIO >>= keyEventLoop eventIntoChan
-  where
-    eventIntoChan tchan = eventLoop h >>= atomically . mapM_ (writeTChan tchan)
+getEvent h = newTChanIO >>= keyEventLoop (eventReader h)
 
-eventLoop :: HANDLE -> IO [Event]
-eventLoop h = do
+eventReader :: HANDLE -> IO [Event]
+eventReader h = do
     let waitTime = 500 -- milliseconds
     ret <- c_WaitForSingleObject h waitTime
     yield -- otherwise, the above foreign call causes the loop to never 
           -- respond to the killThread
     if ret /= (#const WAIT_OBJECT_0)
-        then eventLoop h
+        then eventReader h
         else do
             es <- readEvents h
-            let es' = mapMaybe processEvent es
-            if null es'
-                then eventLoop h
-                else return es'
+            return $ mapMaybe processEvent es
                        
 getConOut :: IO (Maybe HANDLE)
 getConOut = handle (\(_::IOException) -> return Nothing) $ fmap Just

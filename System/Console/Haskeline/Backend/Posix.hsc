@@ -214,7 +214,7 @@ getEvent :: TreeMap Char Key -> TChan Event -> IO Event
 getEvent baseMap = keyEventLoop readKeyEvents
   where
     bufferSize = 100
-    readKeyEvents eventChan = do
+    readKeyEvents = do
         -- Read at least one character of input, and more if available.
         -- In particular, the characters making up a control sequence will all
         -- be available at once, so we can process them together with lexKeys.
@@ -222,10 +222,7 @@ getEvent baseMap = keyEventLoop readKeyEvents
                                 -- ghc < 6.10 (#2363 in ghc's trac)
         bs <- B.hGetNonBlocking stdin bufferSize
         let cs = UTF8.toString bs
-        let ks = map KeyInput $ lexKeys baseMap cs
-        if null ks
-            then readKeyEvents eventChan
-            else atomically $ mapM_ (writeTChan eventChan) ks
+        return $ map KeyInput $ lexKeys baseMap cs
 
 -- fails if stdin is not a handle or if we couldn't access /dev/tty.
 openTTY :: IO (Maybe Handle)

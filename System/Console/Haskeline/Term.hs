@@ -42,8 +42,8 @@ matchInit xs ys = (xs,ys)
 data Event = WindowResize | KeyInput Key
                 deriving Show
 
-keyEventLoop :: (TChan Event -> IO ()) -> TChan Event -> IO Event
-keyEventLoop readKey eventChan = do
+keyEventLoop :: IO [Event] -> TChan Event -> IO Event
+keyEventLoop readEvents eventChan = do
     -- first, see if any events are already queued up (from a key/ctrl-c
     -- event or from a previous call to getEvent where we read in multiple
     -- keys)    
@@ -54,9 +54,15 @@ keyEventLoop readKey eventChan = do
             -- no events are queued yet, so fork off a thread to read keys.
             -- if we receive a different type of event before it's done,
             -- we'll kill it.
-            tid <- forkIO (readKey eventChan)
+            tid <- forkIO readerLoop
             (atomically $ readTChan eventChan)
                 `finally` killThread tid
+  where
+    readerLoop = do
+        es <- readEvents
+        if null es
+            then readerLoop
+            else atomically $ mapM_ (writeTChan eventChan) es
 
 tryReadTChan :: TChan a -> STM (Maybe a)
 tryReadTChan chan = fmap Just (readTChan chan) `orElse` return Nothing
