@@ -31,10 +31,14 @@ process), Haskeline will treat it as a UTF-8-encoded file handle.
 
 module System.Console.Haskeline(
                     -- * Main functions
+                    -- ** The InputT monad transformer
                     InputT,
                     runInputT,
                     runInputTWithPrefs,
+                    -- ** Reading user input
                     getInputLine,
+                    getInputChar,
+                    -- ** Outputting text
                     outputStr,
                     outputStrLn,
                     -- * Settings
@@ -65,11 +69,13 @@ import System.Console.Haskeline.MonadException
 import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Completion
 import System.Console.Haskeline.Term
+import System.Console.Haskeline.Key
 
 import System.IO
 import qualified System.IO.UTF8 as UTF8
 import Data.Char (isSpace)
 import Control.Monad
+import Data.Char(isPrint)
 
 
 
@@ -150,14 +156,7 @@ repeatTillFinish tops getEvent prefix = loop
         loop s processor = do
                 event <- handle (\(e::SomeException) -> movePast prefix s >> throwIO e) getEvent
                 case event of
-                    WindowResize -> do
-                        oldLayout <- ask
-                        newLayout <- liftIO $ getLayout tops
-                        if oldLayout == newLayout
-                            then loop s processor
-                            else local newLayout $ do
-                                reposition oldLayout (lineChars prefix s)
-                                loop s processor
+                    WindowResize -> withReposition tops prefix s $ loop s processor
                     KeyInput k -> do
                       action <- lift $ lookupKey processor k
                       case action of
@@ -224,6 +223,74 @@ actBell = do
 movePast :: (LineState s, Term m) => String -> s -> m ()
 movePast prefix s = moveToNextLine (lineChars prefix s)
 
+withReposition :: (LineState s, Term m) => TermOps -> String -> s -> m a -> m a
+withReposition tops prefix s f = do
+    oldLayout <- ask
+    newLayout <- liftIO $ getLayout tops
+    if oldLayout == newLayout
+        then f
+        else local newLayout $ do
+                reposition oldLayout (lineChars prefix s)
+                f
+----------
+
+{- | Read one character of input from the user, without waiting for a newline.
+
+If 'stdin' is connected to a terminal with echoing enabled, 'getInputLine' returns
+'Nothing' if the user presses @Ctrl-D@.  All user interaction, incuding display of the
+input prompt, will occur on the user's output terminal (which may differ from 'stdout').
+
+If 'stdin' is not connected to a terminal, 'getInputChar' prints the prompt to 'stdout'
+and reads one character of input. It returns 'Nothing'  if an @EOF@ is
+encountered before any characters are read.
+
+-}
+
+getInputChar :: MonadException m => String -- ^ The input prompt
+                    -> InputT m (Maybe Char)
+getInputChar prefix = do
+    liftIO $ hFlush stdout
+    rterm <- ask
+    echo <- liftIO $ hGetEcho stdin
+    case termOps rterm of
+        Just tops | echo -> getInputCmdChar tops prefix
+        _ -> simpleFileChar prefix rterm
+
+simpleFileChar :: MonadIO m => String -> RunTerm -> m (Maybe Char)
+simpleFileChar prefix rterm = liftIO $ do
+    putStrOut rterm prefix
+    atEOF <- hIsEOF stdin
+    if atEOF
+        then return Nothing
+        else liftM Just getChar -- TODO: utf8?
+
+-- TODO: it might be possible to unify this function with getInputCmdLine,
+-- maybe by calling repeatTillFinish here...
+-- It shouldn't be too hard to make Commands parametrized over a return
+-- value (which would be Maybe Char in this case).
+-- My primary obstacle is that there's currently no way to have a
+-- single character input cause a character to be printed and then
+-- immediately exit without waiting for Return to be pressed.
+getInputCmdChar :: MonadException m => TermOps -> String -> InputT m (Maybe Char)
+getInputCmdChar tops prefix = runInputCmdT tops $ runTerm tops $ \getEvent -> do
+                                                drawLine prefix emptyIM
+                                                loop getEvent
+    where
+        s = emptyIM
+        loop :: Term m => m Event -> m (Maybe Char)
+        loop getEvent = do
+            event <- handle (\(e::SomeException) -> movePast prefix emptyIM >> throwIO e) getEvent
+            case event of
+                KeyInput (Key m (KeyChar c))
+                    | m /= noModifier -> loop getEvent
+                    | c == '\EOT'     -> movePast prefix s >> return Nothing
+                    | isPrint c -> do
+                            let s' = insertChar c s
+                            drawLineStateDiff prefix s s'
+                            movePast prefix s'
+                            return (Just c)
+                WindowResize -> withReposition tops prefix emptyIM $ loop getEvent
+                _ -> loop getEvent
 
 
 ------------
