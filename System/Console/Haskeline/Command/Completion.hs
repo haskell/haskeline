@@ -23,7 +23,7 @@ fullReplacement c   | isFinished c  = replacement c ++ " "
 makeCompletion :: Monad m => InsertMode -> InputCmdT m (InsertMode, [Completion])
 makeCompletion (IMode xs ys) = do
     f <- asks complete
-    (rest,completions) <- liftCmdT (f xs)
+    (rest,completions) <- liftCmdT (f (xs, ys))
     return (IMode rest ys,completions)
 
 -- | Create a 'Command' for word completion.

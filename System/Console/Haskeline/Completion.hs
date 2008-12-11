@@ -20,11 +20,14 @@ import Control.Monad(forM)
 
 import System.Console.Haskeline.Monads
 
--- | Performs completions from a reversed 'String'.  
--- The output 'String' is also reversed.
--- Use 'completeWord' to build these functions.
-
-type CompletionFunc m = String -> m (String, [Completion])
+-- | Performs completions from the given line state.
+--
+-- The first 'String' argument is the contents of the line to the left of the cursor,
+-- reversed.
+-- The second 'String' argument is the contents of the line to the right of the cursor.
+--
+-- The output 'String' is the unused portion of the left half of the line, reversed.
+type CompletionFunc m = (String,String) -> m (String, [Completion])
 
 
 data Completion = Completion {replacement  :: String, -- ^ Text to insert in line.
@@ -39,7 +42,7 @@ data Completion = Completion {replacement  :: String, -- ^ Text to insert in lin
 
 -- | Disable completion altogether.
 noCompletion :: Monad m => CompletionFunc m
-noCompletion s = return (s,[])
+noCompletion (s,_) = return (s,[])
 
 --------------
 -- Word break functions
@@ -50,7 +53,7 @@ completeWord :: Monad m => Maybe Char
         -> String -- ^ List of characters which count as whitespace
         -> (String -> m [Completion]) -- ^ Function to produce a list of possible completions
         -> CompletionFunc m
-completeWord esc ws f line = do
+completeWord esc ws f (line, _) = do
     let (word,rest) = case esc of
                         Nothing -> break (`elem` ws) line
                         Just e -> escapedBreak e line
@@ -102,7 +105,8 @@ completeQuotedWord :: Monad m => Maybe Char -- ^ An optional escape character
                             -> CompletionFunc m -- ^ Alternate completion to perform if the 
                                             -- cursor is not at a quoted word
                             -> CompletionFunc m
-completeQuotedWord esc qs completer alterative = \line -> case splitAtQuote esc qs line of
+completeQuotedWord esc qs completer alterative line@(left,_)
+  = case splitAtQuote esc qs left of
     Just (w,rest) | isUnquoted esc qs rest -> do
         cs <- completer (reverse w)
         return (rest, map (addQuotes . escapeReplacement esc qs) cs)
