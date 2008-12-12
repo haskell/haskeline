@@ -13,7 +13,7 @@ import Data.Foldable
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as UTF8
-import Control.Exception.Extensible(evaluate)
+import Control.Exception.Extensible
 
 import System.Directory(doesFileExist)
 
@@ -34,9 +34,9 @@ historyLines = toList . histLines
 -- should probably just silently catch all errors.
 
 -- | Reads the line input history from the given file.  Returns 
--- 'emptyHistory' if the file does not exist.
+-- 'emptyHistory' if the file does not exist or could not be read.
 readHistory :: FilePath -> IO History
-readHistory file = do
+readHistory file = handle (\(_::IOException) -> return emptyHistory) $ do
     exists <- doesFileExist file
     contents <- if exists
         -- use binary file I/O to avoid Windows CRLF line endings
@@ -48,9 +48,10 @@ readHistory file = do
                     stifleAmount = Nothing}
 
 -- | Writes the line history to the given file.  If there is an
--- error when writing the file, ignores it.
+-- error when writing the file, it will be ignored.
 writeHistory :: FilePath -> History -> IO ()
-writeHistory file = B.writeFile file . UTF8.fromString
+writeHistory file = handle (\(_::IOException) -> return ())
+        . B.writeFile file . UTF8.fromString
         . unlines . historyLines 
 
 stifleHistory :: Maybe Int -> History -> History
