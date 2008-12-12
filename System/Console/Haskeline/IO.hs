@@ -44,42 +44,42 @@ import Control.Concurrent
 import Control.Concurrent.MVar
 import System.IO
 
-import Data.Dynamic
 import Control.Monad.Trans
 
 -- Providing a non-monadic API for haskeline
 -- A process is forked off which runs the monadic InputT API
 -- and actions to be run are passed to it through the following MVars.
+
+data Request = forall a . Request (InputT IO a) (MVar a)
+
 data InputState = HD {forkedThread :: ThreadId,
-                        inputChan :: MVar (Maybe (InputT IO Dynamic)),
-                        outputChan :: MVar Dynamic,
+                        requestVar :: MVar (Maybe Request),
                         subthreadFinished :: MVar ()
                     }
 
 -- | Initialize a session of line-oriented user interaction.
 initializeInput :: Settings IO -> IO InputState
 initializeInput settings = do
-    inC <- newEmptyMVar
-    outC <- newEmptyMVar
+    reqV <- newEmptyMVar
     finished <- newEmptyMVar
-    tid <- forkIO (runHaskeline settings inC outC finished)
-    return HD {inputChan = inC, outputChan = outC, forkedThread = tid,
+    tid <- forkIO (runHaskeline settings reqV finished)
+    return HD {requestVar = reqV, forkedThread = tid,
                 subthreadFinished = finished}
 
-runHaskeline :: Settings IO -> MVar (Maybe (InputT IO a)) -> MVar a -> MVar () -> IO ()
-runHaskeline settings inC outC finished = runInputT settings loop
+runHaskeline :: Settings IO -> MVar (Maybe Request) -> MVar () -> IO ()
+runHaskeline settings reqV finished = runInputT settings loop
                     `finally` putMVar finished ()
     where
         loop = do
-            mf <- liftIO $ takeMVar inC
+            mf <- liftIO $ takeMVar reqV
             case mf of
                 Nothing -> return ()
-                Just f -> f >>= liftIO . putMVar outC >> loop
+                Just (Request f var) -> f >>= liftIO . putMVar var >> loop
 
 -- | Finish and clean up the line-oriented user interaction session.  Blocks on an
 -- existing call to 'queryInput'.
 closeInput :: InputState -> IO ()
-closeInput hd = putMVar (inputChan hd) Nothing >> takeMVar (subthreadFinished hd)
+closeInput hd = putMVar (requestVar hd) Nothing >> takeMVar (subthreadFinished hd)
 
 -- | Cancel and clean up the user interaction session.  Does not block on an existing
 -- call to 'queryInput'.
@@ -93,11 +93,10 @@ cancelInput hd = killThread (forkedThread hd) >> takeMVar (subthreadFinished hd)
 -- histories unless they share the same history file.
 --
 -- This function should not be called on a closed or cancelled 'InputState'.
-queryInput :: Typeable a => InputState -> InputT IO a -> IO a
+queryInput :: InputState -> InputT IO a -> IO a
 queryInput hd f = do
-    putMVar (inputChan hd) (Just (fmap toDyn f))
-    fmap fromDyn' $ takeMVar (outputChan hd)
-  where
-    fromDyn' dyn = fromDyn dyn (error "unexpected cast failure!")
+    var <- newEmptyMVar
+    putMVar (requestVar hd) (Just (Request f var))
+    takeMVar var
 
 
