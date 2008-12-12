@@ -1,6 +1,7 @@
 module System.Console.Haskeline.InputT where
 
 
+import System.Console.Haskeline.History
 import System.Console.Haskeline.Command.History
 import System.Console.Haskeline.Command.Undo
 import System.Console.Haskeline.Monads as Monads
@@ -12,7 +13,7 @@ import System.Console.Haskeline.Term
 import System.Directory(getHomeDirectory)
 import System.FilePath
 import Control.Applicative
-import Control.Monad(liftM, ap)
+import qualified Control.Monad.State as State
 
 -- | Application-specific customizations to the user interface.
 data Settings m = Settings {complete :: CompletionFunc m, -- ^ Custom tab completion
@@ -38,11 +39,11 @@ newtype InputT m a = InputT {unInputT :: ReaderT RunTerm
                                         MonadReader RunTerm)
 
 instance Monad m => Functor (InputT m) where
-    fmap = liftM
+    fmap = State.liftM
 
 instance Monad m => Applicative (InputT m) where
     pure = return
-    (<*>) = ap
+    (<*>) = State.ap
 
 instance MonadTrans InputT where
     lift = InputT . lift . lift . lift . lift
@@ -51,6 +52,10 @@ instance MonadException m => MonadException (InputT m) where
     block = InputT . block . unInputT
     unblock = InputT . unblock . unInputT
     catch f h = InputT $ Monads.catch (unInputT f) (unInputT . h)
+
+instance Monad m => State.MonadState History (InputT m) where
+    get = get
+    put = put
 
 -- for internal use only
 type InputCmdT m = ReaderT Layout (UndoT (StateT HistLog 

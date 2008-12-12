@@ -59,10 +59,10 @@ module System.Console.Haskeline(
 
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Command
-import System.Console.Haskeline.Command.History
 import System.Console.Haskeline.Vi
 import System.Console.Haskeline.Emacs
 import System.Console.Haskeline.Prefs
+import System.Console.Haskeline.History
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.MonadException
 import System.Console.Haskeline.InputT
@@ -154,7 +154,7 @@ getInputCmdLine tops prefix = do
                             repeatTillFinish tops getEvent prefix ls emode
     -- Add the line to the history if it's nonempty.
     case result of 
-        Just line | not (all isSpace line) -> addHistory line
+        Just line | not (all isSpace line) -> modify (addHistory line)
         _ -> return ()
     return result
 

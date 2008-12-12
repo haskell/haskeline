@@ -7,13 +7,7 @@ import Control.Monad(liftM,mplus)
 import System.Console.Haskeline.Monads
 import Data.List
 import Data.Maybe(fromMaybe)
-import Control.Exception.Extensible(evaluate)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.UTF8 as UTF8
-
-import System.Directory(doesFileExist)
-
-data History = History {historyLines :: [String]} -- stored in reverse
+import System.Console.Haskeline.History
 
 data HistLog = HistLog {pastHistory, futureHistory :: [String]}
                     deriving Show
@@ -32,27 +26,12 @@ histLog :: History -> HistLog
 histLog hist = HistLog {pastHistory = historyLines hist, futureHistory = []}
 
 runHistoryFromFile :: MonadIO m => Maybe FilePath -> Maybe Int -> StateT History m a -> m a
-runHistoryFromFile Nothing _ f = evalStateT' (History []) f
+runHistoryFromFile Nothing _ f = evalStateT' emptyHistory f
 runHistoryFromFile (Just file) stifleAmt f = do
-    contents <- liftIO $ do
-                exists <- doesFileExist file
-                if exists
-                    -- use binary file I/O to avoid Windows CRLF line endings
-                    -- which cause confusion when switching between systems.
-                    then fmap UTF8.toString (B.readFile file)
-                    else return ""
-    liftIO $ evaluate (length contents) -- force file closed
-    let oldHistory = History (lines contents)
-    (x,newHistory) <- runStateT f oldHistory
-    let stifle = case stifleAmt of
-                    Nothing -> id
-                    Just m -> take m
-    liftIO $ B.writeFile file $ UTF8.fromString 
-        $ unlines $ stifle $ historyLines newHistory
+    oldHistory <- liftIO $ readHistory file
+    (x,newHistory) <- runStateT f (stifleHistory stifleAmt oldHistory)
+    liftIO $ writeHistory file newHistory
     return x
-
-addHistory :: MonadState History m => String -> m ()
-addHistory l = modify $ \(History ls) -> History (l:ls)
 
 runHistLog :: Monad m => StateT HistLog m a -> StateT History m a
 runHistLog f = do
