@@ -17,7 +17,6 @@ main = bracketOnError (initHaskeline defaultSettings)
             cancelHaskeline -- This will only be called if an exception such
                             -- as a SigINT is received.
             (\\hd -> loop hd >> closeHaskeline hd)
-
     where
         loop :: HaskelineData -> IO ()
         loop hd = do
