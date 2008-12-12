@@ -13,18 +13,18 @@ import System.Console.Haskeline
 import System.Console.Haskeline.IO
 import Control.Concurrent
 
-main = bracketOnError (initHaskeline defaultSettings)
-            cancelHaskeline -- This will only be called if an exception such
+main = bracketOnError (initializeInput defaultSettings)
+            cancelInput -- This will only be called if an exception such
                             -- as a SigINT is received.
-            (\\hd -> loop hd >> closeHaskeline hd)
+            (\\hd -> loop hd >> closeInput hd)
     where
-        loop :: HaskelineData -> IO ()
+        loop :: InputState -> IO ()
         loop hd = do
-            minput <- askHaskeline hd (getInputLine \"% \")
+            minput <- queryInput hd (getInputLine \"% \")
             case minput of
                 Nothing -> return ()
                 Just \"quit\" -> return ()
-                Just input -> do askHaskeline hd $ outputStrLn
+                Just input -> do queryInput hd $ outputStrLn
                                     $ \"Input was: \" ++ input
                                  loop hd
 @
@@ -32,11 +32,11 @@ main = bracketOnError (initHaskeline defaultSettings)
 
 -}
 module System.Console.Haskeline.IO(
-                        HaskelineData(),
-                        initHaskeline,
-                        closeHaskeline,
-                        cancelHaskeline,
-                        askHaskeline
+                        InputState(),
+                        initializeInput,
+                        closeInput,
+                        cancelInput,
+                        queryInput
                         ) where
 
 import System.Console.Haskeline hiding (completeFilename)
@@ -50,15 +50,15 @@ import Control.Monad.Trans
 -- Providing a non-monadic API for haskeline
 -- A process is forked off which runs the monadic InputT API
 -- and actions to be run are passed to it through the following MVars.
-data HaskelineData = HD {forkedThread :: ThreadId,
+data InputState = HD {forkedThread :: ThreadId,
                         inputChan :: MVar (Maybe (InputT IO Dynamic)),
                         outputChan :: MVar Dynamic,
                         subthreadFinished :: MVar ()
                     }
 
 -- | Initialize a session of line-oriented user interaction.
-initHaskeline :: Settings IO -> IO HaskelineData
-initHaskeline settings = do
+initializeInput :: Settings IO -> IO InputState
+initializeInput settings = do
     inC <- newEmptyMVar
     outC <- newEmptyMVar
     finished <- newEmptyMVar
@@ -77,24 +77,24 @@ runHaskeline settings inC outC finished = runInputT settings loop
                 Just f -> f >>= liftIO . putMVar outC >> loop
 
 -- | Finish and clean up the line-oriented user interaction session.  Blocks on an
--- existing call to 'askHaskeline'.
-closeHaskeline :: HaskelineData -> IO ()
-closeHaskeline hd = putMVar (inputChan hd) Nothing >> takeMVar (subthreadFinished hd)
+-- existing call to 'queryInput'.
+closeInput :: InputState -> IO ()
+closeInput hd = putMVar (inputChan hd) Nothing >> takeMVar (subthreadFinished hd)
 
 -- | Cancel and clean up the user interaction session.  Does not block on an existing
--- call to 'askHaskeline'.
-cancelHaskeline :: HaskelineData -> IO ()
-cancelHaskeline hd = killThread (forkedThread hd) >> takeMVar (subthreadFinished hd)
+-- call to 'queryInput'.
+cancelInput :: InputState -> IO ()
+cancelInput hd = killThread (forkedThread hd) >> takeMVar (subthreadFinished hd)
 
 -- | Run one action (for example, 'getInputLine') as part of a session of user interaction.
 --
--- For example, multiple calls to 'askHaskeline' using the same 'HaskelineData' will share
+-- For example, multiple calls to 'queryInput' using the same 'InputState' will share
 -- the same input history.  In constrast, multiple calls to 'runInputT' will use distinct
 -- histories unless they share the same history file.
 --
--- This function should not be called on a closed or cancelled 'HaskelineData'.
-askHaskeline :: Typeable a => HaskelineData -> InputT IO a -> IO a
-askHaskeline hd f = do
+-- This function should not be called on a closed or cancelled 'InputState'.
+queryInput :: Typeable a => InputState -> InputT IO a -> IO a
+queryInput hd f = do
     putMVar (inputChan hd) (Just (fmap toDyn f))
     fmap fromDyn' $ takeMVar (outputChan hd)
   where
