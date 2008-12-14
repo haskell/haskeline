@@ -63,7 +63,7 @@ stifleHistory a@(Just n) hist = History {histLines = stifleFnc (histLines hist),
         stifleFnc = if n > Seq.length (histLines hist)
                         then id
                         else Seq.fromList . take n . toList
-                
+
 addHistory :: String -> History -> History
 addHistory s h = h {histLines = s Seq.<| stifledLines}
   where
