@@ -30,9 +30,10 @@ Library
         Build-depends: base < 3
     else
         Build-depends: base>=3 && <5 , containers>=0.1, directory>=1.0
-    Build-depends:  stm>=2.0, filepath>=1.1, 
-                    mtl>=1.1, utf8-string>=0.3.1.1, bytestring>=0.9.0.1,
-                    extensible-exceptions>=0.1.1.0
+    Build-depends:  stm==2.1.*, filepath==1.1.*, mtl==1.1.*, 
+                    bytestring==0.9.*,
+                    utf8-string==0.3.* && >=0.3.1.1, 
+                    extensible-exceptions==0.1.* && >=0.1.1.0
     Extensions:     ForeignFunctionInterface, RankNTypes, FlexibleInstances,
                 TypeSynonymInstances
                 FlexibleContexts, ExistentialQuantification
@@ -69,7 +70,8 @@ Library
         install-includes: win_console.h
         cpp-options: -DMINGW
     } else {
-        Build-depends: terminfo>=0.3 && < 4, unix>=2.0
+        Build-depends: terminfo==0.3.*, unix==2.2.* || ==2.3.*
+                        -- unix-2.3 doesn't build on ghc-6.8.1
         Other-modules: 
                 System.Console.Haskeline.Backend.Posix
                 System.Console.Haskeline.Backend.DumbTerm
