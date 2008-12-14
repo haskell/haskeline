@@ -1,5 +1,6 @@
 module System.Console.Haskeline.History(
                         History(),
+                        stifleAmount,
                         emptyHistory,
                         addHistory,
                         historyLines,
