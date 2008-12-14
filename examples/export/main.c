@@ -10,7 +10,7 @@ extern void __stginit_HaskelineExport();
 void *hdata;
 
 void catch_signal(int signo) {
-    cancel_haskeline(hdata);
+    cancel_input(hdata);
     hs_exit();
     exit(0);
 }
@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
 
     // TODO: block signals at certain points of this program 
     // in order to avoid race conditions.
-    hdata = initialize_haskeline();
+    hdata = initialize_input();
 
     signal(SIGINT, catch_signal);
 
@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
         printf("The strings were:\n%s\n%s\n",str1,str2);
     }
 
-    close_haskeline(hdata);
+    close_input(hdata);
 
     hs_exit();
     return 0;

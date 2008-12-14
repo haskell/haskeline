@@ -6,11 +6,11 @@ import System.Console.Haskeline.IO
 import Foreign
 import Foreign.C.String
 
-foreign export ccall initialize_haskeline :: IO (StablePtr InputState)
+foreign export ccall initialize_input :: IO (StablePtr InputState)
 
-foreign export ccall close_haskeline :: StablePtr InputState -> IO ()
+foreign export ccall close_input :: StablePtr InputState -> IO ()
 
-foreign export ccall cancel_haskeline:: StablePtr InputState -> IO ()
+foreign export ccall cancel_input :: StablePtr InputState -> IO ()
 
 foreign export ccall get_input_line :: StablePtr InputState -> CString
                                         -> IO CString
@@ -18,17 +18,17 @@ foreign export ccall get_input_line :: StablePtr InputState -> CString
 -- TODO: allocate string results with the malloc from stdlib 
 -- so that c code can free it.
 
-initialize_haskeline = do
+initialize_input = do
     hd <- initializeInput defaultSettings
     newStablePtr hd
 
 
-close_haskeline sptr = do
+close_input sptr = do
     hd <- deRefStablePtr sptr
     closeInput hd
     freeStablePtr sptr
 
-cancel_haskeline sptr = do
+cancel_input sptr = do
     hd <- deRefStablePtr sptr
     cancelInput hd
     freeStablePtr sptr
