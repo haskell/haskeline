@@ -17,7 +17,9 @@ import qualified Control.Monad.State as State
 
 -- | Application-specific customizations to the user interface.
 data Settings m = Settings {complete :: CompletionFunc m, -- ^ Custom tab completion
-                            historyFile :: Maybe FilePath
+                            historyFile :: Maybe FilePath, -- TODO DOCS
+                            autoAddHistory :: Bool -- TODO name, DOCS
+
                             }
 
 -- | Because 'complete' is the only field of 'Settings' depending on @m@,

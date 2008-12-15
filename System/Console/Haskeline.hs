@@ -85,11 +85,13 @@ import Data.Char(isPrint)
 -- defaultSettings = Settings {
 --           complete = completeFilename,
 --           historyFile = Nothing,
+--           autoAddHistory = True
 --           }
 -- @
 defaultSettings :: MonadIO m => Settings m
 defaultSettings = Settings {complete = completeFilename,
-                        historyFile = Nothing}
+                        historyFile = Nothing,
+                        autoAddHistory = True}
 
 {- $outputfncs
 The following functions allow cross-platform output of text that may contain
@@ -152,11 +154,16 @@ getInputCmdLine tops prefix = do
                             let ls = emptyIM
                             drawLine prefix ls 
                             repeatTillFinish tops getEvent prefix ls emode
-    -- Add the line to the history if it's nonempty.
-    case result of 
-        Just line | not (all isSpace line) -> modify (addHistory line)
-        _ -> return ()
+    maybeAddHistory result
     return result
+
+maybeAddHistory :: forall m . Monad m => Maybe String -> InputT m ()
+maybeAddHistory result = do
+    settings :: Settings m <- ask
+    case result of
+        Just line | autoAddHistory settings && not (all isSpace line) 
+            -> modify (addHistory line)
+        _ -> return ()
 
 repeatTillFinish :: forall m s d 
     . (MonadTrans d, Term (d m), LineState s, MonadReader Prefs m)
