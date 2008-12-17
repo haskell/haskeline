@@ -16,9 +16,12 @@ import Control.Applicative
 import qualified Control.Monad.State as State
 
 -- | Application-specific customizations to the user interface.
-data Settings m = Settings {complete :: CompletionFunc m, -- ^ Custom tab completion
-                            historyFile :: Maybe FilePath, -- TODO DOCS
-                            autoAddHistory :: Bool -- TODO name, DOCS
+data Settings m = Settings {complete :: CompletionFunc m, -- ^ Custom tab completion.
+                            historyFile :: Maybe FilePath, -- ^ Where to read/write the history at the
+                                                        -- start and end of each
+                                                        -- line input session.
+                            autoAddHistory :: Bool -- ^ If 'True', each nonblank line returned by
+                                -- @getInputLine@ will be automatically added to the history.
 
                             }
 

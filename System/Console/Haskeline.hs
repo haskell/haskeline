@@ -114,6 +114,8 @@ outputStrLn xs = outputStr (xs++"\n")
 
 
 {- $inputfncs
+The following functions read one line or character of input from the user.
+
 If 'stdin' is connected to a terminal, then these functions perform all user interaction,
 including display of the prompt text, on the user's output terminal (which may differ from
 'stdout').
@@ -128,6 +130,9 @@ and they return 'Nothing' if an @EOF@ was encountered before any characters were
 
 {- | Reads one line of input.  The final newline (if any) is removed.  Provides a rich
 line-editing user interface if 'stdin' is a terminal.
+
+If @'autoAddHistory' == 'True'@ and the line input is nonblank (i.e., is not all
+spaces), it will be automatically added to the history.
 -}
 getInputLine :: forall m . MonadException m => String -- ^ The input prompt
                             -> InputT m (Maybe String)
