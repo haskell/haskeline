@@ -68,10 +68,13 @@ getConOut = handle (\(_::IOException) -> return Nothing) $ fmap Just
 processEvent :: InputEvent -> Maybe Event
 processEvent KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc,
                     controlKeyState = cstate}
-    = fmap (KeyInput . Key modifier) $ keyFromCode vc `mplus` simpleKeyChar
+    = fmap (KeyInput . Key modifier') $ keyFromCode vc `mplus` simpleKeyChar
   where
     simpleKeyChar = guard (c /= '\NUL') >> return (KeyChar c)
     testMod ck = (cstate .&. ck) /= 0
+    modifier' = if hasMeta modifier && hasControl modifier
+                    then noModifier {hasShift = hasShift modifier}
+                    else modifier
     modifier = Modifier {hasMeta = testMod ((#const RIGHT_ALT_PRESSED) 
                                         .|. (#const LEFT_ALT_PRESSED))
                         ,hasControl = testMod ((#const RIGHT_CTRL_PRESSED) 
