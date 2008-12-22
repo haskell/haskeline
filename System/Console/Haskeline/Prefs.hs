@@ -4,7 +4,8 @@ module System.Console.Haskeline.Prefs(
                         readPrefs,
                         CompletionType(..),
                         BellStyle(..),
-                        EditMode(..)
+                        EditMode(..),
+                        lookupKeyBinding
                         ) where
 
 import Data.Char(isSpace,toLower)
@@ -42,7 +43,7 @@ data Prefs = Prefs { bellStyle :: !BellStyle,
                         -- ^ If 'False', completions with multiple possibilities
                         -- will ring the bell and only display them if the user
                         -- presses @TAB@ again.
-                     customBindings :: Map.Map Key Key,
+                     customBindings :: Map.Map Key [Key],
                         -- (termName, keysequence, key)
                      customKeySequences :: [(Maybe String, String,Key)]
                      }
@@ -94,8 +95,8 @@ settors = [("bellstyle", mkSettor $ \x p -> p {bellStyle = x})
           ]
 
 addCustomBinding :: String -> Prefs -> Prefs
-addCustomBinding str p = case map parseKey (words str) of
-    [Just k1,Just k2] -> p {customBindings = Map.insert k1 k2 (customBindings p)}
+addCustomBinding str p = case sequence $ map parseKey (words str) of
+    Just (k:ks) -> p {customBindings = Map.insert k ks (customBindings p)}
     _ -> p
 
 addCustomKeySequence :: String -> Prefs -> Prefs
@@ -111,6 +112,9 @@ addCustomKeySequence str = maybe id addKS $ maybeParse
             cs <- readMaybe cstr
             return (mterm,cs,k)
         addKS ks p = p {customKeySequences = ks:customKeySequences p}
+
+lookupKeyBinding :: Key -> Prefs -> [Key]
+lookupKeyBinding k = Map.findWithDefault [k] k . customBindings
 
 -- | Read 'Prefs' from a given file.  If there is an error reading the file,
 -- the 'defaultPrefs' will be returned.

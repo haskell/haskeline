@@ -174,23 +174,25 @@ repeatTillFinish :: forall m s d
     . (MonadTrans d, Term (d m), LineState s, MonadReader Prefs m)
             => TermOps -> d m Event -> String -> s -> KeyMap m s 
             -> d m (Maybe String)
-repeatTillFinish tops getEvent prefix = loop
+repeatTillFinish tops getEvent prefix = loop []
     where 
-        loop :: forall t . LineState t => t -> KeyMap m t -> d m (Maybe String)
-        loop s processor = do
+        loop :: forall t . LineState t
+                    => [Key] -> t -> KeyMap m t -> d m (Maybe String)
+        loop [] s processor = do
                 event <- handle (\(e::SomeException) -> movePast prefix s >> throwIO e) getEvent
                 case event of
-                    WindowResize -> withReposition tops prefix s $ loop s processor
+                    WindowResize -> withReposition tops prefix s $ loop [] s processor
                     KeyInput k -> do
-                      action <- lift $ lookupKey processor k
-                      case action of
-                        Nothing -> actBell >> loop s processor
+                        ks <- lift $ asks $ lookupKeyBinding k
+                        loop ks s processor
+        loop (k:ks) s processor = case lookupKM processor k of
+                        Nothing -> actBell >> loop [] s processor
                         Just g -> case g s of
                             Left r -> movePast prefix s >> return r
                             Right f -> do
                                         KeyAction effect next <- lift f
                                         drawEffect prefix s effect
-                                        loop (effectState effect) next
+                                        loop ks (effectState effect) next
 
 simpleFileLoop :: MonadIO m => String -> RunTerm -> m (Maybe String)
 simpleFileLoop prefix rterm = liftIO $ do
