@@ -104,12 +104,12 @@ repeated = let
     start = foreachDigit startArg ['1'..'9']
     addDigit = foreachDigit addNum ['0'..'9']
     deleteR = simpleChar 'd' 
-                >+> choiceCmd [useMovements (deleteFromRepeatedMove),
+                >+> choiceCmd [useMovements deleteFromRepeatedMove,
                              simpleChar 'd' +> change (const CEmpty)]
     deleteIR = simpleChar 'c'
                 >+> choiceCmd [useMovements deleteAndInsertR,
                              simpleChar 'c' +> change (const emptyIM)]
-    applyArg' f am = enterCommandModeRight $ applyArg f $ fmap insertFromCommandMode am
+    applyArg' f = enterCommandModeRight . applyArg f . fmap insertFromCommandMode
     loop = choiceCmd [addDigit >|> loop
                      , useMovements applyArg' >|> viCommandActions
                      , saveForUndo (deleteR >|> viCommandActions)

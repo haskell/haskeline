@@ -100,7 +100,7 @@ loopUntil :: Command m s s -> Command m s t -> Command m s t
 loopUntil f g = choiceCmd [g, f >|> loopUntil f g]
 
 try :: Command m s s -> Command m s s
-try (Command f) = Command $ \next -> (f next) `orKM` next
+try (Command f) = Command $ \next -> f next `orKM` next
 
 finish :: forall s m t . (Result s, Monad m) => Key -> Command m s t
 finish k = Command $ \_-> useKey k (Left . Just . toResult)

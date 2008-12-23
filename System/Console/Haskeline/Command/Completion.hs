@@ -113,7 +113,7 @@ makeLines ws layout = let
     printWidth = width layout
     maxLength = min printWidth (maximum (map length ws) + minColPad)
     numCols = printWidth `div` maxLength
-    ls = if (maxLength >= printWidth)
+    ls = if maxLength >= printWidth
                     then map (\x -> [x]) ws
                     else splitIntoGroups numCols ws
     in map (padWords maxLength) ls
