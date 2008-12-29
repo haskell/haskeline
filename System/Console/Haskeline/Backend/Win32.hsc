@@ -256,9 +256,8 @@ printText txt = do
     
 printAfter :: MonadLayout m => String -> Draw m ()
 printAfter str = do
-    p <- getPos
     printText str
-    setPos p
+    movePos $ negate $ length str
     
 drawLineDiffWin :: MonadLayout m => LineChars -> LineChars -> Draw m ()
 drawLineDiffWin (xs1,ys1) (xs2,ys2) = case matchInit xs1 xs2 of
