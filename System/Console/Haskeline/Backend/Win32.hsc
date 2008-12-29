@@ -18,7 +18,7 @@ import Data.List(intercalate)
 import Control.Concurrent hiding (throwTo)
 import Control.Concurrent.STM
 import Data.Bits
-import Data.Char(isUpper)
+import Data.Char(isPrint)
 import Data.Maybe(mapMaybe)
 import Control.Monad
 
@@ -81,7 +81,7 @@ processEvent KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc,
                                         .|. (#const LEFT_CTRL_PRESSED))
                                     && not (c > '\NUL' && c <= '\031')
                         ,hasShift = testMod (#const SHIFT_PRESSED)
-                                    && not (isUpper c)
+                                    && not (isPrint c)
                         }
 
 processEvent WindowEvent = Just WindowResize
