@@ -71,10 +71,10 @@ import System.Console.Haskeline.Term
 import System.Console.Haskeline.Key
 
 import System.IO
-import qualified System.IO.UTF8 as UTF8
 import Data.Char (isSpace)
 import Control.Monad
 import Data.Char(isPrint)
+import qualified Data.ByteString as B
 
 
 
@@ -200,7 +200,7 @@ simpleFileLoop prefix rterm = liftIO $ do
     atEOF <- hIsEOF stdin
     if atEOF
         then return Nothing
-        else liftM Just UTF8.getLine
+        else liftM Just $ B.getLine >>= decodeForTerm rterm
 
 drawEffect :: (LineState s, LineState t, Term (d m), 
                 MonadTrans d, MonadReader Prefs m) 

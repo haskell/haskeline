@@ -20,13 +20,14 @@ import System.Posix.IO(stdInput)
 import Data.List
 import System.IO
 import qualified Data.ByteString as B
-import qualified Data.ByteString.UTF8 as UTF8
 import System.Environment
 
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.Key
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.Prefs
+
+import System.Console.Haskeline.Backend.Posix.MultiByte
 
 import GHC.IOBase (haFD,FD)
 import GHC.Handle (withHandle_)
@@ -221,7 +222,7 @@ getEvent baseMap = keyEventLoop readKeyEvents
         threadWaitRead stdInput -- hWaitForInput doesn't work with -threaded on
                                 -- ghc < 6.10 (#2363 in ghc's trac)
         bs <- B.hGetNonBlocking stdin bufferSize
-        let cs = UTF8.toString bs
+        cs <- multiByteToUnicode bs
         return $ map KeyInput $ lexKeys baseMap cs
 
 -- fails if stdin is not a handle or if we couldn't access /dev/tty.
@@ -237,22 +238,23 @@ openTTY = do
 posixRunTerm :: (Handle -> TermOps) -> IO RunTerm
 posixRunTerm tOps = do
     ttyH <- openTTY
+    oldLocale <- setEnvLocale lcLang
     case ttyH of
         Nothing -> return fileRunTerm
-        Just h -> return RunTerm {
-                    putStrOut = putTerm stdout,
-                    closeTerm = hClose h,
-                    wrapInterrupt = withSigIntHandler,
+        Just h -> return fileRunTerm {
+                    closeTerm = setLocale lcLang oldLocale >> hClose h,
                     termOps = Just (wrapRunTerm (wrapTerminalOps h) (tOps h))
                 }
 
 putTerm :: Handle -> String -> IO ()
-putTerm h str = B.hPutStr h (UTF8.fromString str) >> hFlush h
+putTerm h str = unicodeToMultiByte str >>= B.hPutStr h >> hFlush h
 
 fileRunTerm :: RunTerm
 fileRunTerm = RunTerm {putStrOut = putTerm stdout,
                 closeTerm = return (),
                 wrapInterrupt = withSigIntHandler,
+                encodeForTerm = unicodeToMultiByte,
+                decodeForTerm = multiByteToUnicode,
                 termOps = Nothing
                 }
 

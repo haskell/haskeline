@@ -4,16 +4,10 @@ module System.Console.Haskeline.Backend.Win32(
 
 
 import System.IO
-import qualified System.IO.UTF8 as UTF8
-import Foreign.Ptr
-import Foreign.Storable
-import Foreign.Marshal.Alloc
-import Foreign.Marshal.Array
-import Foreign.C.Types
-import Foreign.Marshal.Utils
-import System.Win32.Types
+import Foreign
+import Foreign.C
+import System.Win32 hiding (multiByteToWideChar)
 import Graphics.Win32.Misc(getStdHandle, sTD_INPUT_HANDLE, sTD_OUTPUT_HANDLE)
-import System.Win32.File
 import Data.List(intercalate)
 import Control.Concurrent hiding (throwTo)
 import Control.Concurrent.STM
@@ -26,6 +20,9 @@ import System.Console.Haskeline.Key
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Term
+
+import Data.ByteString.Internal (createAndTrim)
+import qualified Data.ByteString as B
 
 #include "win_console.h"
 
@@ -306,16 +303,15 @@ instance (MonadException m, MonadLayout m) => Term (Draw m) where
 
 win32Term :: IO RunTerm
 win32Term = do
+    fileRT <- fileRunTerm
     inIsTerm <- hIsTerminalDevice stdin
-    putter <- putOut
     if not inIsTerm
-        then fileRunTerm
+        then return fileRT
         else do
             oterm <- getConOut
             case oterm of
-                Nothing -> fileRunTerm
-                Just h -> return RunTerm {
-                            putStrOut = putter,
+                Nothing -> return fileRT
+                Just h -> return fileRT {
                             wrapInterrupt = withWindowMode . withCtrlCHandler,
                             termOps = Just TermOps {
                                             getLayout = getBufferSize h,
@@ -331,9 +327,12 @@ consoleRunTerm conOut f = do
 fileRunTerm :: IO RunTerm
 fileRunTerm = do
     putter <- putOut
+    cp <- getCodePage
     return RunTerm {termOps = Nothing,
                     closeTerm = return (),
                     putStrOut = putter,
+                    encodeForTerm = unicodeToCodePage cp,
+                    decodeForTerm = codePageToUnicode cp,
                     wrapInterrupt = withCtrlCHandler}
 
 -- On Windows, Unicode written to the console must be written with the WriteConsole API call.
@@ -345,7 +344,9 @@ putOut = do
         then do
             h <- getStdHandle sTD_OUTPUT_HANDLE
             return (writeConsole h)
-        else return $ \str -> UTF8.putStr str >> hFlush stdout
+        else do
+            cp <- getCodePage
+            return $ \str -> unicodeToCodePage cp str >>= B.putStr >> hFlush stdout
                 
     
 
@@ -370,3 +371,41 @@ withCtrlCHandler f = bracket (liftIO $ do
         throwTo tid Interrupt
         return True
     handler _ _ = return False
+
+
+------------------------
+-- Multi-byte conversion
+
+foreign import stdcall "WideCharToMultiByte" wideCharToMultiByte
+        :: CodePage -> DWORD -> LPCWSTR -> CInt -> LPCSTR -> CInt
+                -> LPCSTR -> LPBOOL -> IO CInt
+
+unicodeToCodePage :: CodePage -> String -> IO B.ByteString
+unicodeToCodePage cp wideStr = withCWStringLen wideStr $ \(wideBuff, wideLen) -> do
+    -- first, ask for the length without filling the buffer.
+    outSize <- wideCharToMultiByte cp 0 wideBuff (toEnum wideLen)
+                    nullPtr 0 nullPtr nullPtr
+    -- then, actually perform the encoding.
+    createAndTrim (fromEnum outSize) $ \outBuff -> 
+        fmap fromEnum $ wideCharToMultiByte cp 0 wideBuff (toEnum wideLen)
+                    (castPtr outBuff) outSize nullPtr nullPtr
+
+foreign import stdcall "MultiByteToWideChar" multiByteToWideChar
+        :: CodePage -> DWORD -> LPCSTR -> CInt -> LPWSTR -> CInt -> IO CInt
+
+codePageToUnicode :: CodePage -> B.ByteString -> IO String
+codePageToUnicode cp bs = B.useAsCStringLen bs $ \(inBuff, inLen) -> do
+    -- first ask for the size without filling the buffer.
+    outSize <- multiByteToWideChar cp 0 inBuff (toEnum inLen) nullPtr 0
+    -- then, actually perform the decoding.
+    allocaArray0 (fromEnum outSize) $ \outBuff -> do
+    outSize' <- multiByteToWideChar cp 0 inBuff (toEnum inLen) outBuff outSize
+    peekCWStringLen (outBuff, fromEnum outSize')
+                
+
+getCodePage :: IO CodePage
+getCodePage = do
+    conCP <- getConsoleCP
+    if conCP > 0
+        then return conCP
+        else getACP

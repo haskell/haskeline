@@ -8,6 +8,7 @@ import System.Console.Haskeline.Prefs(Prefs)
 import Control.Concurrent
 import Control.Concurrent.STM
 import Data.Typeable
+import Data.ByteString (ByteString)
 
 class (MonadReader Layout m, MonadException m) => Term m where
     reposition :: Layout -> LineChars -> m ()
@@ -21,6 +22,8 @@ class (MonadReader Layout m, MonadException m) => Term m where
 -- termOps being Nothing means we should read the input as a UTF-8 file.
 data RunTerm = RunTerm {
             putStrOut :: String -> IO (),
+            encodeForTerm :: String -> IO ByteString,
+            decodeForTerm :: ByteString -> IO String,
             termOps :: Maybe TermOps,
             wrapInterrupt :: MonadException m => m a -> m a,
             closeTerm :: IO ()

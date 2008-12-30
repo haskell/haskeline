@@ -44,6 +44,7 @@ Library
     Exposed-Modules:
                 System.Console.Haskeline
                 System.Console.Haskeline.Completion
+                System.Console.Haskeline.Encoding
                 System.Console.Haskeline.MonadException
                 System.Console.Haskeline.History
                 System.Console.Haskeline.IO
@@ -74,6 +75,7 @@ Library
                         -- unix-2.3 doesn't build on ghc-6.8.1
         Other-modules: 
                 System.Console.Haskeline.Backend.Posix
+                System.Console.Haskeline.Backend.Posix.MultiByte
                 System.Console.Haskeline.Backend.DumbTerm
                 System.Console.Haskeline.Backend.Terminfo
     }
