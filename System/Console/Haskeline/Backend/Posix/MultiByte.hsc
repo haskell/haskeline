@@ -3,7 +3,7 @@ module System.Console.Haskeline.Backend.Posix.MultiByte(
         unicodeToMultiByte,
         getLocale,
         setLocale,
-        setLocaleEnv,
+        setEnvLocale,
         lcLang
         ) where
 
