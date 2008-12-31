@@ -53,13 +53,7 @@ keyEventLoop readEvents eventChan = do
     me <- atomically $ tryReadTChan eventChan
     case me of
         Just e -> return e
-        Nothing -> do
-            -- no events are queued yet, so fork off a thread to read keys.
-            -- if we receive a different type of event before it's done,
-            -- we'll kill it.
-            tid <- forkIO readerLoop
-            (atomically $ readTChan eventChan)
-                `finally` killThread tid
+        Nothing -> forkThen readerLoop (readTChan eventChan)
   where
     readerLoop = do
         es <- readEvents
@@ -69,6 +63,24 @@ keyEventLoop readEvents eventChan = do
 
 tryReadTChan :: TChan a -> STM (Maybe a)
 tryReadTChan chan = fmap Just (readTChan chan) `orElse` return Nothing
+
+-- Run action in a separate thread, and use waiter to receive its results.
+-- If an exception occurs in the forked thread, re-throw it in the main thread.
+-- Also, make sure that the thread is killed if the waiter finishes before the
+-- forked action completes (for example, if a window resize event occurs).
+forkThen :: IO () -> STM a -> IO a
+forkThen action waiter = do
+    errVar <- atomically $ newEmptyTMVar
+    tid <- forkIO $ handle (\(e::SomeException) ->
+                        atomically $ putTMVar errVar e)
+                        action
+    result <- (atomically $ fmap Left (takeTMVar errVar)
+                `orElse` fmap Right waiter)
+                `finally` killThread tid
+    case result of
+        Left e -> throwIO e
+        Right x -> return x
+
 
 class (MonadReader Layout m, MonadIO m) => MonadLayout m where
 
