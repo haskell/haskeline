@@ -1,8 +1,11 @@
 module System.Console.Haskeline.Backend.Posix (
                         withPosixGetEvent,
                         getPosixLayout,
-                        mapLines,
+                        PosixT,
+                        runPosixT,
+                        Encoders(unicodeToLocale),
                         putTerm,
+                        mapLines,
                         posixRunTerm
                  ) where
 
@@ -180,12 +183,12 @@ lookupChars (TreeMap tm) (c:cs) = case Map.lookup c tm of
 -----------------------------
 
 withPosixGetEvent :: (MonadTrans t, MonadIO m, MonadException (t m), MonadReader Prefs m) 
-                        => Handle -> Maybe Terminal -> (t m Event -> t m a) -> t m a
-withPosixGetEvent h term f = do
+                        => Encoders -> Handle -> Maybe Terminal -> (t m Event -> t m a) -> t m a
+withPosixGetEvent enc h term f = do
     baseMap <- lift $ getKeySequences term
     evenChan <- liftIO $ newChan
     wrapKeypad h term $ withWindowHandler evenChan
-        $ f $ liftIO $ getEvent baseMap evenChan
+        $ f $ liftIO $ getEvent enc baseMap evenChan
 
 -- If the keypad on/off capabilities are defined, wrap the computation with them.
 wrapKeypad :: MonadException m => Handle -> Maybe Terminal -> m a -> m a
@@ -211,8 +214,8 @@ withHandler signal handler f = do
     old_handler <- liftIO $ installHandler signal handler Nothing
     f `finally` liftIO (installHandler signal old_handler Nothing)
 
-getEvent :: TreeMap Char Key -> Chan Event -> IO Event
-getEvent baseMap = keyEventLoop readKeyEvents
+getEvent :: Encoders -> TreeMap Char Key -> Chan Event -> IO Event
+getEvent enc baseMap = keyEventLoop readKeyEvents
   where
     bufferSize = 100
     readKeyEvents = do
@@ -222,7 +225,7 @@ getEvent baseMap = keyEventLoop readKeyEvents
         threadWaitRead stdInput -- hWaitForInput doesn't work with -threaded on
                                 -- ghc < 6.10 (#2363 in ghc's trac)
         bs <- B.hGetNonBlocking stdin bufferSize
-        cs <- multiByteToUnicode bs
+        let cs = localeToUnicode enc bs
         return $ map KeyInput $ lexKeys baseMap cs
 
 -- fails if stdin is not a handle or if we couldn't access /dev/tty.
@@ -235,26 +238,32 @@ openTTY = do
                 return (Just h)
         else return Nothing
 
-posixRunTerm :: (Handle -> TermOps) -> IO RunTerm
+posixRunTerm :: (Encoders -> Handle -> TermOps) -> IO RunTerm
 posixRunTerm tOps = do
+    enc <- getEncoders
+    fileRT <- fileRunTerm enc
     ttyH <- openTTY
-    oldLocale <- setEnvLocale lcLang
     case ttyH of
-        Nothing -> return fileRunTerm
-        Just h -> return fileRunTerm {
-                    closeTerm = setLocale lcLang oldLocale >> hClose h,
-                    termOps = Just (wrapRunTerm (wrapTerminalOps h) (tOps h))
+        Nothing -> return fileRT
+        Just h -> return fileRT {
+                    closeTerm = closeTerm fileRT >> hClose h,
+                    termOps = Just (wrapRunTerm (wrapTerminalOps h) (tOps enc h))
                 }
 
-putTerm :: Handle -> String -> IO ()
-putTerm h str = unicodeToMultiByte str >>= B.hPutStr h >> hFlush h
+type PosixT m = ReaderT Encoders (ReaderT Handle m)
 
-fileRunTerm :: RunTerm
-fileRunTerm = RunTerm {putStrOut = putTerm stdout,
-                closeTerm = return (),
+runPosixT enc h = runReaderT' h . runReaderT' enc
+
+putTerm :: Encoders -> Handle -> String -> IO ()
+putTerm enc h str = B.hPutStr h (unicodeToLocale enc str) >> hFlush h
+
+fileRunTerm :: Encoders -> IO RunTerm
+fileRunTerm enc = do
+    return RunTerm {putStrOut = putTerm enc stdout,
+                closeTerm = cleanupEncoders enc,
                 wrapInterrupt = withSigIntHandler,
-                encodeForTerm = unicodeToMultiByte,
-                decodeForTerm = multiByteToUnicode,
+                encodeForTerm = return . unicodeToLocale enc,
+                decodeForTerm = return . localeToUnicode enc,
                 termOps = Nothing
                 }
 

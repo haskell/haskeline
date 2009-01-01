@@ -17,8 +17,9 @@ data Window = Window {pos :: Int -- ^ # of visible chars to left of cursor
 initWindow :: Window
 initWindow = Window {pos=0}
 
-newtype DumbTerm m a = DumbTerm {unDumbTerm :: ReaderT Handle (StateT Window m) a}
-                deriving (Monad,MonadIO, MonadState Window,MonadReader Handle)
+newtype DumbTerm m a = DumbTerm {unDumbTerm :: StateT Window (PosixT m) a}
+                deriving (Monad,MonadIO, MonadState Window,MonadReader Handle,
+                            MonadReader Encoders)
 
 instance MonadReader Layout m => MonadReader Layout (DumbTerm m) where
     ask = lift ask
@@ -30,17 +31,17 @@ instance MonadException m => MonadException (DumbTerm m) where
     catch (DumbTerm f) g = DumbTerm $ Monads.catch f (unDumbTerm . g)
 
 runDumbTerm :: IO RunTerm
-runDumbTerm = posixRunTerm $ \h -> 
+runDumbTerm = posixRunTerm $ \enc h ->
                 TermOps {
                         getLayout = getPosixLayout h Nothing,
                         runTerm = \f -> 
-                                        evalStateT' initWindow
-                                        (runReaderT' h (unDumbTerm
-                                         (withPosixGetEvent h Nothing f)))
+                                runPosixT enc h $ evalStateT' initWindow
+                                $ unDumbTerm
+                                $ withPosixGetEvent enc h Nothing f
                         }
                                 
 instance MonadTrans DumbTerm where
-    lift = DumbTerm . lift . lift
+    lift = DumbTerm . lift . lift . lift
 
 instance (MonadException m, MonadLayout m) => Term (DumbTerm m) where
     reposition _ s = refitLine s
@@ -53,7 +54,10 @@ instance (MonadException m, MonadLayout m) => Term (DumbTerm m) where
     ringBell False = return ()
       
 printText :: MonadIO m => String -> DumbTerm m ()
-printText str = ask >>= liftIO . flip putTerm str
+printText str = do
+    h <- ask
+    enc <- ask
+    liftIO $ putTerm enc h str
 
 -- Things we can assume a dumb terminal knows how to do
 cr,crlf :: String

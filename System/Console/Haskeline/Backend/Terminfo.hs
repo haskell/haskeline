@@ -9,23 +9,23 @@ import Control.Monad
 import Data.List(intersperse)
 import System.IO
 import qualified Control.Exception.Extensible as Exception
+import qualified Data.ByteString.Char8 as B
 
 import System.Console.Haskeline.Monads as Monads
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.Backend.Posix
-import qualified Codec.Binary.UTF8.String as UTF8
 
 -- | Keep track of all of the output capabilities we can use.
 -- 
 -- We'll be frequently using the (automatic) 'Monoid' instance for 
 -- @Actions -> TermOutput@.
 data Actions = Actions {leftA, rightA, upA :: Int -> TermOutput,
-                        clearToLineEnd :: TermOutput,
-                        nl, cr :: TermOutput,
-                        bellAudible,bellVisual :: TermOutput,
-                        clearAll :: LinesAffected -> TermOutput,
-                        wrapLine :: TermOutput}
+                        clearToLineEnd :: Encoders -> TermOutput,
+                        nl, cr :: Encoders -> TermOutput,
+                        bellAudible,bellVisual :: Encoders -> TermOutput,
+                        clearAllA :: LinesAffected -> TermOutput,
+                        wrapLine :: Encoders -> TermOutput}
 
 getActions :: Capability Actions
 getActions = do
@@ -40,14 +40,14 @@ getActions = do
     bellAudible' <- bell `mplus` return mempty
     bellVisual' <- visualBell `mplus` return mempty
     wrapLine' <- getWrapLine nl' (leftA' 1)
-    return Actions{leftA=leftA',rightA=rightA',upA=upA',
-                clearToLineEnd=clearToLineEnd',nl=nl',cr=cr',
-                bellAudible=bellAudible', bellVisual=bellVisual',
-                clearAll=clearAll',
-                 wrapLine=wrapLine'}
+    return Actions{leftA = leftA', rightA = rightA',upA = upA',
+                clearToLineEnd = const clearToLineEnd', nl = const nl',cr = const cr',
+                bellAudible = const bellAudible', bellVisual = const bellVisual',
+                clearAllA = clearAll',
+                 wrapLine = const wrapLine'}
 
-text :: String -> Actions -> TermOutput
-text str _ = termText (UTF8.encodeString str)
+text :: String -> Actions -> Encoders -> TermOutput
+text str _ enc = termText $ B.unpack $ unicodeToLocale enc str
 
 getWrapLine :: TermOutput -> TermOutput -> Capability TermOutput
 getWrapLine nl' left1 = (autoRightMargin >>= guard >> withAutoMargin)
@@ -59,12 +59,16 @@ getWrapLine nl' left1 = (autoRightMargin >>= guard >> withAutoMargin)
                         wraparoundGlitch >>= guard
                         return (termText " " <#> left1)
                      )`mplus` return mempty
-    
-left,right,up :: Int -> Actions -> TermOutput
-left = flip leftA
-right = flip rightA
-up = flip upA
 
+type TermAction = Actions -> Encoders -> TermOutput
+    
+left,right,up :: Int -> TermAction
+left n = const . flip leftA n
+right n = const . flip rightA n
+up n = const . flip upA n
+
+clearAll :: LinesAffected -> TermAction
+clearAll la = const . flip clearAllA la
 
 --------
 
@@ -85,10 +89,11 @@ initTermPos = TermPos {termRow = 0, termCol = 0}
 
 --------------
 
-newtype Draw m a = Draw {unDraw :: ReaderT Handle (ReaderT Actions 
-                                    (ReaderT Terminal (StateT TermPos m))) a}
+newtype Draw m a = Draw {unDraw :: (ReaderT Actions
+                                    (ReaderT Terminal (StateT TermPos
+                                    (PosixT m)))) a}
     deriving (Monad,MonadIO,MonadReader Actions,MonadReader Terminal,
-        MonadState TermPos, MonadReader Handle)
+        MonadState TermPos, MonadReader Handle, MonadReader Encoders)
 
 instance MonadReader Layout m => MonadReader Layout (Draw m) where
     ask = lift ask
@@ -101,7 +106,7 @@ instance MonadException m => MonadException (Draw m) where
 
 
 instance MonadTrans Draw where
-    lift = Draw . lift . lift . lift . lift
+    lift = Draw . lift . lift . lift . lift . lift
     
 runTerminfoDraw :: IO (Maybe RunTerm)
 runTerminfoDraw = do
@@ -112,23 +117,25 @@ runTerminfoDraw = do
         Left (_::SetupTermError) -> return Nothing
         Right term -> case getCapability term getActions of
             Nothing -> return Nothing
-            Just actions -> fmap Just $ posixRunTerm $ \h -> 
+            Just actions -> fmap Just $ posixRunTerm $ \enc h ->
                 TermOps {
                     getLayout = getPosixLayout h (Just term),
-                    runTerm = \f -> 
-                             evalStateT' initTermPos
-                              (runReaderT' term
-                               (runReaderT' actions
-                                (runReaderT' h (unDraw 
-                                 (withPosixGetEvent h (Just term) f)))))
+                    runTerm = \f ->
+                             runPosixT enc h
+                              $ evalStateT' initTermPos
+                              $ runReaderT' term
+                              $ runReaderT' actions
+                              $ unDraw
+                              $ withPosixGetEvent enc h (Just term) f
                     }
     
-output :: MonadIO m => (Actions -> TermOutput) -> Draw m ()
+output :: MonadIO m => TermAction -> Draw m ()
 output f = do
     toutput <- asks f
     term <- ask
     ttyh <- ask
-    liftIO $ hRunTermOutput ttyh term toutput
+    enc <- ask
+    liftIO $ hRunTermOutput ttyh term (toutput enc)
 
 
 
@@ -221,7 +228,7 @@ clearDeadText n
 clearLayoutT :: MonadLayout m => Draw m ()
 clearLayoutT = do
     h <- asks height
-    output (flip clearAll h)
+    output (clearAll h)
     put initTermPos
 
 moveToNextLineT :: MonadLayout m => LineChars -> Draw m ()

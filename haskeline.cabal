@@ -73,6 +73,7 @@ Library
     } else {
         Build-depends: terminfo==0.3.*, unix==2.2.* || ==2.3.*
                         -- unix-2.3 doesn't build on ghc-6.8.1
+        Extra-libraries: iconv
         Other-modules: 
                 System.Console.Haskeline.Backend.Posix
                 System.Console.Haskeline.Backend.Posix.MultiByte
