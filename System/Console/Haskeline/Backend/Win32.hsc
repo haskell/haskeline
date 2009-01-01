@@ -10,7 +10,7 @@ import System.Win32 hiding (multiByteToWideChar)
 import Graphics.Win32.Misc(getStdHandle, sTD_INPUT_HANDLE, sTD_OUTPUT_HANDLE)
 import Data.List(intercalate)
 import Control.Concurrent hiding (throwTo)
-import Control.Concurrent.STM
+import Control.Concurrent.Chan
 import Data.Bits
 import Data.Char(isPrint)
 import Data.Maybe(mapMaybe)
@@ -42,7 +42,7 @@ getNumberOfEvents h = alloca $ \numEventsPtr -> do
     fmap fromEnum $ peek numEventsPtr
 
 getEvent :: HANDLE -> IO Event
-getEvent h = newTChanIO >>= keyEventLoop (eventReader h)
+getEvent h = newChan >>= keyEventLoop (eventReader h)
 
 eventReader :: HANDLE -> IO [Event]
 eventReader h = do

@@ -13,7 +13,7 @@ import System.Console.Terminfo
 import System.Posix.Terminal hiding (Interrupt)
 import Control.Monad
 import Control.Concurrent hiding (throwTo)
-import Control.Concurrent.STM
+import Control.Concurrent.Chan
 import Data.Maybe
 import System.Posix.Signals.Exts
 import System.Posix.IO(stdInput)
@@ -183,9 +183,9 @@ withPosixGetEvent :: (MonadTrans t, MonadIO m, MonadException (t m), MonadReader
                         => Handle -> Maybe Terminal -> (t m Event -> t m a) -> t m a
 withPosixGetEvent h term f = do
     baseMap <- lift $ getKeySequences term
-    eventChan <- liftIO $ newTChanIO
-    wrapKeypad h term $ withWindowHandler eventChan
-        $ f $ liftIO $ getEvent baseMap eventChan
+    evenChan <- liftIO $ newChan
+    wrapKeypad h term $ withWindowHandler evenChan
+        $ f $ liftIO $ getEvent baseMap evenChan
 
 -- If the keypad on/off capabilities are defined, wrap the computation with them.
 wrapKeypad :: MonadException m => Handle -> Maybe Terminal -> m a -> m a
@@ -195,9 +195,9 @@ wrapKeypad h = maybe id $ \term f -> (maybeOutput term keypadOn >> f)
     maybeOutput term cap = liftIO $ hRunTermOutput h term $
                             fromMaybe mempty (getCapability term cap)
 
-withWindowHandler :: MonadException m => TChan Event -> m a -> m a
+withWindowHandler :: MonadException m => Chan Event -> m a -> m a
 withWindowHandler eventChan = withHandler windowChange $ 
-    Catch $ atomically $ writeTChan eventChan WindowResize
+    Catch $ writeChan eventChan WindowResize
 
 withSigIntHandler :: MonadException m => m a -> m a
 withSigIntHandler f = do
@@ -211,7 +211,7 @@ withHandler signal handler f = do
     old_handler <- liftIO $ installHandler signal handler Nothing
     f `finally` liftIO (installHandler signal old_handler Nothing)
 
-getEvent :: TreeMap Char Key -> TChan Event -> IO Event
+getEvent :: TreeMap Char Key -> Chan Event -> IO Event
 getEvent baseMap = keyEventLoop readKeyEvents
   where
     bufferSize = 100

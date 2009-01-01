@@ -181,6 +181,7 @@ repeatTillFinish tops getEvent prefix = loop []
         loop [] s processor = do
                 event <- handle (\(e::SomeException) -> movePast prefix s >> throwIO e) getEvent
                 case event of
+                    ErrorEvent e -> movePast prefix s >> throwIO e
                     WindowResize -> withReposition tops prefix s $ loop [] s processor
                     KeyInput k -> do
                         ks <- lift $ asks $ lookupKeyBinding k

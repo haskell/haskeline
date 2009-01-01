@@ -6,9 +6,10 @@ import System.Console.Haskeline.Key
 import System.Console.Haskeline.Prefs(Prefs)
 
 import Control.Concurrent
-import Control.Concurrent.STM
+import Control.Concurrent.Chan
 import Data.Typeable
 import Data.ByteString (ByteString)
+import Control.Exception.Extensible (fromException, AsyncException(..))
 
 class (MonadReader Layout m, MonadException m) => Term m where
     reposition :: Layout -> LineChars -> m ()
@@ -42,45 +43,29 @@ matchInit :: Eq a => [a] -> [a] -> ([a],[a])
 matchInit (x:xs) (y:ys)  | x == y = matchInit xs ys
 matchInit xs ys = (xs,ys)
 
-data Event = WindowResize | KeyInput Key
+data Event = WindowResize | KeyInput Key | ErrorEvent SomeException
                 deriving Show
 
-keyEventLoop :: IO [Event] -> TChan Event -> IO Event
+keyEventLoop :: IO [Event] -> Chan Event -> IO Event
 keyEventLoop readEvents eventChan = do
     -- first, see if any events are already queued up (from a key/ctrl-c
     -- event or from a previous call to getEvent where we read in multiple
-    -- keys)    
-    me <- atomically $ tryReadTChan eventChan
-    case me of
-        Just e -> return e
-        Nothing -> forkThen readerLoop (readTChan eventChan)
+    -- keys)
+    isEmpty <- isEmptyChan eventChan
+    if not isEmpty
+        then readChan eventChan
+        else do
+            tid <- forkIO $ handleErrorEvent readerLoop
+            readChan eventChan `finally` killThread tid
   where
     readerLoop = do
         es <- readEvents
         if null es
             then readerLoop
-            else atomically $ mapM_ (writeTChan eventChan) es
-
-tryReadTChan :: TChan a -> STM (Maybe a)
-tryReadTChan chan = fmap Just (readTChan chan) `orElse` return Nothing
-
--- Run action in a separate thread, and use waiter to receive its results.
--- If an exception occurs in the forked thread, re-throw it in the main thread.
--- Also, make sure that the thread is killed if the waiter finishes before the
--- forked action completes (for example, if a window resize event occurs).
-forkThen :: IO () -> STM a -> IO a
-forkThen action waiter = do
-    errVar <- atomically $ newEmptyTMVar
-    tid <- forkIO $ handle (\(e::SomeException) ->
-                        atomically $ putTMVar errVar e)
-                        action
-    result <- (atomically $ fmap Left (takeTMVar errVar)
-                `orElse` fmap Right waiter)
-                `finally` killThread tid
-    case result of
-        Left e -> throwIO e
-        Right x -> return x
-
+            else writeList2Chan eventChan es
+    handleErrorEvent = handle $ \e -> case fromException e of
+                                Just ThreadKilled -> return ()
+                                _ -> writeChan eventChan (ErrorEvent e)
 
 class (MonadReader Layout m, MonadIO m) => MonadLayout m where
 

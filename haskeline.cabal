@@ -30,7 +30,7 @@ Library
         Build-depends: base < 3
     else
         Build-depends: base>=3 && <5 , containers>=0.1, directory>=1.0
-    Build-depends:  stm==2.1.*, filepath==1.1.*, mtl==1.1.*,
+    Build-depends:  filepath==1.1.*, mtl==1.1.*,
                     bytestring==0.9.*,
                     utf8-string==0.3.* && >=0.3.1.1,
                     extensible-exceptions==0.1.* && >=0.1.1.0
