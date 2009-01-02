@@ -96,10 +96,6 @@ defaultSettings = Settings {complete = completeFilename,
 {- $outputfncs
 The following functions allow cross-platform output of text that may contain
 Unicode characters.
-
-If 'stdout' is not connected to a terminal (for example,
-piped to another process), Haskeline will treat it as a UTF-8-encoded file
-handle.
 -}
 
 -- | Write a string to the standard output.
@@ -122,8 +118,8 @@ including display of the prompt text, on the user's output terminal (which may d
 They return 'Nothing' if the user pressed @Ctrl-D@ when the
 input text was empty.
 
-If 'stdin' is not connected to a terminal or does not have echoing enabled, it will be
-treated as a UTF8-encoded file handle.  These functions print the prompt to 'stdout',
+If 'stdin' is not connected to a terminal or does not have echoing enabled,
+then these functions print the prompt to 'stdout',
 and they return 'Nothing' if an @EOF@ was encountered before any characters were read.
 -}
 
