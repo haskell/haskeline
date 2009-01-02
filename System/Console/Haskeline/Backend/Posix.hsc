@@ -30,7 +30,7 @@ import System.Console.Haskeline.Key
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.Prefs
 
-import System.Console.Haskeline.Backend.Posix.MultiByte
+import System.Console.Haskeline.Backend.IConv
 
 import GHC.IOBase (haFD,FD)
 import GHC.Handle (withHandle_)

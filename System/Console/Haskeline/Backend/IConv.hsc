@@ -1,4 +1,4 @@
-module System.Console.Haskeline.Backend.Posix.MultiByte(
+module System.Console.Haskeline.Backend.IConv(
         Encoders(..),
         getEncoders
         ) where
