@@ -8,16 +8,12 @@ Characters or bytes which cannot be encoded/decoded (for example, not belonging
 to the output range) will be ignored.
 -}
 
-module System.Console.Haskeline.Encoding (
-                    encode,
-                    encodeToString,
-                    decode,
-                    decodeFromString) where
+module System.Console.Haskeline.Encoding (encode, decode) where
 
 import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.Monads
-import Data.ByteString.Char8 (ByteString, pack, unpack)
+import Data.ByteString (ByteString)
 
 -- | Encode a Unicode 'String' into a 'ByteString' suitable for the current
 -- console.
@@ -31,11 +27,3 @@ decode :: MonadIO m => ByteString -> InputT m String
 decode str = do
     decoder <- asks decodeForTerm
     liftIO $ decoder str
-
--- | Convert a 'String' from Unicode to the console's encoding.
-encodeToString :: MonadIO m => String -> InputT m String
-encodeToString = fmap unpack . encode
-
--- | Convert a 'String' from the console's encoding to unicode.
-decodeFromString :: MonadIO m => String -> InputT m String
-decodeFromString = decode . pack
