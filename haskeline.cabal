@@ -1,5 +1,5 @@
 Name:           haskeline
-Cabal-Version:  >=1.2
+Cabal-Version:  >=1.6
 Version:        0.6
 Category:       User Interfaces
 License:        BSD3
