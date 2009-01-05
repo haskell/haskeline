@@ -37,11 +37,11 @@ setComplete f s = s {complete = f}
 -- | A monad transformer which carries all of the state and settings
 -- relevant to a line-reading application.
 newtype InputT m a = InputT {unInputT :: ReaderT RunTerm
-                                (StateT History (ReaderT Prefs 
+                                (StateT History (ReaderT Prefs
                                 (ReaderT (Settings m) m))) a}
-                            deriving (Monad,MonadIO, MonadState History,
-                                        MonadReader Prefs, MonadReader (Settings m),
-                                        MonadReader RunTerm)
+                            deriving (Monad, MonadIO, MonadException,
+                                MonadState History, MonadReader Prefs,
+                                MonadReader (Settings m), MonadReader RunTerm)
 
 instance Monad m => Functor (InputT m) where
     fmap = State.liftM
@@ -52,11 +52,6 @@ instance Monad m => Applicative (InputT m) where
 
 instance MonadTrans InputT where
     lift = InputT . lift . lift . lift . lift
-
-instance MonadException m => MonadException (InputT m) where
-    block = InputT . block . unInputT
-    unblock = InputT . unblock . unInputT
-    catch f h = InputT $ Monads.catch (unInputT f) (unInputT . h)
 
 instance Monad m => State.MonadState History (InputT m) where
     get = get

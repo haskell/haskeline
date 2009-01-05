@@ -94,18 +94,13 @@ initTermPos = TermPos {termRow = 0, termCol = 0}
 newtype Draw m a = Draw {unDraw :: (ReaderT Actions
                                     (ReaderT Terminal (StateT TermPos
                                     (PosixT m)))) a}
-    deriving (Monad,MonadIO,MonadReader Actions,MonadReader Terminal,
-        MonadState TermPos, MonadReader Handle, MonadReader Encoders)
+    deriving (Monad, MonadIO, MonadException,
+              MonadReader Actions, MonadReader Terminal, MonadState TermPos,
+              MonadReader Handle, MonadReader Encoders)
 
 instance MonadReader Layout m => MonadReader Layout (Draw m) where
     ask = lift ask
     local r = Draw . local r . unDraw
-
-instance MonadException m => MonadException (Draw m) where
-    block = Draw . block . unDraw
-    unblock = Draw . unblock . unDraw
-    catch (Draw f) g = Draw $ Monads.catch f (unDraw . g)
-
 
 instance MonadTrans Draw where
     lift = Draw . lift . lift . lift . lift . lift

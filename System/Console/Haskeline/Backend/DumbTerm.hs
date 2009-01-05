@@ -18,17 +18,16 @@ initWindow :: Window
 initWindow = Window {pos=0}
 
 newtype DumbTerm m a = DumbTerm {unDumbTerm :: StateT Window (PosixT m) a}
-                deriving (Monad,MonadIO, MonadState Window,MonadReader Handle,
-                            MonadReader Encoders)
+                deriving (Monad, MonadIO, MonadException,
+                          MonadState Window,
+                          MonadReader Handle, MonadReader Encoders)
 
 instance MonadReader Layout m => MonadReader Layout (DumbTerm m) where
     ask = lift ask
     local r = DumbTerm . local r . unDumbTerm
 
-instance MonadException m => MonadException (DumbTerm m) where
-    block = DumbTerm . block . unDumbTerm
-    unblock = DumbTerm . unblock . unDumbTerm
-    catch (DumbTerm f) g = DumbTerm $ Monads.catch f (unDumbTerm . g)
+instance MonadTrans DumbTerm where
+    lift = DumbTerm . lift . lift . lift
 
 runDumbTerm :: IO RunTerm
 runDumbTerm = posixRunTerm $ \enc h ->
@@ -40,9 +39,6 @@ runDumbTerm = posixRunTerm $ \enc h ->
                                 $ withPosixGetEvent enc [] f
                         }
                                 
-instance MonadTrans DumbTerm where
-    lift = DumbTerm . lift . lift . lift
-
 instance (MonadException m, MonadLayout m) => Term (DumbTerm m) where
     reposition _ s = refitLine s
     drawLineDiff = drawLineDiff'
