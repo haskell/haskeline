@@ -10,11 +10,13 @@ import Data.List(intersperse)
 import System.IO
 import qualified Control.Exception.Extensible as Exception
 import qualified Data.ByteString.Char8 as B
+import Data.Maybe (fromMaybe, catMaybes)
 
 import System.Console.Haskeline.Monads as Monads
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.Backend.Posix
+import System.Console.Haskeline.Key
 
 -- | Keep track of all of the output capabilities we can use.
 -- 
@@ -119,15 +121,49 @@ runTerminfoDraw = do
             Nothing -> return Nothing
             Just actions -> fmap Just $ posixRunTerm $ \enc h ->
                 TermOps {
-                    getLayout = getPosixLayout h (Just term),
+                    getLayout = tryGetLayouts (posixLayouts h
+                                                ++ [tinfoLayout term]),
                     runTerm = \f ->
                              runPosixT enc h
                               $ evalStateT' initTermPos
                               $ runReaderT' term
                               $ runReaderT' actions
                               $ unDraw
-                              $ withPosixGetEvent enc h (Just term) f
+                              $ wrapKeypad h term
+                              $ withPosixGetEvent enc (terminfoKeys term) f
                     }
+
+-- If the keypad on/off capabilities are defined, wrap the computation with them.
+wrapKeypad :: MonadException m => Handle -> Terminal -> m a -> m a
+wrapKeypad h term f = (maybeOutput keypadOn >> f)
+                            `finally` maybeOutput keypadOff
+  where
+    maybeOutput cap = liftIO $ hRunTermOutput h term $
+                            fromMaybe mempty (getCapability term cap)
+
+tinfoLayout :: Terminal -> IO (Maybe Layout)
+tinfoLayout term = return $ getCapability term $ do
+                        r <- termColumns
+                        c <- termLines
+                        return Layout {height=r,width=c}
+
+terminfoKeys :: Terminal -> [(String,Key)]
+terminfoKeys term = catMaybes $ map getSequence keyCapabilities
+    where
+        getSequence (cap,x) = do
+                            keys <- getCapability term cap
+                            return (keys,x)
+        keyCapabilities =
+                [(keyLeft,      simpleKey LeftKey)
+                ,(keyRight,      simpleKey RightKey)
+                ,(keyUp,         simpleKey UpKey)
+                ,(keyDown,       simpleKey DownKey)
+                ,(keyBackspace,  simpleKey Backspace)
+                ,(keyDeleteChar, simpleKey Delete)
+                ,(keyHome,       simpleKey Home)
+                ,(keyEnd,        simpleKey End)
+                ]
+
     
 output :: MonadIO m => TermAction -> Draw m ()
 output f = do

@@ -33,11 +33,11 @@ instance MonadException m => MonadException (DumbTerm m) where
 runDumbTerm :: IO RunTerm
 runDumbTerm = posixRunTerm $ \enc h ->
                 TermOps {
-                        getLayout = getPosixLayout h Nothing,
+                        getLayout = tryGetLayouts (posixLayouts h),
                         runTerm = \f -> 
                                 runPosixT enc h $ evalStateT' initWindow
                                 $ unDumbTerm
-                                $ withPosixGetEvent enc h Nothing f
+                                $ withPosixGetEvent enc [] f
                         }
                                 
 instance MonadTrans DumbTerm where

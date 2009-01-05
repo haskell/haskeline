@@ -1,6 +1,7 @@
 module System.Console.Haskeline.Backend.Posix (
                         withPosixGetEvent,
-                        getPosixLayout,
+                        posixLayouts,
+                        tryGetLayouts,
                         PosixT,
                         runPosixT,
                         Encoders(unicodeToLocale),
@@ -12,12 +13,11 @@ module System.Console.Haskeline.Backend.Posix (
 import Foreign
 import Foreign.C.Types
 import qualified Data.Map as Map
-import System.Console.Terminfo
 import System.Posix.Terminal hiding (Interrupt)
 import Control.Monad
 import Control.Concurrent hiding (throwTo)
 import Control.Concurrent.Chan
-import Data.Maybe
+import Data.Maybe (catMaybes)
 import System.Posix.Signals.Exts
 import System.Posix.IO(stdInput)
 import Data.List
@@ -42,8 +42,8 @@ import GHC.Handle (withHandle_)
 
 foreign import ccall ioctl :: CInt -> CULong -> Ptr a -> IO CInt
 
-getPosixLayout :: Handle -> Maybe Terminal -> IO Layout
-getPosixLayout h term = tryGetLayouts [ioctlLayout h, envLayout, tinfoLayout term]
+posixLayouts :: Handle -> [IO (Maybe Layout)]
+posixLayouts h = [ioctlLayout h, envLayout]
 
 ioctlLayout :: Handle -> IO (Maybe Layout)
 ioctlLayout h = allocaBytes (#size struct winsize) $ \ws -> do
@@ -65,12 +65,6 @@ envLayout = handle (\(_::IOException) -> return Nothing) $ do
     c <- getEnv "COLUMNS"
     return $ Just $ Layout {height=read r,width=read c}
 
-tinfoLayout :: Maybe Terminal -> IO (Maybe Layout)
-tinfoLayout = maybe (return Nothing) $ \t -> return $ getCapability t $ do
-                        r <- termColumns
-                        c <- termLines
-                        return Layout {height=r,width=c}
-
 tryGetLayouts :: [IO (Maybe Layout)] -> IO Layout
 tryGetLayouts [] = return Layout {height=24,width=80}
 tryGetLayouts (f:fs) = do
@@ -84,11 +78,10 @@ tryGetLayouts (f:fs) = do
 -- Key sequences
 
 getKeySequences :: (MonadIO m, MonadReader Prefs m)
-        => Maybe Terminal -> m (TreeMap Char Key)
-getKeySequences term = do
+        => [(String,Key)] -> m (TreeMap Char Key)
+getKeySequences tinfos = do
     sttys <- liftIO sttyKeys
     customKeySeqs <- getCustomKeySeqs
-    let tinfos = maybe [] terminfoKeys term
     -- note ++ acts as a union; so the below favors sttys over tinfos
     return $ listToTree
         $ ansiKeys ++ tinfos ++ sttys ++ customKeySeqs
@@ -109,22 +102,6 @@ ansiKeys = [("\ESC[D",  simpleKey LeftKey)
             ,("\ESC[B",  simpleKey DownKey)
             ,("\b",      simpleKey Backspace)]
 
-terminfoKeys :: Terminal -> [(String,Key)]
-terminfoKeys term = catMaybes $ map getSequence keyCapabilities
-    where 
-        getSequence (cap,x) = do 
-                            keys <- getCapability term cap
-                            return (keys,x)
-        keyCapabilities = 
-                [(keyLeft,      simpleKey LeftKey)
-                ,(keyRight,      simpleKey RightKey)
-                ,(keyUp,         simpleKey UpKey)
-                ,(keyDown,       simpleKey DownKey)
-                ,(keyBackspace,  simpleKey Backspace)
-                ,(keyDeleteChar, simpleKey Delete)
-                ,(keyHome,       simpleKey Home)
-                ,(keyEnd,        simpleKey End)
-                ]
 
 sttyKeys :: IO [(String, Key)]
 sttyKeys = do
@@ -183,20 +160,12 @@ lookupChars (TreeMap tm) (c:cs) = case Map.lookup c tm of
 -----------------------------
 
 withPosixGetEvent :: (MonadTrans t, MonadIO m, MonadException (t m), MonadReader Prefs m) 
-                        => Encoders -> Handle -> Maybe Terminal -> (t m Event -> t m a) -> t m a
-withPosixGetEvent enc h term f = do
-    baseMap <- lift $ getKeySequences term
+                        => Encoders -> [(String,Key)] -> (t m Event -> t m a) -> t m a
+withPosixGetEvent enc termKeys f = do
+    baseMap <- lift $ getKeySequences termKeys
     evenChan <- liftIO $ newChan
-    wrapKeypad h term $ withWindowHandler evenChan
+    withWindowHandler evenChan
         $ f $ liftIO $ getEvent enc baseMap evenChan
-
--- If the keypad on/off capabilities are defined, wrap the computation with them.
-wrapKeypad :: MonadException m => Handle -> Maybe Terminal -> m a -> m a
-wrapKeypad h = maybe id $ \term f -> (maybeOutput term keypadOn >> f) 
-                            `finally` maybeOutput term keypadOff
-  where
-    maybeOutput term cap = liftIO $ hRunTermOutput h term $
-                            fromMaybe mempty (getCapability term cap)
 
 withWindowHandler :: MonadException m => Chan Event -> m a -> m a
 withWindowHandler eventChan = withHandler windowChange $ 

@@ -25,6 +25,10 @@ extra-source-files: examples/Test.hs
 flag old-base
     Description: Use the base packages from before version 6.8
 
+flag terminfo
+    Description: Use the terminfo package for POSIX consoles.
+    Default: True
+
 Library
     if flag(old-base)
         Build-depends: base < 3
@@ -71,13 +75,17 @@ Library
         install-includes: win_console.h
         cpp-options: -DMINGW
     } else {
-        Build-depends: terminfo==0.3.*, unix==2.2.* || ==2.3.*
+        Build-depends: unix==2.2.* || ==2.3.*
                         -- unix-2.3 doesn't build on ghc-6.8.1
         Extra-libraries: iconv
         Other-modules: 
                 System.Console.Haskeline.Backend.Posix
                 System.Console.Haskeline.Backend.IConv
                 System.Console.Haskeline.Backend.DumbTerm
-                System.Console.Haskeline.Backend.Terminfo
+        if flag(terminfo) {
+            Build-depends: terminfo==0.3.*
+            Other-modules: System.Console.Haskeline.Backend.Terminfo
+            cpp-options: -DTERMINFO
+        }
     }
     ghc-options: -Wall
