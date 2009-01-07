@@ -1,6 +1,7 @@
 module System.Console.Haskeline.Backend.IConv(
-        Encoders(..),
-        getEncoders
+        getCodeset,
+        openEncoder,
+        openDecoder
         ) where
 
 import Foreign.C
@@ -10,43 +11,32 @@ import Data.ByteString.Internal (createAndTrim)
 import Control.Monad(when)
 import qualified Data.ByteString.UTF8 as UTF8
 
+import System.Console.Haskeline.MonadException
+
 #include <locale.h>
 #include <langinfo.h>
 #include <iconv.h>
 
-data Encoders = Encoders {unicodeToLocale:: String -> ByteString,
-                          localeToUnicode :: ByteString -> String,
-                          cleanupEncoders :: IO ()}
-
-getEncoders :: IO Encoders
-getEncoders = do
-    oldLocale <- setEnvLocale
-    codeset <- nlLangInfo
-    -- convert to UTF-8 instead of UTF-32 so we don't have to worry about
-    -- endian issues.  (Though I'm not sure whether it's really a concern.)
+openEncoder :: String -> IO (String -> IO ByteString)
+openEncoder codeset = do
     encodeT <- iconvOpen codeset "UTF-8"
+    return $ iconv encodeT . UTF8.fromString
+
+openDecoder :: String -> IO (ByteString -> IO String)
+openDecoder codeset = do
     decodeT <- iconvOpen "UTF-8" codeset
-    return Encoders {
-            unicodeToLocale = iconv encodeT . UTF8.fromString,
-            localeToUnicode = UTF8.toString . iconv decodeT,
-            cleanupEncoders = maybe (return Nothing) setLocale oldLocale >> return ()
-            }
+    return $ fmap UTF8.toString . iconv decodeT
 
 ---------------------
 -- Setting the locale
 
-foreign import ccall setlocale :: CInt -> CString -> IO CString
+foreign import ccall "setlocale" c_setlocale :: CInt -> CString -> IO CString
 
-setLocale :: String -> IO (Maybe String)
-setLocale str = do
-    oldLoc <- withCString str (setlocale (#const LC_CTYPE))
-    if oldLoc == nullPtr
-        then return Nothing
-        else fmap Just $ peekCString oldLoc
-
--- sets the locale from the environmental variables $LANG, $LC_ALL, etc.
-setEnvLocale :: IO (Maybe String)
-setEnvLocale = setLocale ""
+getCodeset :: IO String
+getCodeset = bracket setEnvLocale setLocale (const nlLangInfo)
+    where
+        setLocale = c_setlocale (#const LC_CTYPE)
+        setEnvLocale = withCString "" setLocale
 
 -----------------
 -- Getting the encoding
@@ -65,11 +55,6 @@ nlLangInfo = nl_langinfo (#const CODESET) >>= peekCString
 type IConvT = ForeignPtr ()
 type IConvTPtr = Ptr ()
 
--- Note:
--- It's important for the iconv_t to close itself using a finalizer (rather than
--- cleanupEncoders from above), since conceivably it could be required by a thunk
--- even after runInputT has completed and the RunTerm has been closed.
-
 foreign import ccall iconv_open :: CString -> CString -> IO IConvTPtr
 
 iconvOpen :: String -> String -> IO IConvT
@@ -86,8 +71,8 @@ foreign import ccall "&" iconv_close :: FunPtr (IConvTPtr -> IO ())
 foreign import ccall "iconv" c_iconv :: IConvTPtr -> Ptr CString -> Ptr CSize
                             -> Ptr CString -> Ptr CSize -> IO CSize
 
-iconv :: IConvT -> ByteString -> ByteString
-iconv cd inStr = unsafePerformIO $ useAsCStringLen inStr $ \(inPtr, inBuffLen) ->
+iconv :: IConvT -> ByteString -> IO ByteString
+iconv cd inStr = useAsCStringLen inStr $ \(inPtr, inBuffLen) ->
         with inPtr $ \inBuff ->
         with (toEnum inBuffLen) $ \inBytesLeft -> do
                 out <- loop inBuffLen (castPtr inBuff) inBytesLeft

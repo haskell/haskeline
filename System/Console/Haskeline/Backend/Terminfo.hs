@@ -23,11 +23,11 @@ import System.Console.Haskeline.Key
 -- We'll be frequently using the (automatic) 'Monoid' instance for 
 -- @Actions -> TermOutput@.
 data Actions = Actions {leftA, rightA, upA :: Int -> TermOutput,
-                        clearToLineEnd :: Encoders -> TermOutput,
-                        nl, cr :: Encoders -> TermOutput,
-                        bellAudible,bellVisual :: Encoders -> TermOutput,
+                        clearToLineEnd :: TermOutput,
+                        nl, cr :: TermOutput,
+                        bellAudible,bellVisual :: TermOutput,
                         clearAllA :: LinesAffected -> TermOutput,
-                        wrapLine :: Encoders -> TermOutput}
+                        wrapLine :: TermOutput}
 
 getActions :: Capability Actions
 getActions = do
@@ -43,13 +43,13 @@ getActions = do
     bellVisual' <- visualBell `mplus` return mempty
     wrapLine' <- getWrapLine nl' (leftA' 1)
     return Actions{leftA = leftA', rightA = rightA',upA = upA',
-                clearToLineEnd = const clearToLineEnd', nl = const nl',cr = const cr',
-                bellAudible = const bellAudible', bellVisual = const bellVisual',
+                clearToLineEnd = clearToLineEnd', nl = nl',cr = cr',
+                bellAudible = bellAudible', bellVisual = bellVisual',
                 clearAllA = clearAll',
-                 wrapLine = const wrapLine'}
+                 wrapLine = wrapLine'}
 
-text :: String -> Actions -> Encoders -> TermOutput
-text str _ enc = termText $ B.unpack $ unicodeToLocale enc str
+text :: B.ByteString -> Actions -> TermOutput
+text str _ = termText $ B.unpack str
 
 getWrapLine :: TermOutput -> TermOutput -> Capability TermOutput
 getWrapLine nl' left1 = (autoRightMargin >>= guard >> withAutoMargin)
@@ -62,15 +62,15 @@ getWrapLine nl' left1 = (autoRightMargin >>= guard >> withAutoMargin)
                         return (termText " " <#> left1)
                      )`mplus` return mempty
 
-type TermAction = Actions -> Encoders -> TermOutput
+type TermAction = Actions -> TermOutput
     
 left,right,up :: Int -> TermAction
-left n = const . flip leftA n
-right n = const . flip rightA n
-up n = const . flip upA n
+left n = flip leftA n
+right n = flip rightA n
+up n = flip upA n
 
 clearAll :: LinesAffected -> TermAction
-clearAll la = const . flip clearAllA la
+clearAll la = flip clearAllA la
 
 --------
 
@@ -165,8 +165,7 @@ output f = do
     toutput <- asks f
     term <- ask
     ttyh <- ask
-    enc <- ask
-    liftIO $ hRunTermOutput ttyh term (toutput enc)
+    liftIO $ hRunTermOutput ttyh term toutput
 
 
 
@@ -213,12 +212,13 @@ fillLine str = do
     let roomLeft = w - c
     if length str < roomLeft
         then do
-                output (text str)
+                posixEncode str >>= output . text
                 put TermPos{termRow=r, termCol=c+length str}
                 return ""
         else do
                 let (thisLine,rest) = splitAt roomLeft str
-                output (text thisLine <#> wrapLine)
+                bstr <- posixEncode thisLine
+                output (text bstr <#> wrapLine)
                 put TermPos {termRow=r+1,termCol=0}
                 return rest
 
@@ -284,7 +284,9 @@ instance (MonadException m, MonadLayout m) => Term (Draw m) where
     reposition = repositionT
     
     printLines [] = return ()
-    printLines ls = output $ mconcat $ intersperse nl (map text ls) ++ [nl] 
+    printLines ls = do
+        bls <- mapM posixEncode ls
+        output $ mconcat $ intersperse nl (map text bls) ++ [nl]
     clearLayout = clearLayoutT
     moveToNextLine = moveToNextLineT
     ringBell True = output bellAudible

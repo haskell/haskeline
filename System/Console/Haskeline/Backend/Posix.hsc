@@ -4,8 +4,8 @@ module System.Console.Haskeline.Backend.Posix (
                         tryGetLayouts,
                         PosixT,
                         runPosixT,
-                        Encoders(unicodeToLocale),
-                        putTerm,
+                        Encoders(),
+                        posixEncode,
                         mapLines,
                         posixRunTerm
                  ) where
@@ -194,7 +194,7 @@ getEvent enc baseMap = keyEventLoop readKeyEvents
         threadWaitRead stdInput -- hWaitForInput doesn't work with -threaded on
                                 -- ghc < 6.10 (#2363 in ghc's trac)
         bs <- B.hGetNonBlocking stdin bufferSize
-        let cs = localeToUnicode enc bs
+        cs <- localeToUnicode enc bs
         return $ map KeyInput $ lexKeys baseMap cs
 
 -- fails if stdin is not a handle or if we couldn't access /dev/tty.
@@ -209,33 +209,44 @@ openTTY = do
 
 posixRunTerm :: (Encoders -> Handle -> TermOps) -> IO RunTerm
 posixRunTerm tOps = do
-    enc <- getEncoders
-    fileRT <- fileRunTerm enc
+    codeset <- getCodeset
+    fileRT <- fileRunTerm codeset
     ttyH <- openTTY
+    encoders <- liftM2 Encoders (openEncoder codeset) (openDecoder codeset)
     case ttyH of
         Nothing -> return fileRT
         Just h -> return fileRT {
                     closeTerm = closeTerm fileRT >> hClose h,
-                    termOps = Just (wrapRunTerm (wrapTerminalOps h) (tOps enc h))
+                    -- NOTE: could also alloc Encoders once for each call to wrapRunTerm
+                    termOps = Just (wrapRunTerm (wrapTerminalOps h) (tOps encoders h))
                 }
 
 type PosixT m = ReaderT Encoders (ReaderT Handle m)
 
+data Encoders = Encoders {unicodeToLocale :: String -> IO B.ByteString,
+                          localeToUnicode :: B.ByteString -> IO String}
+
+posixEncode :: (MonadIO m, MonadReader Encoders m) => String -> m B.ByteString
+posixEncode str = do
+    encoder <- asks unicodeToLocale
+    liftIO $ encoder str
+
 runPosixT enc h = runReaderT' h . runReaderT' enc
 
-putTerm :: Encoders -> Handle -> String -> IO ()
-putTerm enc h str = B.hPutStr h (unicodeToLocale enc str) >> hFlush h
+putTerm :: B.ByteString -> IO ()
+putTerm str = B.putStr str >> hFlush stdout
 
-fileRunTerm :: Encoders -> IO RunTerm
-fileRunTerm enc = do
-    return RunTerm {putStrOut = putTerm enc stdout,
-                closeTerm = cleanupEncoders enc,
+fileRunTerm :: String -> IO RunTerm
+fileRunTerm codeset = do
+    let encoder str = join $ fmap ($ str) $ openEncoder codeset
+    let decoder str = join $ fmap ($ str) $ openDecoder codeset
+    return RunTerm {putStrOut = \str -> encoder str >>= putTerm,
+                closeTerm = return (),
                 wrapInterrupt = withSigIntHandler,
-                encodeForTerm = return . unicodeToLocale enc,
-                decodeForTerm = return . localeToUnicode enc,
+                encodeForTerm = encoder,
+                decodeForTerm = decoder,
                 termOps = Nothing
                 }
-
 
 -- NOTE: If we set stdout to NoBuffering, there can be a flicker effect when many
 -- characters are printed at once.  We'll keep it buffered here, and let the Draw

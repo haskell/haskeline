@@ -6,6 +6,7 @@ import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Monads as Monads
 
 import System.IO
+import qualified Data.ByteString as B
 
 -- TODO: 
 ---- Put "<" and ">" at end of term if scrolls off.
@@ -52,8 +53,8 @@ instance (MonadException m, MonadLayout m) => Term (DumbTerm m) where
 printText :: MonadIO m => String -> DumbTerm m ()
 printText str = do
     h <- ask
-    enc <- ask
-    liftIO $ putTerm enc h str
+    posixEncode str >>= liftIO . B.hPutStr h
+    liftIO $ hFlush h
 
 -- Things we can assume a dumb terminal knows how to do
 cr,crlf :: String
