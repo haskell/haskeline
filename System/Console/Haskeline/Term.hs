@@ -9,7 +9,7 @@ import Control.Concurrent
 import Control.Concurrent.Chan
 import Data.Typeable
 import Data.ByteString (ByteString)
-import Control.Exception.Extensible (fromException, AsyncException(..))
+import Control.Exception.Extensible (fromException, AsyncException(..),bracket_)
 
 class (MonadReader Layout m, MonadException m) => Term m where
     reposition :: Layout -> LineChars -> m ()
@@ -55,14 +55,21 @@ keyEventLoop readEvents eventChan = do
     if not isEmpty
         then readChan eventChan
         else do
-            tid <- forkIO $ handleErrorEvent readerLoop
-            readChan eventChan `finally` killThread tid
+            lock <- newEmptyMVar
+            tid <- forkIO $ handleErrorEvent (readerLoop lock)
+            readChan eventChan `finally` do
+                            putMVar lock ()
+                            killThread tid
   where
-    readerLoop = do
+    readerLoop lock = do
         es <- readEvents
         if null es
-            then readerLoop
-            else writeList2Chan eventChan es
+            then readerLoop lock
+            else -- Use the lock to work around the fact that writeList2Chan
+                 -- isn't atomic.  Otherwise, some events could be ignored if
+                 -- the subthread is killed before it saves them in the chan.
+                 bracket_ (putMVar lock ()) (takeMVar lock) $ 
+                    writeList2Chan eventChan es
     handleErrorEvent = handle $ \e -> case fromException e of
                                 Just ThreadKilled -> return ()
                                 _ -> writeChan eventChan (ErrorEvent e)
