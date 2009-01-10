@@ -209,8 +209,8 @@ openTTY = do
 
 posixRunTerm :: (Encoders -> Handle -> TermOps) -> IO RunTerm
 posixRunTerm tOps = do
+    fileRT <- fileRunTerm
     codeset <- getCodeset
-    fileRT <- fileRunTerm codeset
     ttyH <- openTTY
     encoders <- liftM2 Encoders (openEncoder codeset) (openDecoder codeset)
     case ttyH of
@@ -236,12 +236,14 @@ runPosixT enc h = runReaderT' h . runReaderT' enc
 putTerm :: B.ByteString -> IO ()
 putTerm str = B.putStr str >> hFlush stdout
 
-fileRunTerm :: String -> IO RunTerm
-fileRunTerm codeset = do
+fileRunTerm :: IO RunTerm
+fileRunTerm = do
+    oldLocale <- setLocale (Just "")
+    codeset <- getCodeset
     let encoder str = join $ fmap ($ str) $ openEncoder codeset
     let decoder str = join $ fmap ($ str) $ openDecoder codeset
     return RunTerm {putStrOut = \str -> encoder str >>= putTerm,
-                closeTerm = return (),
+                closeTerm = setLocale oldLocale >> return (),
                 wrapInterrupt = withSigIntHandler,
                 encodeForTerm = encoder,
                 decodeForTerm = decoder,

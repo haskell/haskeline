@@ -13,11 +13,11 @@ module System.Console.Haskeline.Completion(
                         ) where
 
 
-import System.Directory
 import System.FilePath
 import Data.List(isPrefixOf)
 import Control.Monad(forM)
 
+import System.Console.Haskeline.Directory
 import System.Console.Haskeline.Monads
 
 -- | Performs completions from the given line state.
@@ -141,8 +141,7 @@ isUnquoted esc qs s = case splitAtQuote esc qs s of
 
 -- | List all of the files or folders beginning with this path.
 listFiles :: MonadIO m => FilePath -> m [Completion]
--- NOTE: 'handle' catches exceptions from getDirectoryContents and getHomeDirectory.
-listFiles path = liftIO $ handle (\(_::IOException) -> return []) $ do
+listFiles path = liftIO $ do
     fixedDir <- fixPath dir
     dirExists <- doesDirectoryExist fixedDir
     -- get all of the files in that directory, as basenames

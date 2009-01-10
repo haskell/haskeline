@@ -1,4 +1,5 @@
 module System.Console.Haskeline.Backend.IConv(
+        setLocale,
         getCodeset,
         openEncoder,
         openDecoder
@@ -32,11 +33,9 @@ openDecoder codeset = do
 
 foreign import ccall "setlocale" c_setlocale :: CInt -> CString -> IO CString
 
-getCodeset :: IO String
-getCodeset = bracket setEnvLocale setLocale (const nlLangInfo)
-    where
-        setLocale = c_setlocale (#const LC_CTYPE)
-        setEnvLocale = withCString "" setLocale
+setLocale :: Maybe String -> IO (Maybe String)
+setLocale oldLocale = (maybeWith withCString) oldLocale $ \loc_p -> do
+    c_setlocale (#const LC_CTYPE) loc_p >>= maybePeek peekCString
 
 -----------------
 -- Getting the encoding
@@ -45,8 +44,8 @@ type NLItem = #type nl_item
 
 foreign import ccall nl_langinfo :: NLItem -> IO CString
 
-nlLangInfo :: IO String
-nlLangInfo = nl_langinfo (#const CODESET) >>= peekCString
+getCodeset :: IO String
+getCodeset = nl_langinfo (#const CODESET) >>= peekCString
 
 ----------------
 -- Iconv
