@@ -257,6 +257,7 @@ posixEncode str = do
     encoder <- asks unicodeToLocale
     liftIO $ encoder str
 
+runPosixT :: Monad m => Encoders -> Handle -> PosixT m a -> m a
 runPosixT enc h = runReaderT' h . runReaderT' enc
 
 putTerm :: B.ByteString -> IO ()
