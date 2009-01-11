@@ -186,7 +186,7 @@ withHandler signal handler f = do
 getEvent :: Encoders -> TreeMap Char Key -> Chan Event -> IO Event
 getEvent enc baseMap = keyEventLoop readKeyEvents
   where
-    bufferSize = 100
+    bufferSize = 32
     readKeyEvents = do
         -- Read at least one character of input, and more if available.
         -- In particular, the characters making up a control sequence will all
@@ -194,8 +194,21 @@ getEvent enc baseMap = keyEventLoop readKeyEvents
         threadWaitRead stdInput -- hWaitForInput doesn't work with -threaded on
                                 -- ghc < 6.10 (#2363 in ghc's trac)
         bs <- B.hGetNonBlocking stdin bufferSize
-        cs <- localeToUnicode enc bs
+        cs <- convert bs
         return $ map KeyInput $ lexKeys baseMap cs
+    -- try to convert to the locale encoding using iconv.
+    -- if the buffer has an incomplete shift sequence,
+    -- read another byte of input and try again.
+    convert bs = do
+        (cs,result) <- localeToUnicode enc bs
+        case result of
+            Incomplete rest -> do
+                    extra <- B.hGetNonBlocking stdin 1
+                    if B.null extra
+                        then return cs -- ignore the incomplete shift sequence
+                                       -- since no more input is available.
+                        else fmap (cs ++) $ convert (rest `B.append` extra)
+            _ -> return cs
 
 -- fails if stdin is not a handle or if we couldn't access /dev/tty.
 openTTY :: IO (Maybe Handle)
@@ -212,7 +225,7 @@ posixRunTerm tOps = do
     fileRT <- fileRunTerm
     codeset <- getCodeset
     ttyH <- openTTY
-    encoders <- liftM2 Encoders (openEncoder codeset) (openDecoder codeset)
+    encoders <- liftM2 Encoders (openEncoder codeset) (openPartialDecoder codeset)
     case ttyH of
         Nothing -> return fileRT
         Just h -> return fileRT {
@@ -224,7 +237,7 @@ posixRunTerm tOps = do
 type PosixT m = ReaderT Encoders (ReaderT Handle m)
 
 data Encoders = Encoders {unicodeToLocale :: String -> IO B.ByteString,
-                          localeToUnicode :: B.ByteString -> IO String}
+                          localeToUnicode :: B.ByteString -> IO (String, Result)}
 
 posixEncode :: (MonadIO m, MonadReader Encoders m) => String -> m B.ByteString
 posixEncode str = do
