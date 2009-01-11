@@ -25,6 +25,7 @@ data RunTerm = RunTerm {
             putStrOut :: String -> IO (),
             encodeForTerm :: String -> IO ByteString,
             decodeForTerm :: ByteString -> IO String,
+            getLocaleChar :: IO Char,
             termOps :: Maybe TermOps,
             wrapInterrupt :: MonadException m => m a -> m a,
             closeTerm :: IO ()

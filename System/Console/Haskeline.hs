@@ -272,7 +272,7 @@ simpleFileChar prefix rterm = liftIO $ do
     atEOF <- hIsEOF stdin
     if atEOF
         then return Nothing
-        else liftM Just getChar -- TODO: utf8?
+        else liftM Just $ getLocaleChar rterm
 
 -- TODO: it might be possible to unify this function with getInputCmdLine,
 -- maybe by calling repeatTillFinish here...

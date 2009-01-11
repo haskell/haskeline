@@ -333,6 +333,7 @@ fileRunTerm = do
                     putStrOut = putter,
                     encodeForTerm = unicodeToCodePage cp,
                     decodeForTerm = codePageToUnicode cp,
+                    getLocaleChar = getMultiByteChar cp,
                     wrapInterrupt = withCtrlCHandler}
 
 -- On Windows, Unicode written to the console must be written with the WriteConsole API call.
@@ -409,3 +410,20 @@ getCodePage = do
     if conCP > 0
         then return conCP
         else getACP
+
+foreign import stdcall "IsDBCSLeadByteEx" c_IsDBCSLeadByteEx
+        :: CodePage -> BYTE -> BOOL
+
+getMultiByteChar :: CodePage -> IO Char
+getMultiByteChar cp = do
+    b1 <- getByte
+    bs <- if c_IsDBCSLeadByteEx cp b1
+            then getByte >>= \b2 -> return [b1,b2]
+            else return [b1]
+    cs <- codePageToUnicode cp (B.pack bs)
+    case cs of
+        [] -> getMultiByteChar cp
+        (c:_) -> return c
+  where
+    -- NOTE: relies on getChar returning an 8-bit Char.
+    getByte = fmap (toEnum . fromEnum) getChar

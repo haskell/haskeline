@@ -23,6 +23,7 @@ import System.Posix.IO(stdInput)
 import Data.List
 import System.IO
 import qualified Data.ByteString as B
+import Data.ByteString.Char8 as Char8 (pack)
 import System.Environment
 
 import System.Console.Haskeline.Monads
@@ -194,21 +195,33 @@ getEvent enc baseMap = keyEventLoop readKeyEvents
         threadWaitRead stdInput -- hWaitForInput doesn't work with -threaded on
                                 -- ghc < 6.10 (#2363 in ghc's trac)
         bs <- B.hGetNonBlocking stdin bufferSize
-        cs <- convert bs
+        cs <- convert (localeToUnicode enc) bs
         return $ map KeyInput $ lexKeys baseMap cs
-    -- try to convert to the locale encoding using iconv.
-    -- if the buffer has an incomplete shift sequence,
-    -- read another byte of input and try again.
-    convert bs = do
-        (cs,result) <- localeToUnicode enc bs
-        case result of
-            Incomplete rest -> do
+
+-- try to convert to the locale encoding using iconv.
+-- if the buffer has an incomplete shift sequence,
+-- read another byte of input and try again.
+convert :: (B.ByteString -> IO (String,Result)) -> B.ByteString -> IO String
+convert decoder bs = do
+    (cs,result) <- decoder bs
+    case result of
+        Incomplete rest -> do
                     extra <- B.hGetNonBlocking stdin 1
                     if B.null extra
                         then return cs -- ignore the incomplete shift sequence
                                        -- since no more input is available.
-                        else fmap (cs ++) $ convert (rest `B.append` extra)
-            _ -> return cs
+                        else fmap (cs ++) $ convert decoder (rest `B.append` extra)
+        _ -> return cs
+
+-- NOTE: relys on getChar reading only 8 bytes.
+getMultiByteChar :: (B.ByteString -> IO (String,Result)) -> IO Char
+getMultiByteChar decoder = do
+    b <- getChar
+    cs <- convert decoder (Char8.pack [b])
+    case cs of
+        [] -> getMultiByteChar decoder
+        (c:_) -> return c
+
 
 -- fails if stdin is not a handle or if we couldn't access /dev/tty.
 openTTY :: IO (Maybe Handle)
@@ -255,11 +268,13 @@ fileRunTerm = do
     codeset <- getCodeset
     let encoder str = join $ fmap ($ str) $ openEncoder codeset
     let decoder str = join $ fmap ($ str) $ openDecoder codeset
+    decoder' <- openPartialDecoder codeset
     return RunTerm {putStrOut = \str -> encoder str >>= putTerm,
                 closeTerm = setLocale oldLocale >> return (),
                 wrapInterrupt = withSigIntHandler,
                 encodeForTerm = encoder,
                 decodeForTerm = decoder,
+                getLocaleChar = getMultiByteChar decoder',
                 termOps = Nothing
                 }
 
