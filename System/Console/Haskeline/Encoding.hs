@@ -13,7 +13,6 @@ module System.Console.Haskeline.Encoding (
                                     decode,
                                     getEncoder,
                                     getDecoder
-                                    -- $convFncs
                                     ) where
 
 import System.Console.Haskeline.InputT
