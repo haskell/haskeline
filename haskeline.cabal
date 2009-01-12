@@ -78,7 +78,12 @@ Library
     } else {
         Build-depends: unix>=2.2 && < 2.4
                         -- unix-2.3 doesn't build on ghc-6.8.1
-        Extra-libraries: iconv
+        -- temporary hack: some OSes provide iconv in (g)libc, and
+        -- some provide it as a separate libiconv.  It would be
+        -- better if we could detect this automatically, though.
+        if os(darwin) || os(freebsd) {
+            Extra-libraries: iconv
+        }
         Other-modules: 
                 System.Console.Haskeline.Backend.Posix
                 System.Console.Haskeline.Backend.IConv
