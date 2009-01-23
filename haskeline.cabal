@@ -44,7 +44,7 @@ Library
                 ScopedTypeVariables, GeneralizedNewtypeDeriving
                 MultiParamTypeClasses, OverlappingInstances
                 PatternSignatures, CPP, DeriveDataTypeable,
-                PatternGuards, StandaloneDeriving
+                PatternGuards
     Exposed-Modules:
                 System.Console.Haskeline
                 System.Console.Haskeline.Completion
