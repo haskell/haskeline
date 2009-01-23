@@ -31,11 +31,12 @@ flag terminfo
 
 Library
     if flag(old-base)
-        Build-depends: base < 3
+        Build-depends: base == 2.*
+        cpp-options:    -DOLD_BASE
     else
-        Build-depends: base>=3 && <5 , containers>=0.1, directory>=1.0
+        Build-depends: base>=3 && <5 , containers>=0.1, directory>=1.0,
+                        bytestring==0.9.*
     Build-depends:  filepath==1.1.*, mtl==1.1.*,
-                    bytestring==0.9.*,
                     utf8-string==0.3.* && >=0.3.1.1,
                     extensible-exceptions==0.1.* && >=0.1.1.0
     Extensions:     ForeignFunctionInterface, RankNTypes, FlexibleInstances,
@@ -76,8 +77,8 @@ Library
         install-includes: win_console.h
         cpp-options: -DMINGW
     } else {
-        Build-depends: unix>=2.2 && < 2.4
-                        -- unix-2.3 doesn't build on ghc-6.8.1
+        Build-depends: unix>=2.1 && < 2.4
+                        -- unix-2.3 doesn't build on ghc-6.8.1 or earlier
         -- temporary hack: some OSes provide iconv in (g)libc, and
         -- some provide it as a separate libiconv.  It would be
         -- better if we could detect this automatically, though.

@@ -41,7 +41,7 @@ import GHC.Handle (withHandle_)
 -------------------
 -- Window size
 
-foreign import ccall ioctl :: CInt -> CULong -> Ptr a -> IO CInt
+foreign import ccall ioctl :: FD -> CULong -> Ptr a -> IO CInt
 
 posixLayouts :: Handle -> [IO (Maybe Layout)]
 posixLayouts h = [ioctlLayout h, envLayout]
