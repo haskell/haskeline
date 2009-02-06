@@ -75,8 +75,7 @@ import Data.Char (isSpace)
 import Control.Monad
 import Data.Char(isPrint)
 import qualified Data.ByteString.Char8 as B
-
-
+import System.IO.Error (isEOFError)
 
 
 -- | A useful default.  In particular:
@@ -254,7 +253,12 @@ withReposition tops prefix s f = do
                 f
 ----------
 
-{- | Reads one character of input, without waiting for a newline.
+{- | Reads one character of input.  Ignores non-printable characters.
+
+If stdin is a terminal, then the character will be read without waiting for a newline.
+
+If stdin is not a terminal, then 'getInputChar' will read a newline if one
+is immediately available after the input character.
 -}
 getInputChar :: MonadException m => String -- ^ The input prompt
                     -> InputT m (Maybe Char)
@@ -269,10 +273,37 @@ getInputChar prefix = do
 simpleFileChar :: MonadIO m => String -> RunTerm -> m (Maybe Char)
 simpleFileChar prefix rterm = liftIO $ do
     putStrOut rterm prefix
-    atEOF <- hIsEOF stdin
-    if atEOF
-        then return Nothing
-        else liftM Just $ getLocaleChar rterm
+    c <- getPrintableChar
+    maybeReadNewline
+    return c
+  where
+    getPrintableChar = returnOnEOF Nothing $ do
+                c <- getLocaleChar rterm
+                if isPrint c
+                    then return (Just c)
+                    else getPrintableChar
+
+-- If another character is immediately available, and it is a newline, consume it.
+--
+-- Note that in ghc-6.8.3 and earlier, hReady returns False at an EOF,
+-- whereas in ghc-6.10.1 and later it throws an exception.  (GHC trac #1063).
+-- This code handles both of those cases.
+--
+-- Also note that on Windows with ghc<6.10, hReady may not behave correctly (#1198)
+-- The net result is that this might cause
+-- But this function will generally only be used when reading buffered input
+-- (since stdin isn't a terminal), so it should probably be OK.
+maybeReadNewline :: IO ()
+maybeReadNewline = returnOnEOF () $ do
+    ready <- hReady stdin
+    when ready $ do
+        c <- hLookAhead stdin
+        when (c == '\n') $ getChar >> return ()
+
+returnOnEOF :: a -> IO a -> IO a
+returnOnEOF x = handle $ \e -> if isEOFError e
+                                then return x
+                                else throwIO e
 
 -- TODO: it might be possible to unify this function with getInputCmdLine,
 -- maybe by calling repeatTillFinish here...
