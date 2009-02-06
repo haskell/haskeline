@@ -21,7 +21,7 @@ import qualified Data.ByteString.UTF8 as UTF8
 
 #include <locale.h>
 #include <langinfo.h>
-#include <iconv.h>
+#include "h_iconv.h"
 
 openEncoder :: String -> IO (String -> IO ByteString)
 openEncoder codeset = do
@@ -73,7 +73,8 @@ getCodeset = nl_langinfo (#const CODESET) >>= peekCString
 type IConvT = ForeignPtr ()
 type IConvTPtr = Ptr ()
 
-foreign import ccall iconv_open :: CString -> CString -> IO IConvTPtr
+foreign import ccall "h_iconv_open" iconv_open
+    :: CString -> CString -> IO IConvTPtr
 
 iconvOpen :: String -> String -> IO IConvT
 iconvOpen destName srcName = withCString destName $ \dest ->
@@ -84,9 +85,9 @@ iconvOpen destName srcName = withCString destName $ \dest ->
                                     else newForeignPtr iconv_close res
 
 -- really this returns a CInt, but it's easiest to just ignore that, I think.
-foreign import ccall "&" iconv_close :: FunPtr (IConvTPtr -> IO ())
+foreign import ccall "& h_iconv_close" iconv_close :: FunPtr (IConvTPtr -> IO ())
 
-foreign import ccall "iconv" c_iconv :: IConvTPtr -> Ptr CString -> Ptr CSize
+foreign import ccall "h_iconv" c_iconv :: IConvTPtr -> Ptr CString -> Ptr CSize
                             -> Ptr CString -> Ptr CSize -> IO CSize
 
 data Result = Successful

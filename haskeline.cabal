@@ -85,6 +85,8 @@ Library
         if os(darwin) || os(freebsd) {
             Extra-libraries: iconv
         }
+        c-sources: cbits/h_iconv.c
+        includes: h_iconv.h
         Other-modules: 
                 System.Console.Haskeline.Backend.Posix
                 System.Console.Haskeline.Backend.IConv
