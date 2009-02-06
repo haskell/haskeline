@@ -29,6 +29,10 @@ flag terminfo
     Description: Use the terminfo package for POSIX consoles.
     Default: True
 
+flag libiconv
+    Description: Explicitly link against the libiconv library.
+    Default: False
+
 Library
     if flag(old-base)
         Build-depends: base == 2.*
@@ -82,7 +86,7 @@ Library
         -- temporary hack: some OSes provide iconv in (g)libc, and
         -- some provide it as a separate libiconv.  It would be
         -- better if we could detect this automatically, though.
-        if os(darwin) || os(freebsd) {
+        if os(darwin) || os(freebsd) || flag(libiconv){
             Extra-libraries: iconv
         }
         c-sources: cbits/h_iconv.c
