@@ -255,10 +255,10 @@ withReposition tops prefix s f = do
 
 {- | Reads one character of input.  Ignores non-printable characters.
 
-If stdin is a terminal, then the character will be read without waiting for a newline.
+If stdin is a terminal, the character will be read without waiting for a newline.
 
-If stdin is not a terminal, then 'getInputChar' will read a newline if one
-is immediately available after the input character.
+If stdin is not a terminal, a newline will be read if it is immediately
+available after the input character.
 -}
 getInputChar :: MonadException m => String -- ^ The input prompt
                     -> InputT m (Maybe Char)
