@@ -293,9 +293,6 @@ wrapRunTerm wrap tops = tops {runTerm = \getE -> wrap (runTerm tops getE)
                                 }
 
 bracketSet :: (Eq a, MonadException m) => IO a -> (a -> IO ()) -> a -> m b -> m b
-bracketSet getState set newState f = do
-    oldState <- liftIO getState
-    if oldState == newState
-        then f
-        else finally (liftIO (set newState) >> f) (liftIO (set oldState))
-
+bracketSet getState set newState f = bracket (liftIO getState)
+                            (liftIO . set)
+                            (\_ -> liftIO (set newState) >> f)
