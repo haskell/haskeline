@@ -91,6 +91,7 @@ Library
         }
         c-sources: cbits/h_iconv.c
         includes: h_iconv.h
+        install-includes: h_iconv.h
         Other-modules: 
                 System.Console.Haskeline.Backend.Posix
                 System.Console.Haskeline.Backend.IConv
