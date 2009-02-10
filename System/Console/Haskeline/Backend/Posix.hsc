@@ -36,6 +36,9 @@ import System.Console.Haskeline.Backend.IConv
 import GHC.IOBase (haFD,FD)
 import GHC.Handle (withHandle_)
 
+#ifdef USE_TERMIOS_H
+#include <termios.h>
+#endif
 #include <sys/ioctl.h>
 
 -------------------

@@ -101,5 +101,8 @@ Library
             Other-modules: System.Console.Haskeline.Backend.Terminfo
             cpp-options: -DTERMINFO
         }
+        if os(solaris) {
+            cpp-options: -DUSE_TERMIOS_H
+        }
     }
     ghc-options: -Wall
