@@ -36,6 +36,11 @@ myHooks
 maybeSetLibiconv :: ConfigFlags -> BuildInfo -> ProgramConfiguration -> IO BuildInfo
 maybeSetLibiconv flags bi progConf = do
     let verb = fromFlag (configVerbosity flags)
+    if hasFlagSet flags (FlagName "libiconv")
+        then do
+            putStrLn "Using -liconv."
+            return bi
+        else do
     putStr "checking whether to use -liconv... "
     hFlush stdout
     worksWithout <- tryCompile iconv_prog bi progConf verb
@@ -45,14 +50,17 @@ maybeSetLibiconv flags bi progConf = do
             writeFile "haskeline.buildinfo" ""
             return bi
         else do
-            let newBI = addIconv bi
-            worksWith <- tryCompile iconv_prog newBI progConf verb
-            if worksWith
-                then do
-                    putStrLn "using -liconv."
-                    writeFile "haskeline.buildinfo" $ unlines ["extra-libraries: iconv"]
-                    return newBI
-                else error "Unable to link against the iconv library."
+    let newBI = addIconv bi
+    worksWith <- tryCompile iconv_prog newBI progConf verb
+    if worksWith
+        then do
+            putStrLn "using -liconv."
+            writeFile "haskeline.buildinfo" $ unlines ["extra-libraries: iconv"]
+            return newBI
+        else error "Unable to link against the iconv library."
+
+hasFlagSet :: ConfigFlags -> FlagName -> Bool
+hasFlagSet cflags flag = Just True == lookup flag (configConfigurationsFlags cflags)
 
 tryCompile :: String -> BuildInfo -> ProgramConfiguration -> Verbosity -> IO Bool
 tryCompile program bi progConf verb = handle processExit $ handle processException $ do
