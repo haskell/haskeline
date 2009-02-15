@@ -21,6 +21,7 @@ Homepage:       http://trac.haskell.org/haskeline
 Stability:      Experimental
 Build-Type:     Custom
 extra-source-files: configure examples/Test.hs
+extra-tmp-files: haskeline.buildinfo
 
 flag old-base
     Description: Use the base packages from before version 6.8
