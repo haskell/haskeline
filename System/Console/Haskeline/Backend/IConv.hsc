@@ -81,7 +81,9 @@ iconvOpen destName srcName = withCString destName $ \dest ->
                             withCString srcName $ \src -> do
                                 res <- iconv_open dest src
                                 if res == nullPtr `plusPtr` (-1)
-                                    then throwErrno "iconvOpen"
+                                    then throwErrno $ "iconvOpen "
+                                            ++ show (srcName,destName)
+                                    -- list the two it couldn't convert between?
                                     else newForeignPtr iconv_close res
 
 -- really this returns a CInt, but it's easiest to just ignore that, I think.
