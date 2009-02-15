@@ -39,6 +39,7 @@ maybeSetLibiconv flags bi progConf = do
     if hasFlagSet flags (FlagName "libiconv")
         then do
             putStrLn "Using -liconv."
+            writeBuildInfo "iconv"
             return bi
         else do
     putStr "checking whether to use -liconv... "
@@ -47,7 +48,7 @@ maybeSetLibiconv flags bi progConf = do
     if worksWithout
         then do
             putStrLn "not needed."
-            writeFile "haskeline.buildinfo" ""
+            writeBuildInfo ""
             return bi
         else do
     let newBI = addIconv bi
@@ -55,9 +56,13 @@ maybeSetLibiconv flags bi progConf = do
     if worksWith
         then do
             putStrLn "using -liconv."
-            writeFile "haskeline.buildinfo" $ unlines ["extra-libraries: iconv"]
+            writeBuildInfo "iconv"
             return newBI
         else error "Unable to link against the iconv library."
+  where
+    -- Cabal (at least 1.6.0.1) won't parse an empty buildinfo file.
+    writeBuildInfo libs = writeFile "haskeline.buildinfo"
+                            $ unlines ["extra-libraries: " ++ libs]
 
 hasFlagSet :: ConfigFlags -> FlagName -> Bool
 hasFlagSet cflags flag = Just True == lookup flag (configConfigurationsFlags cflags)
