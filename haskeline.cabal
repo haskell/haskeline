@@ -19,8 +19,8 @@ Description:
                 (under MinGW).
 Homepage:       http://trac.haskell.org/haskeline
 Stability:      Experimental
-Build-Type:     Simple
-extra-source-files: examples/Test.hs
+Build-Type:     Custom
+extra-source-files: configure examples/Test.hs
 
 flag old-base
     Description: Use the base packages from before version 6.8
@@ -83,12 +83,6 @@ Library
     } else {
         Build-depends: unix>=2.1 && < 2.4
                         -- unix-2.3 doesn't build on ghc-6.8.1 or earlier
-        -- temporary hack: some OSes provide iconv in (g)libc, and
-        -- some provide it as a separate libiconv.  It would be
-        -- better if we could detect this automatically, though.
-        if os(darwin) || os(freebsd) || flag(libiconv){
-            Extra-libraries: iconv
-        }
         c-sources: cbits/h_iconv.c
         includes: h_iconv.h
         install-includes: h_iconv.h
