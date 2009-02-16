@@ -15,8 +15,7 @@ Description:
                 it is written in Haskell it is (hopefully) more easily used in other
                 Haskell programs.
                 .
-                Haskeline runs both on POSIX-compatible systems and on Windows
-                (under MinGW).
+                Haskeline runs both on POSIX-compatible systems and on Windows.
 Homepage:       http://trac.haskell.org/haskeline
 Stability:      Experimental
 Build-Type:     Custom
