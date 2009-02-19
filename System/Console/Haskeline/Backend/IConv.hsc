@@ -65,7 +65,14 @@ type NLItem = #type nl_item
 foreign import ccall nl_langinfo :: NLItem -> IO CString
 
 getCodeset :: IO String
-getCodeset = nl_langinfo (#const CODESET) >>= peekCString
+getCodeset = do
+    str <- nl_langinfo (#const CODESET) >>= peekCString
+    -- check for codesets which may be returned by Solaris, but not understood
+    -- by GNU iconv.
+    if str `elem` ["","646"]
+        then return "ISO-8859-1"
+        else return str
+
 ----------------
 -- Iconv
 
