@@ -18,6 +18,7 @@ import Data.ByteString.Internal (createAndTrim')
 #endif
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as UTF8
+import Data.Maybe (fromMaybe)
 
 #include <locale.h>
 #include <langinfo.h>
@@ -26,20 +27,30 @@ import qualified Data.ByteString.UTF8 as UTF8
 openEncoder :: String -> IO (String -> IO ByteString)
 openEncoder codeset = do
     encodeT <- iconvOpen codeset "UTF-8"
-    return $ simpleIConv encodeT . UTF8.fromString
+    return $ simpleIConv dropUTF8Char encodeT . UTF8.fromString
 
 openDecoder :: String -> IO (ByteString -> IO String)
 openDecoder codeset = do
     decodeT <- iconvOpen "UTF-8" codeset
-    return $ fmap UTF8.toString . simpleIConv decodeT
+    return $ fmap UTF8.toString . simpleIConv (B.drop 1) decodeT
+
+dropUTF8Char :: ByteString -> ByteString
+dropUTF8Char = fromMaybe B.empty . fmap snd . UTF8.uncons
+
+replacement :: Word8
+replacement = toEnum (fromEnum '?')
 
 -- handle errors by dropping unuseable chars.
-simpleIConv :: IConvT -> ByteString -> IO ByteString
-simpleIConv t bs = do
+simpleIConv :: (ByteString -> ByteString) -> IConvT -> ByteString -> IO ByteString
+simpleIConv dropper t bs = do
     (cs,result) <- iconv t bs
     case result of
-        Invalid rest    -> fmap (cs `append`) $ simpleIConv t (B.drop 1 rest)
+        Invalid rest    -> continueOnError cs rest
+        Incomplete rest -> continueOnError cs rest
         _               -> return cs
+  where
+    continueOnError cs rest = fmap ((cs `append`) . (replacement `B.cons`))
+                                $ simpleIConv dropper t (dropper rest)
 
 openPartialDecoder :: String -> IO (ByteString -> IO (String, Result))
 openPartialDecoder codeset = do

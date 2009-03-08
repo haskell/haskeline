@@ -211,9 +211,9 @@ convert decoder bs = do
         Incomplete rest -> do
                     extra <- B.hGetNonBlocking stdin 1
                     if B.null extra
-                        then return cs -- ignore the incomplete shift sequence
-                                       -- since no more input is available.
+                        then return (cs ++ "?")
                         else fmap (cs ++) $ convert decoder (rest `B.append` extra)
+        Invalid rest -> fmap ((cs ++) . ('?':)) $ convert decoder (B.drop 1 rest)
         _ -> return cs
 
 -- NOTE: relys on getChar reading only 8 bytes.
@@ -222,7 +222,7 @@ getMultiByteChar decoder = do
     b <- getChar
     cs <- convert decoder (Char8.pack [b])
     case cs of
-        [] -> getMultiByteChar decoder
+        [] -> return '?' -- shouldn't happen, but doesn't hurt to be careful.
         (c:_) -> return c
 
 
