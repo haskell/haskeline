@@ -81,7 +81,7 @@ Library
         install-includes: win_console.h
         cpp-options: -DMINGW
     } else {
-        Build-depends: unix>=2.1 && < 2.4
+        Build-depends: unix>=2.0 && < 2.4
                         -- unix-2.3 doesn't build on ghc-6.8.1 or earlier
         c-sources: cbits/h_iconv.c
         includes: h_iconv.h
