@@ -149,9 +149,10 @@ getKeyEvent p = do
 data Coord = Coord {coordX, coordY :: Int}
                 deriving Show
                 
+#let alignment t = "%lu", (unsigned long)offsetof(struct {char x__; t (y__); }, y__)
 instance Storable Coord where
     sizeOf _ = (#size COORD)
-    alignment = undefined -- ???
+    alignment _ = (#alignment COORD)
     peek p = do
         x :: CShort <- (#peek COORD, X) p
         y :: CShort <- (#peek COORD, Y) p
