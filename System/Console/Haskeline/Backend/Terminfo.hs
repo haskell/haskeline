@@ -11,6 +11,7 @@ import System.IO
 import qualified Control.Exception.Extensible as Exception
 import qualified Data.ByteString.Char8 as B
 import Data.Maybe (fromMaybe, catMaybes)
+import Control.Concurrent.Chan
 
 import System.Console.Haskeline.Monads as Monads
 import System.Console.Haskeline.LineState
@@ -108,6 +109,7 @@ instance MonadTrans Draw where
 runTerminfoDraw :: IO (Maybe RunTerm)
 runTerminfoDraw = do
     mterm <- Exception.try setupTermFromEnv
+    ch <- newChan
     case mterm of
         -- XXX narrow this: either an ioexception (from getenv) or a 
         -- usererror.
@@ -125,7 +127,7 @@ runTerminfoDraw = do
                               $ runReaderT' actions
                               $ unDraw
                               $ wrapKeypad h term
-                              $ withPosixGetEvent enc (terminfoKeys term) f
+                              $ withPosixGetEvent ch enc (terminfoKeys term) f
                     }
 
 -- If the keypad on/off capabilities are defined, wrap the computation with them.

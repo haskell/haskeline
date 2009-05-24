@@ -312,17 +312,18 @@ win32Term = do
             oterm <- getConOut
             case oterm of
                 Nothing -> return fileRT
-                Just h -> return fileRT {
+                Just h -> do
+                        ch <- newChan
+                        return fileRT {
                             wrapInterrupt = withWindowMode . withCtrlCHandler,
                             termOps = Just TermOps {
                                             getLayout = getBufferSize h,
-                                            runTerm = consoleRunTerm h},
+                                            runTerm = consoleRunTerm h ch},
                             closeTerm = closeHandle h}
 
-consoleRunTerm :: HANDLE -> RunTermType
-consoleRunTerm conOut f = do
+consoleRunTerm :: HANDLE -> Chan Event -> RunTermType
+consoleRunTerm conOut eventChan f = do
     inH <- liftIO $ getStdHandle sTD_INPUT_HANDLE
-    eventChan <- liftIO $ newChan
     runReaderT' conOut $ runDraw $ f $ liftIO $ getEvent inH eventChan
 
 -- stdin is not a terminal, but we still need to check the right way to output unicode to stdout.

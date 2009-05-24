@@ -7,6 +7,7 @@ import System.Console.Haskeline.Monads as Monads
 
 import System.IO
 import qualified Data.ByteString as B
+import Control.Concurrent.Chan
 
 -- TODO: 
 ---- Put "<" and ">" at end of term if scrolls off.
@@ -31,13 +32,15 @@ instance MonadTrans DumbTerm where
     lift = DumbTerm . lift . lift . lift
 
 runDumbTerm :: IO RunTerm
-runDumbTerm = posixRunTerm $ \enc h ->
+runDumbTerm = do
+    ch <- newChan
+    posixRunTerm $ \enc h ->
                 TermOps {
                         getLayout = tryGetLayouts (posixLayouts h),
                         runTerm = \f -> 
                                 runPosixT enc h $ evalStateT' initWindow
                                 $ unDumbTerm
-                                $ withPosixGetEvent enc [] f
+                                $ withPosixGetEvent ch enc [] f
                         }
                                 
 instance (MonadException m, MonadLayout m) => Term (DumbTerm m) where

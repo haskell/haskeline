@@ -164,12 +164,11 @@ lookupChars (TreeMap tm) (c:cs) = case Map.lookup c tm of
 -----------------------------
 
 withPosixGetEvent :: (MonadTrans t, MonadIO m, MonadException (t m), MonadReader Prefs m) 
-                        => Encoders -> [(String,Key)] -> (t m Event -> t m a) -> t m a
-withPosixGetEvent enc termKeys f = do
+                        => Chan Event -> Encoders -> [(String,Key)] -> (t m Event -> t m a) -> t m a
+withPosixGetEvent eventChan enc termKeys f = do
     baseMap <- lift $ getKeySequences termKeys
-    evenChan <- liftIO $ newChan
-    withWindowHandler evenChan
-        $ f $ liftIO $ getEvent enc baseMap evenChan
+    withWindowHandler eventChan
+        $ f $ liftIO $ getEvent enc baseMap eventChan
 
 withWindowHandler :: MonadException m => Chan Event -> m a -> m a
 withWindowHandler eventChan = withHandler windowChange $ 
