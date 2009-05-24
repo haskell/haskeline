@@ -72,11 +72,14 @@ hasFlagSet cflags flag = Just True == lookup flag (configConfigurationsFlags cfl
 tryCompile :: String -> BuildInfo -> LocalBuildInfo -> Verbosity -> IO Bool
 tryCompile program bi lbi verb = handle processExit $ handle processException $ do
     tempDir <- getTemporaryDirectory
-    withTempFile tempDir ".c" $ \fname h -> do
-        hPutStr h program
-        hClose h
+    withTempFile tempDir ".c" $ \fname cH ->
+      withTempFile tempDir "" $ \execName oH -> do
+        hPutStr cH program
+        hClose cH
+        hClose oH
         -- TODO take verbosity from the args.
-        rawSystemProgramStdoutConf verb gccProgram (withPrograms lbi) (fname : args)
+        rawSystemProgramStdoutConf verb gccProgram (withPrograms lbi)
+                        (fname : "-o" : execName : args)
         return True
   where
     processException :: IOException -> IO Bool
