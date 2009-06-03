@@ -201,25 +201,25 @@ changeLeft n = do
                 output $ cr <#> up linesUp <#> right newCol
                 
 -- TODO: I think if we wrap this all up in one call to output, it'll be faster...
-printText :: MonadLayout m => String -> Draw m ()
-printText "" = return ()
+printText :: MonadLayout m => [Grapheme] -> Draw m ()
+printText [] = return ()
 printText xs = fillLine xs >>= printText
 
 -- Draws as much of the string as possible in the line, and returns the rest.
 -- If we fill up the line completely, wrap to the next row.
-fillLine :: MonadLayout m => String -> Draw m String
+fillLine :: MonadLayout m => [Grapheme] -> Draw m [Grapheme]
 fillLine str = do
     w <- asks width
     TermPos {termRow=r,termCol=c} <- get
     let roomLeft = w - c
     if length str < roomLeft
         then do
-                posixEncode str >>= output . text
+                posixEncode (graphemesToString str) >>= output . text
                 put TermPos{termRow=r, termCol=c+length str}
-                return ""
+                return []
         else do
                 let (thisLine,rest) = splitAt roomLeft str
-                bstr <- posixEncode thisLine
+                bstr <- posixEncode (graphemesToString thisLine)
                 output (text bstr <#> wrapLine)
                 put TermPos {termRow=r+1,termCol=0}
                 return rest
@@ -279,7 +279,7 @@ repositionT oldLayout s = do
     output $ cr <#> mreplicate l nl
             <#> mreplicate (l + termRow oldPos) (clearToLineEnd <#> up 1)
     put initTermPos
-    drawLineDiffT ("","") s
+    drawLineDiffT ([],[]) s
 
 instance (MonadException m, MonadLayout m) => Term (Draw m) where
     drawLineDiff = drawLineDiffT

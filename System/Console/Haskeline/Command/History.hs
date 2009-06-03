@@ -78,7 +78,7 @@ instance LineState SearchMode where
     beforeCursor _ sm = beforeCursor prefix (foundHistory sm)
         where 
             prefix = "(" ++ directionName (direction sm) ++ ")`" 
-                    ++ searchTerm sm ++ "': "
+                            ++ searchTerm sm ++ "': "
     afterCursor = afterCursor . foundHistory
 
 instance Result SearchMode where
@@ -102,7 +102,9 @@ findInLine text l = find' [] l
     where
         find' _ "" = Nothing
         find' prev ccs@(c:cs)
-            | text `isPrefixOf` ccs = Just (IMode prev ccs)
+                -- TODO
+            | text `isPrefixOf` ccs = Just (IMode (stringToGraphemes prev) 
+                                                (stringToGraphemes ccs))
             | otherwise = find' (c:prev) cs
 
 prepSearch :: SearchMode -> HistLog -> (String,[(String,HistLog)])

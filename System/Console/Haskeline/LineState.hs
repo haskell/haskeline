@@ -1,17 +1,115 @@
-module System.Console.Haskeline.LineState where
+{- |
+This module contains the various datatypes which model the state of the line; that is, the characters displayed and the position of the cursor.
+-}
+module System.Console.Haskeline.LineState(
+                    -- * Graphemes
+                    Grapheme(),
+                    baseChar,
+                    stringToGraphemes,
+                    graphemesToString,
+                    -- * Line State class
+                    LineState(..),
+                    -- ** Convenience functions for the drawing backends
+                    LineChars,
+                    lineChars,
+                    lengthToEnd,
+                    -- ** Supplementary classes
+                    Result(..),
+                    FromString(..),
+                    Move(..),
+                    -- * Instances
+                    -- ** InsertMode
+                    InsertMode(..),
+                    emptyIM,
+                    insertChar,
+                    insertString,
+                    deleteNext,
+                    deletePrev,
+                    skipLeft,
+                    skipRight,
+                    deleteFromDiff,
+                    deleteFromMove,
+                    -- ** CommandMode
+                    CommandMode(..),
+                    deleteChar,
+                    replaceChar,
+                    -- *** Transitioning between modes
+                    enterCommandMode,
+                    enterCommandModeRight,
+                    insertFromCommandMode,
+                    appendFromCommandMode,
+                    withCommandMode,
+                    -- ** ArgMode
+                    ArgMode(..),
+                    startArg,
+                    addNum,
+                    applyArg,
+                    -- ** Other line state types
+                    Cleared(..),
+                    Message(..),
+                    ) where
 
+import Data.Char
 
+-- | A 'Grapheme' is a fundamental unit of display for the UI.  Several characters in sequence
+-- can represent one grapheme; for example, an @a@ followed by the diacritic @\'\\768\'@ should
+-- be treated as one unit.
+data Grapheme = Grapheme {gBaseChar :: Char,
+                            combiningChars :: [Char]}
+                    deriving (Show, Eq)
+
+baseChar :: Grapheme -> Char
+baseChar = gBaseChar
+
+-- | Create a 'Grapheme' from a single base character.
+--
+-- NOTE: Careful, don't use outside this module; and inside, make sure this is only
+-- ever called on non-combining characters.
+baseGrapheme :: Char -> Grapheme
+baseGrapheme c = Grapheme {gBaseChar = c, combiningChars = []}
+
+-- | Add a combining character to the given 'Grapheme'.
+addCombiner :: Grapheme -> Char -> Grapheme
+addCombiner g c = g {combiningChars = combiningChars g ++ [c]}
+
+isCombiningChar :: Char -> Bool
+isCombiningChar c = generalCategory c == NonSpacingMark
+
+-- | Converts a string into a sequence of graphemes.
+--
+-- NOTE: Drops any initial, unattached combining characters.
+stringToGraphemes :: String -> [Grapheme]
+stringToGraphemes = mkString . dropWhile isCombiningChar
+    where
+        mkString [] = []
+        mkString (c:cs) = Grapheme c (takeWhile isCombiningChar cs)
+                                : mkString (dropWhile isCombiningChar cs)
+
+graphemesToString :: [Grapheme] -> String
+graphemesToString = concatMap (\g -> (baseChar g : combiningChars g))
+
+-- | This class abstracts away the internal representations of the line state,
+-- for use by the drawing actions.  Line state is generally stored in a zipper format.
 class LineState s where
-    beforeCursor :: String -> s -> String -- text to left of cursor
-    afterCursor :: s -> String -- text under and to right of cursor
-    isTemporary :: s -> Bool
+    beforeCursor :: String -- ^ The input prefix.
+                    -> s -- ^ The current line state.
+                    -> [Grapheme] -- ^ The text to the left of the cursor, reversed.  (This 
+                                  -- includes the prefix.)
+    afterCursor :: s -> [Grapheme] -- ^ The text under and to the right of the cursor.
+    isTemporary :: s -> Bool        -- ^ When several lines are printed from a completion
+                                    -- attempt, should this state remain on the screen or
+                                    -- be cleared?
     isTemporary _ = False
 
-type LineChars = (String,String)
+-- | The characters in the line (with the cursor in the middle).  NOT in a zippered format;
+-- both lists are in the order left->right that appears on the screen.
+type LineChars = ([Grapheme],[Grapheme])
 
+-- | Accessor function for the various backends.
 lineChars :: LineState s => String -> s -> LineChars
 lineChars prefix s = (beforeCursor prefix s, afterCursor s)
 
+-- | Compute the number of characters under and to the right of the cursor.
 lengthToEnd :: LineChars -> Int
 lengthToEnd = length . snd
 
@@ -24,16 +122,17 @@ class (Result s) => FromString s where
 class Move s where
     goLeft, goRight, moveToStart, moveToEnd :: s -> s
     
-
-data InsertMode = IMode String String 
+-- | The standard line state representation; considers the cursor to be located
+-- between two characters.  The first list is reversed.
+data InsertMode = IMode [Grapheme] [Grapheme]
                     deriving (Show, Eq)
 
 instance LineState InsertMode where
-    beforeCursor prefix (IMode xs _) = prefix ++ reverse xs
+    beforeCursor prefix (IMode xs _) = stringToGraphemes prefix ++ reverse xs
     afterCursor (IMode _ ys) = ys
 
 instance Result InsertMode where
-    toResult (IMode xs ys) = reverse xs ++ ys
+    toResult (IMode xs ys) = graphemesToString $ reverse xs ++ ys
 
 instance Move InsertMode where
     goLeft im@(IMode [] _) = im 
@@ -46,16 +145,24 @@ instance Move InsertMode where
     moveToEnd (IMode xs ys) = IMode (reverse ys ++ xs) []
 
 instance FromString InsertMode where
-    fromString s = IMode (reverse s) []
+    fromString s = IMode (reverse (stringToGraphemes s)) []
 
 emptyIM :: InsertMode
-emptyIM = IMode "" ""
+emptyIM = IMode [] []
 
+-- | Insert one character, which may be combining, to the left of the cursor.
+--  
 insertChar :: Char -> InsertMode -> InsertMode
-insertChar c (IMode xs ys) = IMode (c:xs) ys
+insertChar c im@(IMode xs ys)
+    | isCombiningChar c = case xs of
+                            []   -> im -- drop a combining character if it
+                                       -- appears at the start of the line.
+                            z:zs -> IMode (addCombiner z c : zs) ys
+    | otherwise         = IMode (baseGrapheme c : xs) ys
 
+-- | Insert a sequence of characters to the left of the cursor. 
 insertString :: String -> InsertMode -> InsertMode
-insertString s (IMode xs ys) = IMode (reverse s ++ xs) ys
+insertString s (IMode xs ys) = IMode (reverse (stringToGraphemes s) ++ xs) ys
 
 deleteNext, deletePrev :: InsertMode -> InsertMode
 deleteNext im@(IMode _ []) = im
@@ -65,24 +172,25 @@ deletePrev im@(IMode [] _) = im
 deletePrev (IMode (_:xs) ys) = IMode xs ys 
 
 skipLeft, skipRight :: (Char -> Bool) -> InsertMode -> InsertMode
-skipLeft f (IMode xs ys) = let (ws,zs) = span f xs 
+skipLeft f (IMode xs ys) = let (ws,zs) = span (f . baseChar) xs 
                            in IMode zs (reverse ws ++ ys)
-skipRight f (IMode xs ys) = let (ws,zs) = span f ys 
+skipRight f (IMode xs ys) = let (ws,zs) = span (f . baseChar) ys 
                             in IMode (reverse ws ++ xs) zs
 
-
-data CommandMode = CMode String Char String | CEmpty
+-- | Used by vi mode.  Considers the cursor to be located over some specific character.
+-- The first list is reversed.
+data CommandMode = CMode [Grapheme] Grapheme [Grapheme] | CEmpty
                     deriving Show
 
 instance LineState CommandMode where
-    beforeCursor prefix CEmpty = prefix
-    beforeCursor prefix (CMode xs _ _) = prefix ++ reverse xs
-    afterCursor CEmpty = ""
+    beforeCursor prefix CEmpty = stringToGraphemes prefix
+    beforeCursor prefix (CMode xs _ _) = stringToGraphemes prefix ++ reverse xs
+    afterCursor CEmpty = []
     afterCursor (CMode _ c ys) = c:ys
 
 instance Result CommandMode where
     toResult CEmpty = ""
-    toResult (CMode xs c ys) = reverse xs ++ (c:ys)
+    toResult (CMode xs c ys) = graphemesToString $ reverse xs ++ (c:ys)
 
 instance Move CommandMode where
     goLeft (CMode (x:xs) c ys) = CMode xs x (c:ys)
@@ -98,7 +206,7 @@ instance Move CommandMode where
     moveToEnd CEmpty = CEmpty
 
 instance FromString CommandMode where
-    fromString s = case reverse s of
+    fromString s = case reverse (stringToGraphemes s) of
                     [] -> CEmpty
                     (c:cs) -> CMode cs c []
 
@@ -107,10 +215,15 @@ deleteChar (CMode xs _ (y:ys)) = CMode xs y ys
 deleteChar (CMode (x:xs) _ []) = CMode xs x []
 deleteChar _ = CEmpty
 
+-- | Replace the character under the cursor
+-- But if the new character is combining, alter the character to the 
+-- left of the cursor.
 replaceChar :: Char -> CommandMode -> CommandMode
-replaceChar c (CMode xs _ ys) = CMode xs c ys
-replaceChar _ CEmpty = CEmpty
-
+replaceChar c cm@(CMode xs d ys)
+    | not (isCombiningChar c)   = CMode xs (baseGrapheme c) ys
+    | (z:zs) <- xs              = CMode (addCombiner z c : zs) d ys
+    | otherwise                 = cm
+    
 ------------------------
 -- Transitioning between modes
 
@@ -138,6 +251,7 @@ withCommandMode f = enterCommandModeRight . f . insertFromCommandMode
 ----------------------
 -- Supplementary modes
 
+-- | Used for commands which take an integer argument.
 data ArgMode s = ArgMode {arg :: Int, argState :: s}
 
 instance Functor ArgMode where
@@ -170,14 +284,14 @@ applyArg f am = repeatN (arg am) (argState am)
 data Cleared = Cleared
 
 instance LineState Cleared where
-    beforeCursor _ Cleared = ""
-    afterCursor Cleared = ""
+    beforeCursor _ Cleared = []
+    afterCursor Cleared = []
 
 data Message s = Message {messageState :: s, messageText :: String}
 
 instance LineState s => LineState (Message s) where
-    beforeCursor _ = messageText
-    afterCursor _ = ""
+    beforeCursor _ = stringToGraphemes . messageText
+    afterCursor _ = []
     isTemporary _ = True
 
 -----------------

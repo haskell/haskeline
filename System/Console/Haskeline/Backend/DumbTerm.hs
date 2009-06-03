@@ -94,15 +94,15 @@ drawLineDiff' (xs1,ys1) (xs2,ys2) = do
                 (_,[]) | xs1' ++ ys1 == ys2 -> -- moved left
                     printText $ backs (length xs1')
                 ([],_) | ys1 == xs2' ++ ys2 -> -- moved right
-                    printText xs2'
+                    printText (graphemesToString xs2')
                 _ -> let
                         extraLength = length xs1' + length ys1
                                     - length xs2' - length ys2
                      in printText $ backs (length xs1')
-                        ++ xs2' ++ ys2' ++ clearDeadText extraLength
+                        ++ graphemesToString (xs2' ++ ys2') ++ clearDeadText extraLength
                         ++ backs (length ys2')
 
-refitLine :: MonadLayout m => (String,String) -> DumbTerm m ()
+refitLine :: MonadLayout m => ([Grapheme],[Grapheme]) -> DumbTerm m ()
 refitLine (xs,ys) = do
     w <- maxWidth
     let xs' = dropFrames w xs
@@ -110,12 +110,12 @@ refitLine (xs,ys) = do
     put Window {pos=p}
     let ys' = take (w - p) ys
     let k = length ys'
-    printText $ cr ++ xs' ++ ys'
+    printText $ cr ++ graphemesToString (xs' ++ ys')
         ++ spaces (w-k-p)
         ++ backs (w-p)
   where
     dropFrames w zs = case splitAt w zs of
-                        (_,"") -> zs
+                        (_,[]) -> zs
                         (_,zs') -> dropFrames w zs'
     
 clearDeadText :: Int -> String

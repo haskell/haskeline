@@ -266,8 +266,8 @@ drawLineDiffWin (xs1,ys1) (xs2,ys2) = case matchInit xs1 xs2 of
         movePos (negate $ length xs1')
         let m = length xs1' + length ys1 - (length xs2' + length ys2)
         let deadText = replicate m ' '
-        printText xs2'
-        printAfter (ys2 ++ deadText)
+        printText (graphemesToString xs2')
+        printAfter (graphemesToString ys2 ++ deadText)
 
 movePos :: MonadLayout m => Int -> Draw m ()
 movePos n = do

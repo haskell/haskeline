@@ -23,8 +23,10 @@ fullReplacement c   | isFinished c  = replacement c ++ " "
 makeCompletion :: Monad m => InsertMode -> InputCmdT m (InsertMode, [Completion])
 makeCompletion (IMode xs ys) = do
     f <- asks complete
-    (rest,completions) <- liftCmdT (f (xs, ys))
-    return (IMode rest ys,completions)
+    (rest,completions) <- liftCmdT (f (withRev graphemesToString xs, graphemesToString ys))
+    return (IMode (withRev stringToGraphemes rest) ys,completions)
+  where
+    withRev f = reverse . f . reverse
 
 -- | Create a 'Command' for word completion.
 completionCmd :: Monad m => Key -> Command (InputCmdT m) InsertMode InsertMode
@@ -124,8 +126,14 @@ makeLines ws layout = let
 padWords :: Int -> [String] -> String
 padWords _ [x] = x
 padWords _ [] = ""
-padWords len (x:xs) = x ++ replicate (len - length x) ' '
+padWords len (x:xs) = x ++ replicate (len - glength x) ' '
 			++ padWords len xs
+    where
+        -- kludge: compute the length in graphemes, not chars.
+        -- but don't use graphemes for the max length, since I'm not convinced
+        -- that would work correctly. (This way, the worst that can happen is
+        -- that columns are longer than necessary.)
+        glength = length . stringToGraphemes
 
 -- Split xs into rows of length n,
 -- such that the list increases incrementally along the columns.

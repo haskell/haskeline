@@ -136,7 +136,7 @@ movements = [ (simpleChar 'h', goLeft)
 
 cmdChar :: InsertMode -> (Char -> Bool)
 cmdChar (IMode _ (c:_))
-    | isWordChar c = isWordChar
+    | isWordChar (baseChar c) = isWordChar
 cmdChar _ = \d -> not (isWordChar d) && not (isSpace d)
 
 isWordChar :: Char -> Bool
