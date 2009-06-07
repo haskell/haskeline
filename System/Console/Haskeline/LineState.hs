@@ -215,6 +215,8 @@ deleteChar (CMode xs _ (y:ys)) = CMode xs y ys
 deleteChar (CMode (x:xs) _ []) = CMode xs x []
 deleteChar _ = CEmpty
 
+-- TODO: prob. do want different behavior for replace (on empty line it should
+-- start inserting)
 -- | Replace the character under the cursor
 -- But if the new character is combining, alter the character to the 
 -- left of the cursor.
@@ -223,6 +225,7 @@ replaceChar c cm@(CMode xs d ys)
     | not (isCombiningChar c)   = CMode xs (baseGrapheme c) ys
     | (z:zs) <- xs              = CMode (addCombiner z c : zs) d ys
     | otherwise                 = cm
+replaceChar _ CEmpty = CEmpty
     
 ------------------------
 -- Transitioning between modes
