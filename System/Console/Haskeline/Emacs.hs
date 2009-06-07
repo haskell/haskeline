@@ -10,7 +10,7 @@ import System.Console.Haskeline.InputT
 
 import Data.Char
 
-type InputCmd s t = forall m . Monad m => Command (InputCmdT m) s t
+type InputCmd s t = forall m . Monad m => KeyCommand (InputCmdT m) s t
 
 emacsCommands :: Monad m => KeyMap (InputCmdT m) InsertMode
 emacsCommands = runCommand $ choiceCmd [simpleActions, controlActions]
@@ -23,7 +23,7 @@ simpleActions = choiceCmd
             , simpleKey Backspace +> change deletePrev
             , simpleKey Delete +> change deleteNext 
             , changeFromChar insertChar
-            , saveForUndo $ simpleChar '\t' +> completionCmd
+            , saveForUndo $ completionCmd (simpleChar '\t')
             , simpleKey UpKey +> historyBack
             , simpleKey DownKey +> historyForward
             , searchHistory
@@ -34,16 +34,14 @@ controlActions = choiceCmd
             , ctrlChar 'e' +> change moveToEnd
             , ctrlChar 'b' +> change goLeft
             , ctrlChar 'f' +> change goRight
-            , ctrlChar 'd' +> deleteCharOrEOF
+            , deleteCharOrEOF (ctrlChar 'd')
             , ctrlChar 'l' +> clearScreenCmd
             , metaChar 'f' +> change wordRight
             , metaChar 'b' +> change wordLeft
             , ctrlChar '_' +> commandUndo
-            , ctrlChar 'x' +> change id 
+            , ctrlChar 'x' +> keyCommand (try (ctrlChar 'u' +> commandUndo))
             , simpleKey Home +> change moveToStart
             , simpleKey End +> change moveToEnd
-                >|> choiceCmd [ctrlChar 'u' +> commandUndo
-                              , continue]
             , saveForUndo $ choiceCmd
                 [ ctrlChar 'w' +> change (deleteFromMove bigWordLeft)
                 , metaKey (simpleKey Backspace) +> change (deleteFromMove wordLeft)
@@ -54,11 +52,11 @@ controlActions = choiceCmd
             ]
 
 deleteCharOrEOF :: Key -> InputCmd InsertMode InsertMode
-deleteCharOrEOF k = k +> acceptKeyOrFail (\s -> if s == emptyIM
-            then Nothing
-            else Just $ Change (deleteNext s) >=> justDelete)
+deleteCharOrEOF k = k +> askState (\s -> if s == emptyIM
+                                            then failCmd
+                                            else change deleteNext >|> justDelete) 
     where
-        justDelete = try (change deleteNext k >|> justDelete)
+        justDelete = keyCommand $ try (k +> change deleteNext >|> justDelete)
 
 wordRight, wordLeft, bigWordLeft :: InsertMode -> InsertMode
 wordRight = skipRight isAlphaNum . skipRight (not . isAlphaNum)

@@ -43,8 +43,7 @@ prevHistory :: FromString s => s -> HistLog -> (s, HistLog)
 prevHistory s h = let (s',h') = fromMaybe (toResult s,h) $ prevHistoryM (toResult s) h
                   in (fromString s',h')
 
-historyBack, historyForward :: (FromString s, MonadState HistLog m) => 
-                        Key -> Command m s s
+historyBack, historyForward :: (FromString s, MonadState HistLog m) => Command m s s
 historyBack = simpleCommand $ histUpdate prevHistory
 historyForward = simpleCommand $ reverseHist . histUpdate prevHistory
 
@@ -102,7 +101,7 @@ findInLine text l = find' [] l
     where
         find' _ "" = Nothing
         find' prev ccs@(c:cs)
-                -- TODO
+                -- TODO will this work correctly with combining characters?
             | text `isPrefixOf` ccs = Just (IMode (stringToGraphemes prev) 
                                                 (stringToGraphemes ccs))
             | otherwise = find' (c:prev) cs
@@ -130,22 +129,22 @@ doSearch useCurrent sm = case direction sm of
             Just (sm',hist') -> put hist' >> return (Change sm')
             Nothing -> return (RingBell sm)
 
-searchHistory :: MonadState HistLog m => Command m InsertMode InsertMode
+searchHistory :: MonadState HistLog m => KeyCommand m InsertMode InsertMode
 searchHistory = choiceCmd [
                  backKey +> change (startSearchMode Reverse)
                  , forwardKey +> change (startSearchMode Forward)
-                 ] >|> keepSearching
+                 ] >+> keepSearching
     where
         backKey = ctrlChar 'r'
         forwardKey = ctrlChar 's'
-        keepSearching = choiceCmd [
+        keepSearching = keyCommand $ choiceCmd [
                             choiceCmd [
                                 charCommand oneMoreChar
                                 , backKey +> simpleCommand (searchMore Reverse)
                                 , forwardKey +> simpleCommand (searchMore Forward)
                                 , simpleKey Backspace +> change delLastChar
-                                ] >|> keepSearching
-                            , changeWithoutKey foundHistory -- abort
+                                ] >+> keepSearching
+                            , withoutConsuming (change foundHistory) -- abort
                             ]
         delLastChar s = s {searchTerm = minit (searchTerm s)}
         minit xs = if null xs then "" else init xs

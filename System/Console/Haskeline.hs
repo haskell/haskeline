@@ -169,26 +169,31 @@ repeatTillFinish :: forall m s d
     . (MonadTrans d, Term (d m), LineState s, MonadReader Prefs m)
             => TermOps -> d m Event -> String -> s -> KeyMap m s 
             -> d m (Maybe String)
-repeatTillFinish tops getEvent prefix = loop []
+repeatTillFinish tops getEvent prefix = loopKeys []
     where 
-        loop :: forall t . LineState t
+        loopKeys :: forall t . LineState t
                     => [Key] -> t -> KeyMap m t -> d m (Maybe String)
-        loop [] s processor = do
+        loopKeys [] s processor = do -- no keys left, so read some more
                 event <- handle (\(e::SomeException) -> movePast prefix s >> throwIO e) getEvent
                 case event of
                     ErrorEvent e -> movePast prefix s >> throwIO e
-                    WindowResize -> withReposition tops prefix s $ loop [] s processor
+                    WindowResize -> withReposition tops prefix s $ loopKeys [] s processor
                     KeyInput k -> do
                         ks <- lift $ asks $ lookupKeyBinding k
-                        loop ks s processor
-        loop (k:ks) s processor = case lookupKM processor k of
-                        Nothing -> actBell >> loop [] s processor
-                        Just g -> case g s of
-                            Left r -> movePast prefix s >> return r
-                            Right f -> do
-                                        KeyAction effect next <- lift f
-                                        drawEffect prefix s effect
-                                        loop ks (effectState effect) next
+                        loopKeys ks s processor
+        loopKeys (k:ks) s processor = case lookupKM processor k of
+                        Nothing -> actBell >> loopKeys [] s processor
+                        Just (Consumed cmd) -> loopCmd ks s cmd
+                        Just (NotConsumed cmd) -> loopCmd (k:ks) s cmd
+        loopCmd :: forall t . LineState t
+                    => [Key] -> t -> CmdStream m t -> d m (Maybe String)
+        loopCmd ks s (GetKey next) = loopKeys ks s next
+        loopCmd ks s (AskState next) = loopCmd ks s (next s)
+        loopCmd ks s (PutState t next) = do
+                                                drawEffect prefix s t
+                                                loopCmd ks (effectState t) next
+        loopCmd ks s (StreamM nextM) = lift nextM >>= loopCmd ks s
+        loopCmd _ _ (Finish result) = return result
 
 simpleFileLoop :: MonadIO m => String -> RunTerm -> m (Maybe String)
 simpleFileLoop prefix rterm = liftIO $ do
@@ -309,9 +314,6 @@ returnOnEOF x = handle $ \e -> if isEOFError e
 -- maybe by calling repeatTillFinish here...
 -- It shouldn't be too hard to make Commands parametrized over a return
 -- value (which would be Maybe Char in this case).
--- My primary obstacle is that there's currently no way to have a
--- single character input cause a character to be printed and then
--- immediately exit without waiting for Return to be pressed.
 getInputCmdChar :: MonadException m => TermOps -> String -> InputT m (Maybe Char)
 getInputCmdChar tops prefix = runInputCmdT tops $ runTerm tops $ \getEvent -> do
                                                 drawLine prefix emptyIM

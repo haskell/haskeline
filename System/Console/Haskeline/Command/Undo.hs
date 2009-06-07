@@ -1,7 +1,6 @@
 module System.Console.Haskeline.Command.Undo where
 
 import System.Console.Haskeline.Command
-import System.Console.Haskeline.Key
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Monads
 
@@ -58,11 +57,12 @@ redoFuture ls u@Undo {futureRedo = (futureLS:lss)}
 
 
 saveForUndo :: (Save s, MonadState Undo m)
-                => Command m s t -> Command m s t
-saveForUndo  = withState $ modify . saveToUndo
+                => KeyCommand m s t -> KeyCommand m s t
+saveForUndo  = doBefore $ askState $ \s -> commandM $ do
+    modify (saveToUndo s)
+    return continue
 
-commandUndo, commandRedo :: (MonadState Undo m, Save s)
-                => Key -> Command m s s
+commandUndo, commandRedo :: (MonadState Undo m, Save s) => Command m s s
 commandUndo = simpleCommand $ liftM Change . update . undoPast
 commandRedo = simpleCommand $ liftM Change . update . redoFuture
 

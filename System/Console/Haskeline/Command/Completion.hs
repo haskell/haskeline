@@ -29,36 +29,36 @@ makeCompletion (IMode xs ys) = do
     withRev f = reverse . f . reverse
 
 -- | Create a 'Command' for word completion.
-completionCmd :: Monad m => Key -> Command (InputCmdT m) InsertMode InsertMode
-completionCmd k = k +> acceptKeyM (\s -> do
+completionCmd :: Monad m => Key -> KeyCommand (InputCmdT m) InsertMode InsertMode
+completionCmd k = k +> askState (\s -> commandM $ do
     prefs <- ask
     (rest,completions) <- makeCompletion s
-    case completionType prefs of
-        MenuCompletion -> return $ menuCompletion k s
+    return $ case completionType prefs of
+        MenuCompletion -> menuCompletion k s
                         $ map (\c -> insertString (fullReplacement c) rest) completions
         ListCompletion -> 
                 pagingCompletion prefs s rest completions k)
 
 pagingCompletion :: Monad m => Prefs
                 -> InsertMode -> InsertMode -> [Completion] 
-                -> Key -> InputCmdT m (CmdAction (InputCmdT m) InsertMode)
-pagingCompletion _ oldIM _ [] _ = return $ RingBell oldIM >=> continue
+                -> Key -> Command (InputCmdT m) InsertMode InsertMode
+pagingCompletion _ oldIM _ [] _ = effect $ RingBell oldIM
 pagingCompletion _ _ im [newWord] _ 
-        = return $ (Change $ insertString (fullReplacement newWord) im) >=> continue
+        = effect $ Change $ insertString (fullReplacement newWord) im
 pagingCompletion prefs oldIM im completions k
-    | oldIM /= withPartial = return $ Change withPartial >=> continue
-    | otherwise = do
+    | oldIM /= withPartial = effect $ Change withPartial
+    | otherwise = commandM $ do
         layout <- ask
         let wordLines = makeLines (map display completions) layout
-        printingCmd <- if completionPaging prefs
+        let printingCmd = if completionPaging prefs
                         then printPage wordLines moreMessage
-                        else return $ printAll wordLines withPartial
+                        else printAll wordLines withPartial
         let pageAction = askFirst (completionPromptLimit prefs) (length completions) 
                             withPartial printingCmd
         if listCompletionsImmediately prefs
             then return pageAction
-            else return $ RingBell withPartial >=> 
-                        try (k +> acceptKey (const pageAction))
+            else return $ effect (RingBell withPartial) >|> 
+                        keyCommand (try (k +> pageAction))
   where
     withPartial = insertString partial im
     partial = foldl1 commonPrefix (map replacement completions)
@@ -67,46 +67,46 @@ pagingCompletion prefs oldIM im completions k
     moreMessage = Message withPartial "----More----"
 
 askFirst :: Monad m => Maybe Int -> Int -> InsertMode
-            -> CmdAction (InputCmdT m) InsertMode
-            -> CmdAction (InputCmdT m) InsertMode
+            -> Command (InputCmdT m) InsertMode InsertMode
+            -> Command (InputCmdT m) InsertMode InsertMode
 askFirst mlimit numCompletions im printingCmd = case mlimit of
     Just limit | limit < numCompletions -> 
-        Change (Message im ("Display all " ++ show numCompletions
-                            ++ " possibilities? (y or n)"))
-                    >=> choiceCmd [
-                            simpleChar 'y' +> acceptKey (const printingCmd)
+        effect (Change (Message im ("Display all " ++ show numCompletions
+                            ++ " possibilities? (y or n)")))
+                    >|> keyChoiceCmd [
+                            simpleChar 'y' +> change messageState >|> printingCmd
                             , simpleChar 'n' +> change messageState
                             ]
     _ -> printingCmd
 
-printOneLine :: Monad m => [String] -> Message InsertMode -> CmdAction (InputCmdT m) InsertMode
+printOneLine :: Monad m => [String] -> Message InsertMode
+                    -> Command (InputCmdT m) s InsertMode
 printOneLine (w:ws) im | not (null ws) =
-            PrintLines [w] im >=> pagingCommands ws
-printOneLine _ im = Change (messageState im) >=> continue
+            effect (PrintLines [w] im) >|> pagingCommands ws
+printOneLine _ im = effect (Change (messageState im))
 
 printPage :: Monad m => [String] -> Message InsertMode
-                    -> InputCmdT m (CmdAction (InputCmdT m) InsertMode)
-printPage ws im = do
+                    -> Command (InputCmdT m) s InsertMode
+printPage ws im = commandM $ do
     layout <- ask
     return $ case splitAt (height layout - 1) ws of
-        (_,[]) -> PrintLines ws (messageState im) >=> continue
-        (zs,rest) -> PrintLines zs im
-                    >=> pagingCommands rest
-
+        (_,[]) -> effect (PrintLines ws (messageState im))
+        (zs,rest) -> effect (PrintLines zs im)
+                    >|> pagingCommands rest
 
 -- TODO: move testing of nullity into here
 pagingCommands :: Monad m => [String] -> Command (InputCmdT m) (Message InsertMode) InsertMode
-pagingCommands ws = choiceCmd [
-                            simpleChar ' ' +> acceptKeyM (printPage ws)
+pagingCommands ws = keyChoiceCmd [
+                            simpleChar ' ' +> askState (printPage ws)
                             ,simpleChar 'q' +> change messageState
-                            ,simpleChar '\n' +> acceptKey (printOneLine ws)
-                            ,simpleKey DownKey +> acceptKey (printOneLine ws)
+                            ,simpleChar '\n' +> askState (printOneLine ws)
+                            ,simpleKey DownKey +> askState (printOneLine ws)
                             ]
 
 
 printAll :: Monad m => [String] -> InsertMode 
-            -> CmdAction (InputCmdT m) InsertMode
-printAll ws im = PrintLines ws im >=> continue
+            -> Command (InputCmdT m) InsertMode InsertMode
+printAll ws im = effect $ PrintLines ws im
 
 
 makeLines :: [String] -> Layout -> [String]
@@ -154,11 +154,11 @@ ceilDiv m n | m `rem` n == 0    =  m `div` n
             | otherwise         =  m `div` n + 1
 
 menuCompletion :: forall m . Monad m => Key -> InsertMode -> [InsertMode] 
-                    -> CmdAction m InsertMode
-menuCompletion _ oldState [] = RingBell oldState >=> continue
-menuCompletion _ _ [c] = Change c >=> continue
-menuCompletion k oldState (c:cs) = Change c >=> loop cs
+                    -> Command m InsertMode InsertMode
+menuCompletion _ oldState [] = effect (RingBell oldState)
+menuCompletion _ _ [c] = effect (Change c)
+menuCompletion k oldState (c:cs) = effect (Change c) >|> loop cs
     where
-        loop [] = choiceCmd [change (const oldState) k,continue]
-        loop (d:ds) = choiceCmd [change (const d) k >|> loop ds,continue]
+        loop [] = keyCommand $ try $ k +> change (const oldState)
+        loop (d:ds) = keyCommand $ try $ k +> change (const d) >|> loop ds
 
