@@ -38,6 +38,9 @@ controlActions = choiceCmd
             , ctrlChar 'l' +> clearScreenCmd
             , metaChar 'f' +> change wordRight
             , metaChar 'b' +> change wordLeft
+            , metaChar 'c' +> change (modifyWord capitalize)
+            , metaChar 'l' +> change (modifyWord (mapBaseChars toLower))
+            , metaChar 'u' +> change (modifyWord (mapBaseChars toUpper))
             , ctrlChar '_' +> commandUndo
             , ctrlChar 'x' +> keyCommand (try (ctrlChar 'u' +> commandUndo))
             , simpleKey Home +> change moveToStart
@@ -62,3 +65,13 @@ wordRight, wordLeft, bigWordLeft :: InsertMode -> InsertMode
 wordRight = skipRight isAlphaNum . skipRight (not . isAlphaNum)
 wordLeft = skipLeft isAlphaNum . skipLeft (not . isAlphaNum)
 bigWordLeft = skipLeft (not . isSpace) . skipLeft isSpace
+
+modifyWord :: ([Grapheme] -> [Grapheme]) -> InsertMode -> InsertMode
+modifyWord f im = IMode (reverse (f ys1) ++ xs) ys2
+    where
+        IMode xs ys = skipRight (not . isAlphaNum) im
+        (ys1,ys2) = span (isAlphaNum . baseChar) ys
+
+capitalize :: [Grapheme] -> [Grapheme]
+capitalize [] = []
+capitalize (c:cs) = modifyBaseChar toUpper c : cs

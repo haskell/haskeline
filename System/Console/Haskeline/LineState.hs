@@ -7,6 +7,8 @@ module System.Console.Haskeline.LineState(
                     baseChar,
                     stringToGraphemes,
                     graphemesToString,
+                    modifyBaseChar,
+                    mapBaseChars,
                     -- * Line State class
                     LineState(..),
                     -- ** Convenience functions for the drawing backends
@@ -60,6 +62,12 @@ data Grapheme = Grapheme {gBaseChar :: Char,
 
 baseChar :: Grapheme -> Char
 baseChar = gBaseChar
+
+modifyBaseChar :: (Char -> Char) -> Grapheme -> Grapheme
+modifyBaseChar f g = g {gBaseChar = f (gBaseChar g)}
+
+mapBaseChars :: (Char -> Char) -> [Grapheme] -> [Grapheme]
+mapBaseChars f = map (modifyBaseChar f)
 
 -- | Create a 'Grapheme' from a single base character.
 --
