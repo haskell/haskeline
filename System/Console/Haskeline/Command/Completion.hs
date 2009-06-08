@@ -58,7 +58,7 @@ pagingCompletion prefs oldIM im completions k
         if listCompletionsImmediately prefs
             then return pageAction
             else return $ effect (RingBell withPartial) >|> 
-                        keyCommand (try (k +> pageAction))
+                        try (k +> pageAction)
   where
     withPartial = insertString partial im
     partial = foldl1 commonPrefix (map replacement completions)
@@ -159,6 +159,6 @@ menuCompletion _ oldState [] = effect (RingBell oldState)
 menuCompletion _ _ [c] = effect (Change c)
 menuCompletion k oldState (c:cs) = effect (Change c) >|> loop cs
     where
-        loop [] = keyCommand $ try $ k +> change (const oldState)
-        loop (d:ds) = keyCommand $ try $ k +> change (const d) >|> loop ds
+        loop [] = try $ k +> change (const oldState)
+        loop (d:ds) = try $ k +> change (const d) >|> loop ds
 

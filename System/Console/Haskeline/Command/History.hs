@@ -137,7 +137,7 @@ searchHistory = choiceCmd [
     where
         backKey = ctrlChar 'r'
         forwardKey = ctrlChar 's'
-        keepSearching = keyCommand $ choiceCmd [
+        keepSearching = keyChoiceCmd [
                             choiceCmd [
                                 charCommand oneMoreChar
                                 , backKey +> simpleCommand (searchMore Reverse)

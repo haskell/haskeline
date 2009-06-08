@@ -92,10 +92,10 @@ simpleCmdActions = choiceCmd [ simpleChar '\n'  +> finish
                     ]
 
 replaceOnce :: InputCmd CommandMode CommandMode
-replaceOnce = keyCommand $ try $ changeFromChar replaceChar
+replaceOnce = try $ changeFromChar replaceChar
 
 loopReplace :: InputCmd CommandMode CommandMode
-loopReplace = keyCommand $ try $ changeFromChar (\c -> goRight . replaceChar c)
+loopReplace = try $ changeFromChar (\c -> goRight . replaceChar c)
                                     >+> loopReplace
 
 repeated :: InputKeyCmd CommandMode InsertMode

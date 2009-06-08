@@ -94,8 +94,8 @@ loopUntil f g = choiceCmd [g, f >+> keyCommand (loopUntil f g)]
 
 -- attempt to run the command (predicated on getting a valid key); but if it fails, just keep
 -- going.
-try :: KeyCommand m s s -> KeyCommand m s s
-try f = choiceCmd [f,withoutConsuming continue]
+try :: KeyCommand m s s -> Command m s s
+try f = keyChoiceCmd [f,withoutConsuming continue]
 
 infixr 6 +>
 (+>) :: Key -> Command m s t -> KeyCommand m s t

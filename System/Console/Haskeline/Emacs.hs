@@ -42,7 +42,7 @@ controlActions = choiceCmd
             , metaChar 'l' +> change (modifyWord (mapBaseChars toLower))
             , metaChar 'u' +> change (modifyWord (mapBaseChars toUpper))
             , ctrlChar '_' +> commandUndo
-            , ctrlChar 'x' +> keyCommand (try (ctrlChar 'u' +> commandUndo))
+            , ctrlChar 'x' +> try (ctrlChar 'u' +> commandUndo)
             , simpleKey Home +> change moveToStart
             , simpleKey End +> change moveToEnd
             , saveForUndo $ choiceCmd
@@ -59,7 +59,7 @@ deleteCharOrEOF k = k +> askState (\s -> if s == emptyIM
                                             then failCmd
                                             else change deleteNext >|> justDelete) 
     where
-        justDelete = keyCommand $ try (k +> change deleteNext >|> justDelete)
+        justDelete = try $ k +> change deleteNext >|> justDelete
 
 wordRight, wordLeft, bigWordLeft :: InsertMode -> InsertMode
 wordRight = skipRight isAlphaNum . skipRight (not . isAlphaNum)
