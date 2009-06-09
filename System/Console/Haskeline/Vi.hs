@@ -125,21 +125,53 @@ repeated = let
 movements :: [(Key,InsertMode -> InsertMode)]
 movements = [ (simpleChar 'h', goLeft)
             , (simpleChar 'l', goRight)
-            , (simpleChar 'w', skipRight isSpace . (\s -> skipRight (cmdChar s) s))
-            , (simpleChar 'b', (\s -> skipLeft (cmdChar s) s) . goLeft . skipLeft isSpace)
-            , (simpleChar 'W', skipRight isSpace . skipRight (not . isSpace))
-            , (simpleChar 'B', skipLeft (not . isSpace) . skipLeft isSpace)
             , (simpleChar ' ', goRight)
             , (simpleKey LeftKey, goLeft)
             , (simpleKey RightKey, goRight)
             , (simpleChar '0', moveToStart)
             , (simpleChar '$', moveToEnd)
+            , (simpleChar '^', skipRight isSpace . moveToStart)
+            ------------------
+            -- Word movements
+            -- move to the start of the next word
+            , (simpleChar 'w', skipRight isSpace . skipWordRight)
+            , (simpleChar 'W', skipRight isSpace . skipRight bigWordChar)
+            -- move to the beginning of the previous word
+            , (simpleChar 'b', skipWordLeft . goLeft . skipLeft isSpace)
+            , (simpleChar 'B', skipLeft bigWordChar . goLeft . skipLeft isSpace)
+            -- move to the end of the current word
+            , (simpleChar 'e', moveLeftIfNotEnd . skipWordRight
+                                    . skipRight isSpace . goRight)
+            , (simpleChar 'E', moveLeftIfNotEnd . skipRight bigWordChar
+                                    . skipRight isSpace . goRight)
             ]
 
-cmdChar :: InsertMode -> (Char -> Bool)
-cmdChar (IMode _ (c:_))
+moveLeftIfNotEnd :: InsertMode -> InsertMode
+moveLeftIfNotEnd im@(IMode _ []) = im
+moveLeftIfNotEnd im = goLeft im
+
+{- 
+From IEEE 1003.1:
+A "bigword" consists of: a maximal sequence of non-blanks preceded and followed by blanks
+A "word" consists of either:
+ - a maximal sequence of wordChars, delimited at both ends by non-wordchars
+ - a maximal sequence of non-blank non-wordchars, delimited at both ends by either blanks
+   or a wordchar.
+-}            
+
+skipWordRight, skipWordLeft :: InsertMode -> InsertMode
+skipWordRight s = skipRight (wordRule s) s
+skipWordLeft s = skipLeft (wordRule s) s
+
+bigWordChar :: Char -> Bool
+bigWordChar = not . isSpace
+
+
+-- Looks at the character under the cursor, and returns a guard for similar characters.
+wordRule :: InsertMode -> (Char -> Bool)
+wordRule (IMode _ (c:_))
     | isWordChar (baseChar c) = isWordChar
-cmdChar _ = \d -> not (isWordChar d) && not (isSpace d)
+wordRule _ = \d -> not (isWordChar d) && not (isSpace d)
 
 isWordChar :: Char -> Bool
 isWordChar d = isAlphaNum d || d == '_'
