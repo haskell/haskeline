@@ -98,8 +98,7 @@ loopReplace = try $ changeFromChar (\c -> goRight . replaceChar c)
 repeatedCommands :: InputKeyCmd CommandMode InsertMode
 repeatedCommands = choiceCmd [argumented, withNoArg repeatableCommands]
     where
-        -- TODO: this will unnecessarily print '1:', I think
-        withNoArg = doBefore (change (ArgMode 1))
+        withNoArg = doBefore (change (hiddenArg 1))
         start = foreachDigit startArg ['1'..'9']
         addDigit = foreachDigit addNum ['0'..'9']
         argumented = start >+> loop

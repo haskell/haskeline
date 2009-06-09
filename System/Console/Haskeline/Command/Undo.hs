@@ -21,7 +21,7 @@ instance Save CommandMode where
 
 instance Save s => Save (ArgMode s) where
     save = save . argState
-    restore = ArgMode 0 . restore
+    restore s = startArg 0 (restore s)
 
 
 data Undo = Undo {pastUndo, futureRedo :: [InsertMode]}
