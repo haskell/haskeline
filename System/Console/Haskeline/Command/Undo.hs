@@ -57,8 +57,8 @@ redoFuture ls u@Undo {futureRedo = (futureLS:lss)}
 
 
 saveForUndo :: (Save s, MonadState Undo m)
-                => KeyCommand m s t -> KeyCommand m s t
-saveForUndo  = doBefore $ askState $ \s -> commandM $ do
+                => Command m s s
+saveForUndo = askState $ \s -> commandM $ do
     modify (saveToUndo s)
     return continue
 

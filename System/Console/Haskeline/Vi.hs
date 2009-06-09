@@ -34,7 +34,7 @@ simpleInsertions = choiceCmd
                    , simpleKey UpKey +> historyBack
                    , simpleKey DownKey +> historyForward
                    , searchHistory
-                   , saveForUndo $ choiceCmd
+                   , doBefore saveForUndo $ choiceCmd
                         [ simpleKey KillLine +> change (deleteFromMove moveToStart)
                         , completionCmd (simpleChar '\t')
                         ]
@@ -63,11 +63,8 @@ exitingCommands =  choiceCmd [
                     , simpleChar 'A' +> change (moveToEnd . appendFromCommandMode)
                     , simpleKey End +> change (moveToStart  . insertFromCommandMode)
                     , simpleChar 's' +> change (insertFromCommandMode . deleteChar)
-                    , repeated
-                    , saveForUndo $ choiceCmd
-                        [ simpleChar 'S' +> change (const emptyIM)
-                        , deleteIOnce
-                        ]
+                    , simpleChar 'S' +> saveForUndo >|> change (const emptyIM)
+                    , repeatedCommands
                     ]
 
 simpleCmdActions :: InputKeyCmd CommandMode CommandMode
@@ -81,17 +78,14 @@ simpleCmdActions = choiceCmd [ simpleChar '\n'  +> finish
                     , simpleChar 'u' +> commandUndo
                     , ctrlChar 'r' +> commandRedo
                     , simpleChar '.' +> commandRedo
-                    , useMovements withCommandMode
                     -- vi-mode quirk: history is put at the start of the line.
                     , simpleChar 'j' +> historyForward >|> change moveToStart
                     , simpleChar 'k' +> historyBack >|> change moveToStart
                     , simpleKey DownKey +> historyForward  >|> change moveToStart
                     , simpleKey UpKey +> historyBack >|> change moveToStart
-                    , saveForUndo $ choiceCmd
-                        [ simpleKey KillLine +> change (withCommandMode
-                                        $ deleteFromMove moveToStart)
-                        , deleteOnce
-                        ]
+                    , simpleKey KillLine +> saveForUndo >|>
+                                                (change $ withCommandMode
+                                                    $ deleteFromMove moveToStart)
                     ]
 
 replaceOnce :: InputCmd CommandMode CommandMode
@@ -101,26 +95,72 @@ loopReplace :: InputCmd CommandMode CommandMode
 loopReplace = try $ changeFromChar (\c -> goRight . replaceChar c)
                                     >+> loopReplace
 
-repeated :: InputKeyCmd CommandMode InsertMode
-repeated = let
-    start = foreachDigit startArg ['1'..'9']
-    addDigit = foreachDigit addNum ['0'..'9']
-    deleteR = simpleChar 'd' 
-                +> keyChoiceCmd [useMovements deleteFromRepeatedMove,
-                             simpleChar 'd' +> change (const CEmpty)]
-    deleteIR = simpleChar 'c'
-                +> keyChoiceCmd [useMovements deleteAndInsertR,
-                             simpleChar 'c' +> change (const emptyIM)]
-    applyArg' f = enterCommandModeRight . applyArg f . fmap insertFromCommandMode
-    loop = keyChoiceCmd [addDigit >+> loop
-                     , useMovements applyArg' >+> viCommandActions
-                     , saveForUndo (deleteR >+> viCommandActions)
-                     , saveForUndo deleteIR
-                     , saveForUndo (simpleChar 'x' +> change (applyArg deleteChar)
-                        >|> viCommandActions)
-                     , withoutConsuming (change argState) >+> viCommandActions
-                     ]
-    in start >+> loop
+repeatedCommands :: InputKeyCmd CommandMode InsertMode
+repeatedCommands = choiceCmd [argumented, withNoArg repeatableCommands]
+    where
+        -- TODO: this will unnecessarily print '1:', I think
+        withNoArg = doBefore (change (ArgMode 1))
+        start = foreachDigit startArg ['1'..'9']
+        addDigit = foreachDigit addNum ['0'..'9']
+        argumented = start >+> loop
+        loop = keyChoiceCmd [addDigit >+> loop
+                            , repeatableCommands
+                            -- if no match, bail out.
+                            , withoutConsuming (change argState) >+> viCommandActions
+                            ]
+
+mapMovements :: ((InsertMode -> InsertMode) -> Command m s t) -> KeyCommand m s t
+mapMovements f = choiceCmd $ map (\(k,g) -> k +> f g) movements
+
+repeatableCommands :: Monad m => KeyCommand (InputCmdT m) (ArgMode CommandMode) InsertMode
+repeatableCommands = choiceCmd 
+                        [ repeatableCmdToIMode
+                        , repeatableCmdMode >+> viCommandActions
+                        ]
+                
+
+repeatableCmdMode :: InputKeyCmd (ArgMode CommandMode) CommandMode
+repeatableCmdMode = choiceCmd $ 
+                    [ simpleChar 'x' +> saveForUndo >|> change (applyArg deleteChar)
+                    , simpleChar 'd' +> deletionCmd
+                    , mapMovements (change . applyCmdArg)
+                    ]
+
+repeatableCmdToIMode :: InputKeyCmd (ArgMode CommandMode) InsertMode
+repeatableCmdToIMode = simpleChar 'c' +> deletionToInsertCmd
+
+deletionCmd :: InputCmd (ArgMode CommandMode) CommandMode
+deletionCmd = keyChoiceCmd $
+                    [simpleChar 'd' +> change (const CEmpty)
+                    -- special case end-of-word because the cursor isn't in a useful position
+                    -- from the motion commands.
+                    , simpleChar 'e' +> makeDeletion goToWordDelEnd
+                    , simpleChar 'E' +> makeDeletion goToBigWordDelEnd
+                    , mapMovements makeDeletion
+                    , withoutConsuming (change argState)
+                    ]
+    where
+        makeDeletion move = saveForUndo >|> change (applyCmdArg $ deleteFromMove move)
+
+goToWordDelEnd, goToBigWordDelEnd :: InsertMode -> InsertMode
+goToWordDelEnd = goRightUntil $ atStart (not . isWordChar)
+                                    .||. atStart (not . isOtherChar)
+goToBigWordDelEnd = goRightUntil $ atStart (not . isBigWordChar)
+
+deletionToInsertCmd :: InputCmd (ArgMode CommandMode) InsertMode
+deletionToInsertCmd = keyChoiceCmd $
+        [simpleChar 'c' +> change (const emptyIM)
+        , simpleChar 'e' +> makeDeletion goToWordDelEnd
+        , simpleChar 'E' +> makeDeletion goToBigWordDelEnd
+        -- vim,for whatever reason, treats cw same as ce and cW same as cE.
+        , simpleChar 'w' +> makeDeletion goToWordDelEnd
+        , simpleChar 'W' +> makeDeletion goToBigWordDelEnd
+        , mapMovements makeDeletion
+        , withoutConsuming (change argState) >+> viCommandActions
+        ]
+  where
+    makeDeletion move = saveForUndo >|> change (insertFromCommandMode
+                                                . applyCmdArg (deleteFromMove move))
 
 movements :: [(Key,InsertMode -> InsertMode)]
 movements = [ (simpleChar 'h', goLeft)
@@ -134,21 +174,18 @@ movements = [ (simpleChar 'h', goLeft)
             ------------------
             -- Word movements
             -- move to the start of the next word
-            , (simpleChar 'w', skipRight isSpace . skipWordRight)
-            , (simpleChar 'W', skipRight isSpace . skipRight bigWordChar)
+            , (simpleChar 'w', goRightUntil $
+                                atStart isWordChar .||. atStart isOtherChar)
+            , (simpleChar 'W', goRightUntil (atStart isBigWordChar))
             -- move to the beginning of the previous word
-            , (simpleChar 'b', skipWordLeft . goLeft . skipLeft isSpace)
-            , (simpleChar 'B', skipLeft bigWordChar . goLeft . skipLeft isSpace)
+            , (simpleChar 'b', goLeftUntil $
+                                atStart isWordChar .||. atStart isOtherChar)
+            , (simpleChar 'B', goLeftUntil (atStart isBigWordChar))
             -- move to the end of the current word
-            , (simpleChar 'e', moveLeftIfNotEnd . skipWordRight
-                                    . skipRight isSpace . goRight)
-            , (simpleChar 'E', moveLeftIfNotEnd . skipRight bigWordChar
-                                    . skipRight isSpace . goRight)
+            , (simpleChar 'e', goRightUntil $
+                                atEnd isWordChar .||. atEnd isOtherChar)
+            , (simpleChar 'E', goRightUntil (atEnd isBigWordChar))
             ]
-
-moveLeftIfNotEnd :: InsertMode -> InsertMode
-moveLeftIfNotEnd im@(IMode _ []) = im
-moveLeftIfNotEnd im = goLeft im
 
 {- 
 From IEEE 1003.1:
@@ -158,60 +195,16 @@ A "word" consists of either:
  - a maximal sequence of non-blank non-wordchars, delimited at both ends by either blanks
    or a wordchar.
 -}            
+isBigWordChar, isWordChar, isOtherChar :: Char -> Bool
+isBigWordChar = not . isSpace
+isWordChar = isAlphaNum .||. (=='_')
+isOtherChar = not . (isSpace .||. isWordChar)
 
-skipWordRight, skipWordLeft :: InsertMode -> InsertMode
-skipWordRight s = skipRight (wordRule s) s
-skipWordLeft s = skipLeft (wordRule s) s
-
-bigWordChar :: Char -> Bool
-bigWordChar = not . isSpace
-
-
--- Looks at the character under the cursor, and returns a guard for similar characters.
-wordRule :: InsertMode -> (Char -> Bool)
-wordRule (IMode _ (c:_))
-    | isWordChar (baseChar c) = isWordChar
-wordRule _ = \d -> not (isWordChar d) && not (isSpace d)
-
-isWordChar :: Char -> Bool
-isWordChar d = isAlphaNum d || d == '_'
-
-useMovements :: LineState t => ((InsertMode -> InsertMode) -> s -> t) 
-                -> InputKeyCmd s t
-useMovements f = choiceCmd $ map (\(k,g) -> k +> change (f g))
-                                movements
-
-deleteOnce :: InputKeyCmd CommandMode CommandMode
-deleteOnce = simpleChar 'd'
-            +> keyChoiceCmd [useMovements deleteFromCmdMove,
-                         simpleChar 'd' +> change (const CEmpty)]
-
-deleteIOnce :: InputKeyCmd CommandMode InsertMode
-deleteIOnce = simpleChar 'c'
-              +> keyChoiceCmd [useMovements deleteAndInsert,
-                            simpleChar 'c' +> change (const emptyIM)]
-
-deleteAndInsert :: (InsertMode -> InsertMode) -> CommandMode -> InsertMode
-deleteAndInsert f = insertFromCommandMode . deleteFromCmdMove f
-
-deleteAndInsertR :: (InsertMode -> InsertMode) 
-                -> ArgMode CommandMode -> InsertMode
-deleteAndInsertR f = insertFromCommandMode . deleteFromRepeatedMove f
-
+(.||.) :: (a -> Bool) -> (a -> Bool) -> a -> Bool
+f .||. g = \x -> f x || g x
 
 foreachDigit :: (Monad m, LineState t) => (Int -> s -> t) -> [Char] 
                 -> KeyCommand m s t
 foreachDigit f ds = choiceCmd $ map digitCmd ds
     where digitCmd d = simpleChar d +> change (f (toDigit d))
           toDigit d = fromEnum d - fromEnum '0'
-
-
-deleteFromCmdMove :: (InsertMode -> InsertMode) -> CommandMode -> CommandMode
-deleteFromCmdMove f = withCommandMode $ \x -> deleteFromDiff x (f x)
-
-deleteFromRepeatedMove :: (InsertMode -> InsertMode)
-            -> ArgMode CommandMode -> CommandMode
-deleteFromRepeatedMove f am = let
-    am' = fmap insertFromCommandMode am
-    in enterCommandModeRight $ 
-                deleteFromDiff (argState am') (applyArg f am')

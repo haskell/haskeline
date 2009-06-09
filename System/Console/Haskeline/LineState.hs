@@ -29,8 +29,12 @@ module System.Console.Haskeline.LineState(
                     deletePrev,
                     skipLeft,
                     skipRight,
-                    deleteFromDiff,
                     deleteFromMove,
+                    -- *** Moving to word boundaries
+                    goRightUntil,
+                    goLeftUntil,
+                    atStart,
+                    atEnd,
                     -- ** CommandMode
                     CommandMode(..),
                     deleteChar,
@@ -46,6 +50,7 @@ module System.Console.Haskeline.LineState(
                     startArg,
                     addNum,
                     applyArg,
+                    applyCmdArg,
                     -- ** Other line state types
                     Cleared(..),
                     Message(..),
@@ -286,10 +291,14 @@ addNum n am
 
 -- todo: negatives
 applyArg :: (s -> s) -> ArgMode s -> s
-applyArg f am = repeatN (arg am) (argState am)
-    where
-        repeatN n | n <= 1 = f
-                    | otherwise = f . repeatN (n-1)
+applyArg f am = repeatN (arg am) f (argState am)
+
+repeatN :: Int -> (a -> a) -> a -> a
+repeatN n f | n <= 1 = f
+          | otherwise = f . repeatN (n-1) f
+
+applyCmdArg :: (InsertMode -> InsertMode) -> ArgMode CommandMode -> CommandMode
+applyCmdArg f am = withCommandMode (repeatN (arg am) f) (argState am)
 
 ---------------
 data Cleared = Cleared
@@ -306,10 +315,29 @@ instance LineState s => LineState (Message s) where
     isTemporary _ = True
 
 -----------------
+
 deleteFromDiff :: InsertMode -> InsertMode -> InsertMode
 deleteFromDiff (IMode xs1 ys1) (IMode xs2 ys2)
-    | length xs1 < length xs2 = IMode xs1 ys2
+    | length xs1 < length xs2 = IMode xs1 ys2 -- moved right
     | otherwise = IMode xs2 ys1
 
 deleteFromMove :: (InsertMode -> InsertMode) -> InsertMode -> InsertMode
 deleteFromMove f = \x -> deleteFromDiff x (f x)
+
+atStart, atEnd :: (Char -> Bool) -> InsertMode -> Bool
+atStart f (IMode (x:_) (y:_)) = not (f (baseChar x)) && f (baseChar y)
+atStart _ _ = False
+
+atEnd f (IMode _ (y1:y2:_)) = f (baseChar y1) && not (f (baseChar y2))
+atEnd _ _ = False
+
+goRightUntil, goLeftUntil :: (InsertMode -> Bool) -> InsertMode -> InsertMode
+goRightUntil f = loop . goRight
+    where
+        loop im@(IMode _ ys) | null ys || f im  = im
+                             | otherwise = loop (goRight im)
+goLeftUntil f = loop . goLeft
+    where
+        loop im@(IMode xs _)   | null xs || f im = im
+                            | otherwise = loop (goLeft im)
+

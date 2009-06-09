@@ -23,7 +23,7 @@ simpleActions = choiceCmd
             , simpleKey Backspace +> change deletePrev
             , simpleKey Delete +> change deleteNext 
             , changeFromChar insertChar
-            , saveForUndo $ completionCmd (simpleChar '\t')
+            , doBefore saveForUndo $ completionCmd (simpleChar '\t')
             , simpleKey UpKey +> historyBack
             , simpleKey DownKey +> historyForward
             , searchHistory
@@ -45,7 +45,7 @@ controlActions = choiceCmd
             , ctrlChar 'x' +> try (ctrlChar 'u' +> commandUndo)
             , simpleKey Home +> change moveToStart
             , simpleKey End +> change moveToEnd
-            , saveForUndo $ choiceCmd
+            , doBefore saveForUndo $ choiceCmd
                 [ ctrlChar 'w' +> change (deleteFromMove bigWordLeft)
                 , metaKey (simpleKey Backspace) +> change (deleteFromMove wordLeft)
                 , metaChar 'd' +> change (deleteFromMove wordRight)
@@ -62,9 +62,9 @@ deleteCharOrEOF k = k +> askState (\s -> if s == emptyIM
         justDelete = try $ k +> change deleteNext >|> justDelete
 
 wordRight, wordLeft, bigWordLeft :: InsertMode -> InsertMode
-wordRight = skipRight isAlphaNum . skipRight (not . isAlphaNum)
-wordLeft = skipLeft isAlphaNum . skipLeft (not . isAlphaNum)
-bigWordLeft = skipLeft (not . isSpace) . skipLeft isSpace
+wordRight = goRightUntil (atStart (not . isAlphaNum))
+wordLeft = goLeftUntil (atStart isAlphaNum)
+bigWordLeft = goLeftUntil (atStart isSpace)
 
 modifyWord :: ([Grapheme] -> [Grapheme]) -> InsertMode -> InsertMode
 modifyWord f im = IMode (reverse (f ys1) ++ xs) ys2

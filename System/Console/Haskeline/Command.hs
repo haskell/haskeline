@@ -144,7 +144,7 @@ changeFromChar f = charCommand (\c s -> return $ Change (f c s))
 clearScreenCmd :: LineState s => Command m s s
 clearScreenCmd = askState $ effect . Redraw True
 
-doBefore :: Command m s s -> KeyCommand m s t -> KeyCommand m s t
+doBefore :: Command m s t -> KeyCommand m t u -> KeyCommand m s u
 doBefore (Command cmd) (KeyCommand kcmd) = KeyCommand $ \next -> case kcmd next of
         KeyMap km -> KeyMap $ \k -> case km k of
                     Nothing -> Nothing
