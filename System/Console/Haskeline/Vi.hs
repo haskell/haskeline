@@ -82,6 +82,9 @@ simpleCmdActions = choiceCmd [ simpleChar '\n'  +> finish
                     , ctrlChar 'r' +> commandRedo
                     , simpleChar '.' +> commandRedo
                     , useMovements withCommandMode
+                    -- vi-mode quirk: history is put at the start of the line.
+                    , simpleChar 'j' +> historyForward >|> change moveToStart
+                    , simpleChar 'k' +> historyBack >|> change moveToStart
                     , simpleKey DownKey +> historyForward  >|> change moveToStart
                     , simpleKey UpKey +> historyBack >|> change moveToStart
                     , saveForUndo $ choiceCmd
