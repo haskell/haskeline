@@ -157,6 +157,8 @@ deletionToInsertCmd = keyChoiceCmd $
         -- vim,for whatever reason, treats cw same as ce and cW same as cE.
         , simpleChar 'w' +> makeDeletion goToWordDelEnd
         , simpleChar 'W' +> makeDeletion goToBigWordDelEnd
+        -- TODO: this seems a little hacky...
+        , simpleChar '$' +> makeDeletion moveToEnd >|> change goRight
         , mapMovements makeDeletion
         , withoutConsuming (change argState) >+> viCommandActions
         ]
