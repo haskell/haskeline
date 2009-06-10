@@ -64,6 +64,8 @@ exitingCommands =  choiceCmd [
                     , simpleKey End +> change (moveToStart  . insertFromCommandMode)
                     , simpleChar 's' +> change (insertFromCommandMode . deleteChar)
                     , simpleChar 'S' +> saveForUndo >|> change (const emptyIM)
+                    , simpleChar 'C' +> saveForUndo >|> change (appendFromCommandMode
+                                                . withCommandMode (deleteFromMove moveToEnd))
                     , repeatedCommands
                     ]
 
@@ -73,7 +75,7 @@ simpleCmdActions = choiceCmd [ simpleChar '\n'  +> finish
                     , ctrlChar 'd' +> eofIfEmpty
                     , simpleChar 'r'   +> replaceOnce 
                     , simpleChar 'R'   +> loopReplace
-                    , simpleChar 'x' +> change deleteChar
+                    , simpleChar 'D' +> change (withCommandMode (deleteFromMove moveToEnd))
                     , ctrlChar 'l' +> clearScreenCmd
                     , simpleChar 'u' +> commandUndo
                     , ctrlChar 'r' +> commandRedo
@@ -121,6 +123,7 @@ repeatableCommands = choiceCmd
 repeatableCmdMode :: InputKeyCmd (ArgMode CommandMode) CommandMode
 repeatableCmdMode = choiceCmd $ 
                     [ simpleChar 'x' +> saveForUndo >|> change (applyArg deleteChar)
+                    , simpleChar 'X' +> saveForUndo >|> change (applyArg (withCommandMode deletePrev))
                     , simpleChar 'd' +> deletionCmd
                     , mapMovements (change . applyCmdArg)
                     ]
