@@ -121,7 +121,7 @@ lookupKeyBinding k = Map.findWithDefault [k] k . customBindings
 readPrefs :: FilePath -> IO Prefs
 readPrefs file = handle (\(_::IOException) -> return defaultPrefs) $ do
     ls <- fmap lines $ readFile file
-    return $ foldl' applyField defaultPrefs ls
+    return $! foldl' applyField defaultPrefs ls
   where
     applyField p l = case break (==':') l of
                 (name,val)  -> case lookup (map toLower $ trimSpaces name) settors of
