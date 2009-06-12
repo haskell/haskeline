@@ -4,6 +4,7 @@ module System.Console.Haskeline.InputT where
 import System.Console.Haskeline.History
 import System.Console.Haskeline.Command.History
 import System.Console.Haskeline.Command.Undo
+import System.Console.Haskeline.Command.KillRing
 import System.Console.Haskeline.Monads as Monads
 import System.Console.Haskeline.Prefs
 import System.Console.Haskeline.Completion
@@ -37,8 +38,9 @@ setComplete f s = s {complete = f}
 -- | A monad transformer which carries all of the state and settings
 -- relevant to a line-reading application.
 newtype InputT m a = InputT {unInputT :: ReaderT RunTerm
-                                (StateT History (ReaderT Prefs
-                                (ReaderT (Settings m) m))) a}
+                                (StateT History
+                                (StateT KillRing (ReaderT Prefs
+                                (ReaderT (Settings m) m)))) a}
                             deriving (Monad, MonadIO, MonadException,
                                 MonadState History, MonadReader Prefs,
                                 MonadReader (Settings m), MonadReader RunTerm)
@@ -51,15 +53,15 @@ instance Monad m => Applicative (InputT m) where
     (<*>) = State.ap
 
 instance MonadTrans InputT where
-    lift = InputT . lift . lift . lift . lift
+    lift = InputT . lift . lift . lift . lift . lift
 
 instance Monad m => State.MonadState History (InputT m) where
     get = get
     put = put
 
 -- for internal use only
-type InputCmdT m = ReaderT Layout (UndoT (StateT HistLog 
-                (ReaderT Prefs (ReaderT (Settings m) m))))
+type InputCmdT m = ReaderT Layout (UndoT (StateT HistLog (StateT KillRing
+                (ReaderT Prefs (ReaderT (Settings m) m)))))
 
 instance MonadIO m => MonadLayout (InputCmdT m) where
 
@@ -70,12 +72,13 @@ runInputCmdT tops f = InputT $ do
 
 
 liftCmdT :: Monad m => m a -> InputCmdT m a
-liftCmdT = lift  . lift . lift . lift . lift
+liftCmdT = lift  . lift . lift . lift . lift . lift
 
 runInputTWithPrefs :: MonadException m => Prefs -> Settings m -> InputT m a -> m a
 runInputTWithPrefs prefs settings (InputT f) = bracket (liftIO myRunTerm)
     (liftIO . closeTerm)
     $ \run -> runReaderT' settings $ runReaderT' prefs 
+        $ runKillRing
         $ runHistoryFromFile (historyFile settings) (maxHistorySize prefs) 
         $ runReaderT f run
         

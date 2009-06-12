@@ -25,6 +25,7 @@ module System.Console.Haskeline.LineState(
                     emptyIM,
                     insertChar,
                     insertString,
+                    insertGraphemes,
                     deleteNext,
                     deletePrev,
                     skipLeft,
@@ -190,6 +191,9 @@ skipLeft f (IMode xs ys) = let (ws,zs) = span (f . baseChar) xs
                            in IMode zs (reverse ws ++ ys)
 skipRight f (IMode xs ys) = let (ws,zs) = span (f . baseChar) ys 
                             in IMode (reverse ws ++ xs) zs
+
+insertGraphemes :: [Grapheme] -> InsertMode -> InsertMode
+insertGraphemes s (IMode xs ys) = IMode (reverse s ++ xs) ys
 
 -- | Used by vi mode.  Considers the cursor to be located over some specific character.
 -- The first list is reversed.

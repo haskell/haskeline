@@ -62,6 +62,7 @@ Library
                 System.Console.Haskeline.Command
                 System.Console.Haskeline.Command.Completion
                 System.Console.Haskeline.Command.History
+                System.Console.Haskeline.Command.KillRing
                 System.Console.Haskeline.Directory
                 System.Console.Haskeline.Emacs
                 System.Console.Haskeline.InputT
