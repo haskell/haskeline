@@ -4,6 +4,7 @@ import System.Console.Haskeline.Command
 import System.Console.Haskeline.Key
 import System.Console.Haskeline.Command.Completion
 import System.Console.Haskeline.Command.History
+import System.Console.Haskeline.Command.KillRing
 import System.Console.Haskeline.Command.Undo
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.InputT
@@ -34,10 +35,9 @@ simpleInsertions = choiceCmd
                    , simpleKey UpKey +> historyBack
                    , simpleKey DownKey +> historyForward
                    , searchHistory
-                   , doBefore saveForUndo $ choiceCmd
-                        [ simpleKey KillLine +> change (deleteFromMove moveToStart)
-                        , completionCmd (simpleChar '\t')
-                        ]
+                   , simpleKey KillLine +> killFromMove moveToStart
+                   -- TODO: fixme
+                   , doBefore saveForUndo (completionCmd (simpleChar '\t'))
                    ]
 
 -- If we receive a ^D and the line is empty, return Nothing
@@ -64,8 +64,9 @@ exitingCommands =  choiceCmd [
                     , simpleKey End +> change (moveToStart  . insertFromCommandMode)
                     , simpleChar 's' +> change (insertFromCommandMode . deleteChar)
                     , simpleChar 'S' +> saveForUndo >|> change (const emptyIM)
-                    , simpleChar 'C' +> saveForUndo >|> change (appendFromCommandMode
-                                                . withCommandMode (deleteFromMove moveToEnd))
+                    -- TODO: does this work right? is the append necessary?
+                    , simpleChar 'C' +> killFromMove moveToEnd
+                                            >|> change appendFromCommandMode
                     , repeatedCommands
                     ]
 
@@ -75,7 +76,7 @@ simpleCmdActions = choiceCmd [ simpleChar '\n'  +> finish
                     , ctrlChar 'd' +> eofIfEmpty
                     , simpleChar 'r'   +> replaceOnce 
                     , simpleChar 'R'   +> replaceLoop
-                    , simpleChar 'D' +> change (withCommandMode (deleteFromMove moveToEnd))
+                    , simpleChar 'D' +> killFromMove moveToEnd
                     , ctrlChar 'l' +> clearScreenCmd
                     , simpleChar 'u' +> commandUndo
                     , ctrlChar 'r' +> commandRedo
@@ -85,9 +86,11 @@ simpleCmdActions = choiceCmd [ simpleChar '\n'  +> finish
                     , simpleChar 'k' +> historyBack >|> change moveToStart
                     , simpleKey DownKey +> historyForward  >|> change moveToStart
                     , simpleKey UpKey +> historyBack >|> change moveToStart
-                    , simpleKey KillLine +> saveForUndo >|>
-                                                (change $ withCommandMode
-                                                    $ deleteFromMove moveToStart)
+                    , simpleKey KillLine +> killFromMove moveToStart
+                    , simpleChar 'p' +> pasteCommand
+                                            (withCommandMode . insertGraphemes)
+                    , simpleChar 'P' +> pasteCommand
+                                            (withCommandMode . insertGraphemesBefore)
                     ]
 
 replaceOnce :: InputCmd CommandMode CommandMode
@@ -132,13 +135,11 @@ deletionCmd = keyChoiceCmd $
                     [simpleChar 'd' +> change (const CEmpty)
                     -- special case end-of-word because the cursor isn't in a useful position
                     -- from the motion commands.
-                    , simpleChar 'e' +> makeDeletion goToWordDelEnd
-                    , simpleChar 'E' +> makeDeletion goToBigWordDelEnd
-                    , mapMovements makeDeletion
+                    , simpleChar 'e' +> killFromArgMove goToWordDelEnd
+                    , simpleChar 'E' +> killFromArgMove goToBigWordDelEnd
+                    , mapMovements killFromArgMove
                     , withoutConsuming (change argState)
                     ]
-    where
-        makeDeletion move = saveForUndo >|> change (applyCmdArg $ deleteFromMove move)
 
 goToWordDelEnd, goToBigWordDelEnd :: InsertMode -> InsertMode
 goToWordDelEnd = goRightUntil $ atStart (not . isWordChar)
@@ -148,19 +149,16 @@ goToBigWordDelEnd = goRightUntil $ atStart (not . isBigWordChar)
 deletionToInsertCmd :: InputCmd (ArgMode CommandMode) InsertMode
 deletionToInsertCmd = keyChoiceCmd $
         [simpleChar 'c' +> change (const emptyIM)
-        , simpleChar 'e' +> makeDeletion goToWordDelEnd
-        , simpleChar 'E' +> makeDeletion goToBigWordDelEnd
+        , simpleChar 'e' +> killFromArgMove goToWordDelEnd
+        , simpleChar 'E' +> killFromArgMove goToBigWordDelEnd
         -- vim,for whatever reason, treats cw same as ce and cW same as cE.
-        , simpleChar 'w' +> makeDeletion goToWordDelEnd
-        , simpleChar 'W' +> makeDeletion goToBigWordDelEnd
+        , simpleChar 'w' +> killFromArgMove goToWordDelEnd
+        , simpleChar 'W' +> killFromArgMove goToBigWordDelEnd
         -- TODO: this seems a little hacky...
-        , simpleChar '$' +> makeDeletion moveToEnd >|> change goRight
-        , mapMovements makeDeletion
+        , simpleChar '$' +> killFromArgMove moveToEnd >|> change goRight
+        , mapMovements killFromArgMove
         , withoutConsuming (change argState) >+> viCommandActions
         ]
-  where
-    makeDeletion move = saveForUndo >|> change (insertFromCommandMode
-                                                . applyCmdArg (deleteFromMove move))
 
 movements :: [(Key,InsertMode -> InsertMode)]
 movements = [ (simpleChar 'h', goLeft)

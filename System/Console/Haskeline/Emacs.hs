@@ -26,6 +26,7 @@ simpleActions = choiceCmd
             , simpleKey Backspace +> change deletePrev
             , simpleKey Delete +> change deleteNext 
             , changeFromChar insertChar
+            -- TODO: fixme
             , doBefore saveForUndo $ completionCmd (simpleChar '\t')
             , simpleKey UpKey +> historyBack
             , simpleKey DownKey +> historyForward
@@ -49,7 +50,7 @@ controlActions = choiceCmd
             , simpleKey Home +> change moveToStart
             , simpleKey End +> change moveToEnd
             , choiceCmd
-                [ ctrlChar 'w' +> change (deleteFromMove bigWordLeft)
+                [ ctrlChar 'w' +> killFromMove bigWordLeft
                 , metaKey (simpleKey Backspace) +> killFromMove wordLeft
                 , metaChar 'd' +> killFromMove wordRight
                 , ctrlChar 'k' +> killFromMove moveToEnd

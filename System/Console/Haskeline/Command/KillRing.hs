@@ -32,15 +32,15 @@ runKillRing :: Monad m => StateT KillRing m a -> m a
 runKillRing = evalStateT' emptyStack
 
 
-pasteCommand :: (LineState s, MonadState KillRing m) => ([Grapheme] -> s -> s)
-                                -> Command m s s
-pasteCommand use = commandM $ do
+pasteCommand :: (Save s, MonadState KillRing m, MonadState Undo m)
+            => ([Grapheme] -> s -> s) -> Command m s s
+pasteCommand use = simpleCommand $ \s -> do
     ms <- liftM peek get
-    return $ case ms of
-        Nothing -> continue
-        Just s -> change (use s)
-
--- TODO: this should completely replace the stuff in LineState
+    case ms of
+        Nothing -> return $ Change s
+        Just p -> do
+            modify (saveToUndo s)
+            return $ Change $ use p s
 
 deleteFromDiff' :: InsertMode -> InsertMode -> ([Grapheme],InsertMode)
 deleteFromDiff' (IMode xs1 ys1) (IMode xs2 ys2)
@@ -49,9 +49,19 @@ deleteFromDiff' (IMode xs1 ys1) (IMode xs2 ys2)
   where
     posChange = length xs2 - length xs1
 
-killFromMove :: (MonadState KillRing m, MonadState Undo m)
-                => (InsertMode -> InsertMode) -> Command m InsertMode InsertMode
-killFromMove move = saveForUndo >|> simpleCommand (\oldIM -> do
-    let (gs,im) = deleteFromDiff' oldIM (move oldIM)
+killFromMove :: (MonadState KillRing m, MonadState Undo m,
+                        Save s, Save t)
+                => (InsertMode -> InsertMode) -> Command m s t
+killFromMove move = saveForUndo >|> simpleCommand (\oldS -> do
+    let oldIM = save oldS
+    let (gs,newIM) = deleteFromDiff' oldIM (move oldIM)
     modify (push gs)
-    return (Change im))
+    return (Change (restore newIM)))
+
+killFromArgMove :: (MonadState KillRing m, MonadState Undo m, Save s, Save t)
+                => (InsertMode -> InsertMode) -> Command m (ArgMode s) t
+killFromArgMove move = saveForUndo >|> simpleCommand (\oldS -> do
+    let oldIMA = fmap save oldS
+    let (gs,newIM) = deleteFromDiff' (argState oldIMA) (applyArg move oldIMA)
+    modify (push gs)
+    return (Change (restore newIM)))

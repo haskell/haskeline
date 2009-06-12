@@ -27,11 +27,11 @@ module System.Console.Haskeline.LineState(
                     insertString,
                     replaceCharIM,
                     insertGraphemes,
+                    insertGraphemesBefore,
                     deleteNext,
                     deletePrev,
                     skipLeft,
                     skipRight,
-                    deleteFromMove,
                     -- *** Moving to word boundaries
                     goRightUntil,
                     goLeftUntil,
@@ -193,8 +193,9 @@ skipLeft f (IMode xs ys) = let (ws,zs) = span (f . baseChar) xs
 skipRight f (IMode xs ys) = let (ws,zs) = span (f . baseChar) ys 
                             in IMode (reverse ws ++ xs) zs
 
-insertGraphemes :: [Grapheme] -> InsertMode -> InsertMode
+insertGraphemes, insertGraphemesBefore :: [Grapheme] -> InsertMode -> InsertMode
 insertGraphemes s (IMode xs ys) = IMode (reverse s ++ xs) ys
+insertGraphemesBefore s (IMode xs ys) = IMode xs (s ++ ys)
 
 -- For the 'R' command.
 replaceCharIM :: Char -> InsertMode -> InsertMode
@@ -284,6 +285,9 @@ withCommandMode f = enterCommandModeRight . f . insertFromCommandMode
 data ArgMode s = ArgMode {arg :: Int, argState :: s,
                             overwritePrefix :: Bool}
 
+instance Functor ArgMode where
+    fmap f am = am {argState = f (argState am)}
+
 instance LineState s => LineState (ArgMode s) where
     beforeCursor prefix am = let pre' = if overwritePrefix am
                                             then "(arg: " ++ show (arg am) ++ ") "
@@ -331,15 +335,6 @@ instance LineState s => LineState (Message s) where
     isTemporary _ = True
 
 -----------------
-
-deleteFromDiff :: InsertMode -> InsertMode -> InsertMode
-deleteFromDiff (IMode xs1 ys1) (IMode xs2 ys2)
-    | length xs1 < length xs2 = IMode xs1 ys2 -- moved right
-    | otherwise = IMode xs2 ys1
-
-deleteFromMove :: (InsertMode -> InsertMode) -> InsertMode -> InsertMode
-deleteFromMove f = \x -> deleteFromDiff x (f x)
-
 atStart, atEnd :: (Char -> Bool) -> InsertMode -> Bool
 atStart f (IMode (x:_) (y:_)) = not (f (baseChar x)) && f (baseChar y)
 atStart _ _ = False
