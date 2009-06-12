@@ -193,7 +193,7 @@ repeatTillFinish tops getEvent prefix = loopKeys []
                                                 drawEffect prefix s t
                                                 loopCmd ks (effectState t) next
         loopCmd ks s (StreamM nextM) = lift nextM >>= loopCmd ks s
-        loopCmd _ _ (Finish result) = return result
+        loopCmd _ s (Finish result) = movePast prefix s >> return result
 
 simpleFileLoop :: MonadIO m => String -> RunTerm -> m (Maybe String)
 simpleFileLoop prefix rterm = liftIO $ do
