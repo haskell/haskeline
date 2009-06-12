@@ -6,6 +6,7 @@ module System.Console.Haskeline.Command.Completion(
                             ) where
 
 import System.Console.Haskeline.Command
+import System.Console.Haskeline.Command.Undo
 import System.Console.Haskeline.Key
 import System.Console.Haskeline.Term(Layout(..))
 import System.Console.Haskeline.LineState
@@ -30,7 +31,7 @@ makeCompletion (IMode xs ys) = do
 
 -- | Create a 'Command' for word completion.
 completionCmd :: Monad m => Key -> KeyCommand (InputCmdT m) InsertMode InsertMode
-completionCmd k = k +> askState (\s -> commandM $ do
+completionCmd k = k +> saveForUndo >|> askState (\s -> commandM $ do
     prefs <- ask
     (rest,completions) <- makeCompletion s
     return $ case completionType prefs of

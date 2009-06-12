@@ -26,8 +26,7 @@ simpleActions = choiceCmd
             , simpleKey Backspace +> change deletePrev
             , simpleKey Delete +> change deleteNext 
             , changeFromChar insertChar
-            -- TODO: fixme
-            , doBefore saveForUndo $ completionCmd (simpleChar '\t')
+            , completionCmd (simpleChar '\t')
             , simpleKey UpKey +> historyBack
             , simpleKey DownKey +> historyForward
             , searchHistory

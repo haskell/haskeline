@@ -36,8 +36,7 @@ simpleInsertions = choiceCmd
                    , simpleKey DownKey +> historyForward
                    , searchHistory
                    , simpleKey KillLine +> killFromMove moveToStart
-                   -- TODO: fixme
-                   , doBefore saveForUndo (completionCmd (simpleChar '\t'))
+                   , completionCmd (simpleChar '\t')
                    ]
 
 -- If we receive a ^D and the line is empty, return Nothing
