@@ -25,6 +25,7 @@ module System.Console.Haskeline.LineState(
                     emptyIM,
                     insertChar,
                     insertString,
+                    replaceCharIM,
                     insertGraphemes,
                     deleteNext,
                     deletePrev,
@@ -195,6 +196,19 @@ skipRight f (IMode xs ys) = let (ws,zs) = span (f . baseChar) ys
 insertGraphemes :: [Grapheme] -> InsertMode -> InsertMode
 insertGraphemes s (IMode xs ys) = IMode (reverse s ++ xs) ys
 
+-- For the 'R' command.
+replaceCharIM :: Char -> InsertMode -> InsertMode
+replaceCharIM c im
+    | isCombiningChar c = case im of
+                    IMode [] [] -> im
+                    IMode [] (y:ys) -> IMode [] (addCombiner y c:ys)
+                    IMode (x:xs) ys -> IMode (addCombiner x c:xs) ys
+    | otherwise = let g = baseGrapheme c
+                  in case im of
+                    IMode xs [] -> IMode (g:xs) []
+                    IMode xs (_:ys) -> IMode (g:xs) ys
+
+
 -- | Used by vi mode.  Considers the cursor to be located over some specific character.
 -- The first list is reversed.
 data CommandMode = CMode [Grapheme] Grapheme [Grapheme] | CEmpty
@@ -233,18 +247,12 @@ deleteChar (CMode xs _ (y:ys)) = CMode xs y ys
 deleteChar (CMode (x:xs) _ []) = CMode xs x []
 deleteChar _ = CEmpty
 
--- TODO: prob. do want different behavior for replace (on empty line it should
--- start inserting)
--- | Replace the character under the cursor
--- But if the new character is combining, alter the character to the 
--- left of the cursor.
 replaceChar :: Char -> CommandMode -> CommandMode
-replaceChar c cm@(CMode xs d ys)
+replaceChar c (CMode xs d ys)
     | not (isCombiningChar c)   = CMode xs (baseGrapheme c) ys
-    | (z:zs) <- xs              = CMode (addCombiner z c : zs) d ys
-    | otherwise                 = cm
+    | otherwise                 = CMode xs (addCombiner d c) ys
 replaceChar _ CEmpty = CEmpty
-    
+
 ------------------------
 -- Transitioning between modes
 

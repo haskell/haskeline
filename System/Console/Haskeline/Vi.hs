@@ -74,7 +74,7 @@ simpleCmdActions = choiceCmd [ simpleChar '\n'  +> finish
                     , simpleChar '\ESC' +> change id -- helps break out of loops
                     , ctrlChar 'd' +> eofIfEmpty
                     , simpleChar 'r'   +> replaceOnce 
-                    , simpleChar 'R'   +> loopReplace
+                    , simpleChar 'R'   +> replaceLoop
                     , simpleChar 'D' +> change (withCommandMode (deleteFromMove moveToEnd))
                     , ctrlChar 'l' +> clearScreenCmd
                     , simpleChar 'u' +> commandUndo
@@ -92,10 +92,6 @@ simpleCmdActions = choiceCmd [ simpleChar '\n'  +> finish
 
 replaceOnce :: InputCmd CommandMode CommandMode
 replaceOnce = try $ changeFromChar replaceChar
-
-loopReplace :: InputCmd CommandMode CommandMode
-loopReplace = try $ changeFromChar (\c -> goRight . replaceChar c)
-                                    >+> loopReplace
 
 repeatedCommands :: InputKeyCmd CommandMode InsertMode
 repeatedCommands = choiceCmd [argumented, withNoArg repeatableCommands]
@@ -212,3 +208,16 @@ foreachDigit :: (Monad m, LineState t) => (Int -> s -> t) -> [Char]
 foreachDigit f ds = choiceCmd $ map digitCmd ds
     where digitCmd d = simpleChar d +> change (f (toDigit d))
           toDigit d = fromEnum d - fromEnum '0'
+
+---------------
+-- Replace mode
+replaceLoop :: InputCmd CommandMode CommandMode
+replaceLoop = saveForUndo >|> change insertFromCommandMode >|> loop
+                >|> change enterCommandModeRight
+    where
+        loop = try (oneReplaceCmd >+> loop)
+        oneReplaceCmd = choiceCmd [
+                simpleKey LeftKey +> change goLeft
+                , simpleKey RightKey +> change goRight
+                , changeFromChar replaceCharIM
+                ]
