@@ -86,10 +86,8 @@ simpleCmdActions = choiceCmd [ simpleChar '\n'  +> finish
                     , simpleKey DownKey +> historyForward  >|> change moveToStart
                     , simpleKey UpKey +> historyBack >|> change moveToStart
                     , simpleKey KillLine +> killFromMove moveToStart
-                    , simpleChar 'p' +> pasteCommand
-                                            (withCommandMode . insertGraphemes)
-                    , simpleChar 'P' +> pasteCommand
-                                            (withCommandMode . insertGraphemesBefore)
+                    , simpleChar 'p' +> pasteCommand pasteGraphemesAfter
+                    , simpleChar 'P' +> pasteCommand pasteGraphemesBefore
                     ]
 
 replaceOnce :: InputCmd CommandMode CommandMode
@@ -123,6 +121,7 @@ repeatableCmdMode = choiceCmd $
                     [ simpleChar 'x' +> saveForUndo >|> change (applyArg deleteChar)
                     , simpleChar 'X' +> saveForUndo >|> change (applyArg (withCommandMode deletePrev))
                     , simpleChar 'd' +> deletionCmd
+                    , simpleChar 'y' +> yankCommand
                     , mapMovements (change . applyCmdArg)
                     ]
 
@@ -131,7 +130,7 @@ repeatableCmdToIMode = simpleChar 'c' +> deletionToInsertCmd
 
 deletionCmd :: InputCmd (ArgMode CommandMode) CommandMode
 deletionCmd = keyChoiceCmd $
-                    [simpleChar 'd' +> change (const CEmpty)
+                    [simpleChar 'd' +> killFromArgMove (const emptyIM)
                     -- special case end-of-word because the cursor isn't in a useful position
                     -- from the motion commands.
                     , simpleChar 'e' +> killFromArgMove goToWordDelEnd
@@ -140,6 +139,13 @@ deletionCmd = keyChoiceCmd $
                     , withoutConsuming (change argState)
                     ]
 
+yankCommand :: InputCmd (ArgMode CommandMode) CommandMode
+yankCommand = keyChoiceCmd $ 
+                [simpleChar 'y' +> copyFromArgMove (const emptyIM)
+                , mapMovements copyFromArgMove
+                , withoutConsuming (change argState)
+                ]
+
 goToWordDelEnd, goToBigWordDelEnd :: InsertMode -> InsertMode
 goToWordDelEnd = goRightUntil $ atStart (not . isWordChar)
                                     .||. atStart (not . isOtherChar)
@@ -147,7 +153,7 @@ goToBigWordDelEnd = goRightUntil $ atStart (not . isBigWordChar)
 
 deletionToInsertCmd :: InputCmd (ArgMode CommandMode) InsertMode
 deletionToInsertCmd = keyChoiceCmd $
-        [simpleChar 'c' +> change (const emptyIM)
+        [simpleChar 'c' +> killFromArgMove (const emptyIM)
         , simpleChar 'e' +> killFromArgMove goToWordDelEnd
         , simpleChar 'E' +> killFromArgMove goToBigWordDelEnd
         -- vim,for whatever reason, treats cw same as ce and cW same as cE.

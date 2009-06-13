@@ -43,6 +43,7 @@ pasteCommand use = simpleCommand $ \s -> do
             return $ Change $ use p s
 
 deleteFromDiff' :: InsertMode -> InsertMode -> ([Grapheme],InsertMode)
+deleteFromDiff' (IMode xs ys) im@(IMode [] []) = (reverse xs ++ ys,im)
 deleteFromDiff' (IMode xs1 ys1) (IMode xs2 ys2)
     | posChange >= 0 = (take posChange ys1, IMode xs1 ys2)
     | otherwise = (take (negate posChange) ys2 ,IMode xs2 ys1)
@@ -65,3 +66,11 @@ killFromArgMove move = saveForUndo >|> simpleCommand (\oldS -> do
     let (gs,newIM) = deleteFromDiff' (argState oldIMA) (applyArg move oldIMA)
     modify (push gs)
     return (Change (restore newIM)))
+
+copyFromArgMove :: (MonadState KillRing m, Save s)
+                => (InsertMode -> InsertMode) -> Command m (ArgMode s) s
+copyFromArgMove move = simpleCommand $ \oldS -> do
+    let oldIMA = fmap save oldS
+    let (gs,_) = deleteFromDiff' (argState oldIMA) (applyArg move oldIMA)
+    modify (push gs)
+    return $ Change $ argState oldS

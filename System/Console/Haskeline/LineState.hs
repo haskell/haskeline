@@ -27,7 +27,6 @@ module System.Console.Haskeline.LineState(
                     insertString,
                     replaceCharIM,
                     insertGraphemes,
-                    insertGraphemesBefore,
                     deleteNext,
                     deletePrev,
                     skipLeft,
@@ -41,6 +40,8 @@ module System.Console.Haskeline.LineState(
                     CommandMode(..),
                     deleteChar,
                     replaceChar,
+                    pasteGraphemesBefore,
+                    pasteGraphemesAfter,
                     -- *** Transitioning between modes
                     enterCommandMode,
                     enterCommandModeRight,
@@ -193,9 +194,8 @@ skipLeft f (IMode xs ys) = let (ws,zs) = span (f . baseChar) xs
 skipRight f (IMode xs ys) = let (ws,zs) = span (f . baseChar) ys 
                             in IMode (reverse ws ++ xs) zs
 
-insertGraphemes, insertGraphemesBefore :: [Grapheme] -> InsertMode -> InsertMode
+insertGraphemes :: [Grapheme] -> InsertMode -> InsertMode
 insertGraphemes s (IMode xs ys) = IMode (reverse s ++ xs) ys
-insertGraphemesBefore s (IMode xs ys) = IMode xs (s ++ ys)
 
 -- For the 'R' command.
 replaceCharIM :: Char -> InsertMode -> InsertMode
@@ -253,6 +253,13 @@ replaceChar c (CMode xs d ys)
     | not (isCombiningChar c)   = CMode xs (baseGrapheme c) ys
     | otherwise                 = CMode xs (addCombiner d c) ys
 replaceChar _ CEmpty = CEmpty
+
+pasteGraphemesBefore, pasteGraphemesAfter :: [Grapheme] -> CommandMode -> CommandMode
+pasteGraphemesBefore [] = id
+pasteGraphemesBefore s = enterCommandMode . insertGraphemes s . insertFromCommandMode
+
+pasteGraphemesAfter [] = id
+pasteGraphemesAfter s = enterCommandMode . insertGraphemes s . appendFromCommandMode
 
 ------------------------
 -- Transitioning between modes
