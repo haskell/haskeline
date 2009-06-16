@@ -180,6 +180,7 @@ movements = [ (simpleChar 'h', goLeft)
             , (simpleChar '0', moveToStart)
             , (simpleChar '$', moveToEnd)
             , (simpleChar '^', skipRight isSpace . moveToStart)
+            , (simpleChar '%', findMatchingBrace)
             ------------------
             -- Word movements
             -- move to the start of the next word
@@ -224,6 +225,24 @@ foreachDigit :: (Monad m, LineState t) => (Int -> s -> t) -> [Char]
 foreachDigit f ds = choiceCmd $ map digitCmd ds
     where digitCmd d = simpleChar d +> change (f (toDigit d))
           toDigit d = fromEnum d - fromEnum '0'
+
+-- TODO: This isn't compatible with deletions!
+findMatchingBrace :: InsertMode -> InsertMode
+findMatchingBrace im@(IMode _ []) = im
+findMatchingBrace origIM@(IMode _ (y:_))= case baseChar y of
+    '(' -> finder goRightUntil '(' ')' origIM
+    ')' -> finder goLeftUntil ')' '(' origIM
+    '[' -> finder goRightUntil '[' ']' origIM
+    ']' -> finder goLeftUntil ']' '[' origIM
+    '{' -> finder goRightUntil '{' '}' origIM
+    '}' -> finder goLeftUntil '}' '{' origIM
+    _ -> origIM
+  where
+    finder moveUntil c d im = case moveUntil (overChar (==c) .||. overChar (==d)) im of
+        im'@(IMode _ (z:_))
+            | baseChar z==c  -> finder moveUntil c d $ finder moveUntil c d im'
+            | baseChar z==d  -> im'
+        _ -> origIM -- couldn't find match
 
 ---------------
 -- Replace mode
