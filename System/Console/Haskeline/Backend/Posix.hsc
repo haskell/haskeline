@@ -38,7 +38,7 @@ import Data.Dynamic (cast)
 import System.IO.Error
 import GHC.IO.Handle
 import GHC.IO.Exception
-import GHC.IO.Handle.Types
+import GHC.IO.Handle.Types hiding (getState)
 import GHC.IO.Handle.Internals
 import System.Posix.Internals (FD)
 
