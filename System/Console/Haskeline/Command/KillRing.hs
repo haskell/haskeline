@@ -42,6 +42,7 @@ pasteCommand use = simpleCommand $ \s -> do
             modify (saveToUndo s)
             return $ Change $ use p s
 
+-- TODO: this first case isn't really great...
 deleteFromDiff' :: InsertMode -> InsertMode -> ([Grapheme],InsertMode)
 deleteFromDiff' (IMode xs ys) im@(IMode [] []) = (reverse xs ++ ys,im)
 deleteFromDiff' (IMode xs1 ys1) (IMode xs2 ys2)
