@@ -25,6 +25,7 @@ module System.Console.Haskeline.Command(
                         changeFromChar,
                         clearScreenCmd,
                         (+>),
+                        useChar,
                         choiceCmd,
                         keyChoiceCmd,
                         doBefore,
@@ -63,6 +64,13 @@ continue = Command id
 
 useKey :: Key -> KeyCommand m s s
 useKey k = KeyCommand $ \next -> KeyMap $ \k' -> if k==k' then Just (Consumed next) else Nothing
+
+useChar :: (Char -> Command m s t) -> KeyCommand m s t
+useChar act = KeyCommand $ \next -> KeyMap $ \k -> case k of
+                            Key m (KeyChar c) | isPrint c && m==noModifier -> Just $ Consumed $
+                                case act c of
+                                    Command cact -> cact next
+                            _ -> Nothing
 
 withoutConsuming :: Command m s t -> KeyCommand m s t
 withoutConsuming (Command f) = KeyCommand $ \next ->
@@ -124,13 +132,7 @@ simpleCommand f = Command $ \next -> AskState $ \s -> StreamM $ do
 
 charCommand :: (LineState t, Monad m) => (Char -> s -> m (Effect t))
                     -> KeyCommand m s t
-charCommand f = KeyCommand $ \next -> KeyMap $ \k -> case k of
-                    Key m (KeyChar c) | isPrint c && m==noModifier -> Just $ Consumed $
-                            AskState $ \s -> StreamM $ do
-                                    t <- f c s
-                                    return $ PutState t next
-                    _ -> Nothing
-                    
+charCommand f = useChar $ \c -> simpleCommand (f c)
 
 effect :: LineState t => Effect t -> Command m s t
 effect t = Command $ \next -> PutState t next

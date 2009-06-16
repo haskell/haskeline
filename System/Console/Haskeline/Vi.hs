@@ -106,8 +106,14 @@ repeatedCommands = choiceCmd [argumented, withNoArg repeatableCommands]
                             , withoutConsuming (change argState) >+> viCommandActions
                             ]
 
-mapMovements :: ((InsertMode -> InsertMode) -> Command m s t) -> KeyCommand m s t
-mapMovements f = choiceCmd $ map (\(k,g) -> k +> f g) movements
+mapMovements :: Command m s t -> ((InsertMode -> InsertMode) -> Command m s t)
+                    -> KeyCommand m s t
+mapMovements alternate f = choiceCmd $ map (\(k,g) -> k +> f g) movements
+                            ++ map mkCharCommand charMovements
+    where
+        mkCharCommand (k,g) = k +> keyChoiceCmd [
+                                    useChar (f . g)
+                                    , withoutConsuming alternate]
 
 repeatableCommands :: Monad m => KeyCommand (InputCmdT m) (ArgMode CommandMode) InsertMode
 repeatableCommands = choiceCmd 
@@ -122,7 +128,7 @@ repeatableCmdMode = choiceCmd $
                     , simpleChar 'X' +> saveForUndo >|> change (applyArg (withCommandMode deletePrev))
                     , simpleChar 'd' +> deletionCmd
                     , simpleChar 'y' +> yankCommand
-                    , mapMovements (change . applyCmdArg)
+                    , mapMovements (change argState) (change . applyCmdArg)
                     ]
 
 repeatableCmdToIMode :: InputKeyCmd (ArgMode CommandMode) InsertMode
@@ -135,14 +141,14 @@ deletionCmd = keyChoiceCmd $
                     -- from the motion commands.
                     , simpleChar 'e' +> killFromArgMove goToWordDelEnd
                     , simpleChar 'E' +> killFromArgMove goToBigWordDelEnd
-                    , mapMovements killFromArgMove
+                    , mapMovements (change argState) killFromArgMove
                     , withoutConsuming (change argState)
                     ]
 
 yankCommand :: InputCmd (ArgMode CommandMode) CommandMode
 yankCommand = keyChoiceCmd $ 
                 [simpleChar 'y' +> copyFromArgMove (const emptyIM)
-                , mapMovements copyFromArgMove
+                , mapMovements (change argState) copyFromArgMove
                 , withoutConsuming (change argState)
                 ]
 
@@ -161,7 +167,7 @@ deletionToInsertCmd = keyChoiceCmd $
         , simpleChar 'W' +> killFromArgMove goToBigWordDelEnd
         -- TODO: this seems a little hacky...
         , simpleChar '$' +> killFromArgMove moveToEnd >|> change goRight
-        , mapMovements killFromArgMove
+        , mapMovements (change argState >|> viCommandActions) killFromArgMove
         , withoutConsuming (change argState) >+> viCommandActions
         ]
 
@@ -189,6 +195,13 @@ movements = [ (simpleChar 'h', goLeft)
                                 atEnd isWordChar .||. atEnd isOtherChar)
             , (simpleChar 'E', goRightUntil (atEnd isBigWordChar))
             ]
+
+charMovements :: [(Key, Char -> InsertMode -> InsertMode)]
+charMovements = [ (simpleChar 'f', \c -> goRightUntil $ overChar (==c))
+                       , (simpleChar 'F', \c -> goLeftUntil $ overChar (==c))
+                       , (simpleChar 't', \c -> goRightUntil $ beforeChar (==c))
+                       , (simpleChar 'T', \c -> goLeftUntil $ afterChar (==c))
+                       ]
 
 {- 
 From IEEE 1003.1:

@@ -36,6 +36,9 @@ module System.Console.Haskeline.LineState(
                     goLeftUntil,
                     atStart,
                     atEnd,
+                    beforeChar,
+                    afterChar,
+                    overChar,
                     -- ** CommandMode
                     CommandMode(..),
                     deleteChar,
@@ -348,6 +351,16 @@ atStart _ _ = False
 
 atEnd f (IMode _ (y1:y2:_)) = f (baseChar y1) && not (f (baseChar y2))
 atEnd _ _ = False
+
+overChar, beforeChar, afterChar :: (Char -> Bool) -> InsertMode -> Bool
+overChar f (IMode _ (y:_)) = f (baseChar y)
+overChar _ _ = False
+
+beforeChar f (IMode _ (_:y:_)) = f (baseChar y)
+beforeChar _ _ = False
+
+afterChar f (IMode (x:_) _) = f (baseChar x)
+afterChar _ _ = False
 
 goRightUntil, goLeftUntil :: (InsertMode -> Bool) -> InsertMode -> InsertMode
 goRightUntil f = loop . goRight
