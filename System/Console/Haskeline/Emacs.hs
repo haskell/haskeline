@@ -49,11 +49,11 @@ controlActions = choiceCmd
             , simpleKey Home +> change moveToStart
             , simpleKey End +> change moveToEnd
             , choiceCmd
-                [ ctrlChar 'w' +> killFromMove bigWordLeft
-                , metaKey (simpleKey Backspace) +> killFromMove wordLeft
-                , metaChar 'd' +> killFromMove wordRight
-                , ctrlChar 'k' +> killFromMove moveToEnd
-                , simpleKey KillLine +> killFromMove moveToStart
+                [ ctrlChar 'w' +> killFromHelper (SimpleMove bigWordLeft)
+                , metaKey (simpleKey Backspace) +> killFromHelper (SimpleMove wordLeft)
+                , metaChar 'd' +> killFromHelper (SimpleMove wordRight)
+                , ctrlChar 'k' +> killFromHelper (SimpleMove moveToEnd)
+                , simpleKey KillLine +> killFromHelper (SimpleMove moveToStart)
                 ]
             , ctrlChar 'y' +> rotatePaste
             ]

@@ -35,7 +35,7 @@ simpleInsertions = choiceCmd
                    , simpleKey UpKey +> historyBack
                    , simpleKey DownKey +> historyForward
                    , searchHistory
-                   , simpleKey KillLine +> killFromMove moveToStart
+                   , simpleKey KillLine +> killFromHelper (SimpleMove moveToStart)
                    , completionCmd (simpleChar '\t')
                    ]
 
@@ -62,10 +62,8 @@ exitingCommands =  choiceCmd [
                     , simpleChar 'A' +> change (moveToEnd . appendFromCommandMode)
                     , simpleKey End +> change (moveToStart  . insertFromCommandMode)
                     , simpleChar 's' +> change (insertFromCommandMode . deleteChar)
-                    , simpleChar 'S' +> saveForUndo >|> change (const emptyIM)
-                    -- TODO: does this work right? is the append necessary?
-                    , simpleChar 'C' +> killFromMove moveToEnd
-                                            >|> change appendFromCommandMode
+                    , simpleChar 'S' +> killFromHelper killAll
+                    , simpleChar 'C' +> killFromHelper (SimpleMove moveToEnd)
                     , repeatedCommands
                     ]
 
@@ -75,7 +73,7 @@ simpleCmdActions = choiceCmd [ simpleChar '\n'  +> finish
                     , ctrlChar 'd' +> eofIfEmpty
                     , simpleChar 'r'   +> replaceOnce 
                     , simpleChar 'R'   +> replaceLoop
-                    , simpleChar 'D' +> killFromMove moveToEnd
+                    , simpleChar 'D' +> killFromHelper (SimpleMove moveToEnd)
                     , ctrlChar 'l' +> clearScreenCmd
                     , simpleChar 'u' +> commandUndo
                     , ctrlChar 'r' +> commandRedo
@@ -85,7 +83,7 @@ simpleCmdActions = choiceCmd [ simpleChar '\n'  +> finish
                     , simpleChar 'k' +> historyBack >|> change moveToStart
                     , simpleKey DownKey +> historyForward  >|> change moveToStart
                     , simpleKey UpKey +> historyBack >|> change moveToStart
-                    , simpleKey KillLine +> killFromMove moveToStart
+                    , simpleKey KillLine +> killFromHelper (SimpleMove moveToStart)
                     , simpleChar 'p' +> pasteCommand pasteGraphemesAfter
                     , simpleChar 'P' +> pasteCommand pasteGraphemesBefore
                     ]
@@ -106,13 +104,29 @@ repeatedCommands = choiceCmd [argumented, withNoArg repeatableCommands]
                             , withoutConsuming (change argState) >+> viCommandActions
                             ]
 
-mapMovements :: Command m s t -> ((InsertMode -> InsertMode) -> Command m s t)
-                    -> KeyCommand m s t
-mapMovements alternate f = choiceCmd $ map (\(k,g) -> k +> f g) movements
-                            ++ map mkCharCommand charMovements
+pureMovements :: InputKeyCmd (ArgMode CommandMode) CommandMode
+pureMovements = choiceCmd $
+            map mkCharCommand charMovements
+            ++ map mkSimpleCommand movements
     where
-        mkCharCommand (k,g) = k +> keyChoiceCmd [
-                                    useChar (f . g)
+        mkSimpleCommand (k,move) = k +> change (applyCmdArg move)
+        mkCharCommand (k,move) = k +> keyChoiceCmd [
+                                        useChar (change . applyCmdArg . move)
+                                        , withoutConsuming (change argState)
+                                        ]
+
+useMovementsForKill :: Command m s t -> (KillHelper -> Command m s t) -> KeyCommand m s t
+useMovementsForKill alternate useHelper = choiceCmd $
+            map mkCharCommand charMovements
+            ++ specialCases
+            ++ map (\(k,move) -> k +> useHelper (SimpleMove move)) movements
+    where
+        specialCases = [ simpleChar 'e' +> useHelper (SimpleMove goToWordDelEnd)
+                       , simpleChar 'E' +> useHelper (SimpleMove goToBigWordDelEnd)
+                       , simpleChar '%' +> useHelper (GenericKill deleteMatchingBrace)
+                       ]
+        mkCharCommand (k,move) = k +> keyChoiceCmd [
+                                    useChar (useHelper . SimpleMove . move)
                                     , withoutConsuming alternate]
 
 repeatableCommands :: Monad m => KeyCommand (InputCmdT m) (ArgMode CommandMode) InsertMode
@@ -128,7 +142,7 @@ repeatableCmdMode = choiceCmd $
                     , simpleChar 'X' +> saveForUndo >|> change (applyArg (withCommandMode deletePrev))
                     , simpleChar 'd' +> deletionCmd
                     , simpleChar 'y' +> yankCommand
-                    , mapMovements (change argState) (change . applyCmdArg)
+                    , pureMovements
                     ]
 
 repeatableCmdToIMode :: InputKeyCmd (ArgMode CommandMode) InsertMode
@@ -136,19 +150,26 @@ repeatableCmdToIMode = simpleChar 'c' +> deletionToInsertCmd
 
 deletionCmd :: InputCmd (ArgMode CommandMode) CommandMode
 deletionCmd = keyChoiceCmd $
-                    [simpleChar 'd' +> killFromArgMove (const emptyIM)
-                    -- special case end-of-word because the cursor isn't in a useful position
-                    -- from the motion commands.
-                    , simpleChar 'e' +> killFromArgMove goToWordDelEnd
-                    , simpleChar 'E' +> killFromArgMove goToBigWordDelEnd
-                    , mapMovements (change argState) killFromArgMove
+                    [simpleChar 'd' +> killFromArgHelper killAll
+                    , useMovementsForKill (change argState) killFromArgHelper
                     , withoutConsuming (change argState)
                     ]
 
+deletionToInsertCmd :: InputCmd (ArgMode CommandMode) InsertMode
+deletionToInsertCmd = keyChoiceCmd $
+        [simpleChar 'c' +> killFromArgHelper killAll
+        -- vim, for whatever reason, treats cw same as ce and cW same as cE.
+        -- readline does this too, so we should also.
+        , simpleChar 'w' +> killFromArgHelper (SimpleMove goToWordDelEnd)
+        , simpleChar 'W' +> killFromArgHelper (SimpleMove goToBigWordDelEnd)
+        , withoutConsuming (change argState) >+> viCommandActions
+        ]
+
+
 yankCommand :: InputCmd (ArgMode CommandMode) CommandMode
 yankCommand = keyChoiceCmd $ 
-                [simpleChar 'y' +> copyFromArgMove (const emptyIM)
-                , mapMovements (change argState) copyFromArgMove
+                [simpleChar 'y' +> copyFromArgHelper killAll
+                , useMovementsForKill (change argState) copyFromArgHelper
                 , withoutConsuming (change argState)
                 ]
 
@@ -157,19 +178,6 @@ goToWordDelEnd = goRightUntil $ atStart (not . isWordChar)
                                     .||. atStart (not . isOtherChar)
 goToBigWordDelEnd = goRightUntil $ atStart (not . isBigWordChar)
 
-deletionToInsertCmd :: InputCmd (ArgMode CommandMode) InsertMode
-deletionToInsertCmd = keyChoiceCmd $
-        [simpleChar 'c' +> killFromArgMove (const emptyIM)
-        , simpleChar 'e' +> killFromArgMove goToWordDelEnd
-        , simpleChar 'E' +> killFromArgMove goToBigWordDelEnd
-        -- vim,for whatever reason, treats cw same as ce and cW same as cE.
-        , simpleChar 'w' +> killFromArgMove goToWordDelEnd
-        , simpleChar 'W' +> killFromArgMove goToBigWordDelEnd
-        -- TODO: this seems a little hacky...
-        , simpleChar '$' +> killFromArgMove moveToEnd >|> change goRight
-        , mapMovements (change argState >|> viCommandActions) killFromArgMove
-        , withoutConsuming (change argState) >+> viCommandActions
-        ]
 
 movements :: [(Key,InsertMode -> InsertMode)]
 movements = [ (simpleChar 'h', goLeft)
@@ -226,23 +234,44 @@ foreachDigit f ds = choiceCmd $ map digitCmd ds
     where digitCmd d = simpleChar d +> change (f (toDigit d))
           toDigit d = fromEnum d - fromEnum '0'
 
--- TODO: This isn't compatible with deletions!
+------------------
+-- Matching braces
+
 findMatchingBrace :: InsertMode -> InsertMode
-findMatchingBrace im@(IMode _ []) = im
-findMatchingBrace origIM@(IMode _ (y:_))= case baseChar y of
-    '(' -> finder goRightUntil '(' ')' origIM
-    ')' -> finder goLeftUntil ')' '(' origIM
-    '[' -> finder goRightUntil '[' ']' origIM
-    ']' -> finder goLeftUntil ']' '[' origIM
-    '{' -> finder goRightUntil '{' '}' origIM
-    '}' -> finder goLeftUntil '}' '{' origIM
-    _ -> origIM
-  where
-    finder moveUntil c d im = case moveUntil (overChar (==c) .||. overChar (==d)) im of
-        im'@(IMode _ (z:_))
-            | baseChar z==c  -> finder moveUntil c d $ finder moveUntil c d im'
-            | baseChar z==d  -> im'
-        _ -> origIM -- couldn't find match
+findMatchingBrace (IMode xs (y:ys))
+    | Just b <- matchingRightBrace yc,
+      Just ((b':bs),ys') <- scanBraces yc b ys = IMode (bs++[y]++xs) (b':ys')
+    | Just b <- matchingLeftBrace yc,
+      Just (bs,xs') <- scanBraces yc b xs = IMode xs' (bs ++ [y]++ys)
+  where yc = baseChar y
+findMatchingBrace im = im
+
+deleteMatchingBrace :: InsertMode -> ([Grapheme],InsertMode)
+deleteMatchingBrace (IMode xs (y:ys))
+    | Just b <- matchingRightBrace yc,
+      Just (bs,ys') <- scanBraces yc b ys = (y : reverse bs, IMode xs ys')
+    | Just b <- matchingLeftBrace yc,
+      Just (bs,xs') <- scanBraces yc b xs = (bs ++ [y], IMode xs' ys)
+  where yc = baseChar y
+deleteMatchingBrace im = ([],im)
+
+
+scanBraces :: Char -> Char -> [Grapheme] -> Maybe ([Grapheme],[Grapheme])
+scanBraces c d = scanBraces' (1::Int) []
+    where
+        scanBraces' 0 bs xs = Just (bs,xs)
+        scanBraces' _ _ [] = Nothing
+        scanBraces' n bs (x:xs) = scanBraces' m (x:bs) xs
+            where m | baseChar x == c = n+1
+                    | baseChar x == d = n-1
+                    | otherwise = n
+
+matchingRightBrace, matchingLeftBrace :: Char -> Maybe Char 
+matchingRightBrace = flip lookup braceList
+matchingLeftBrace = flip lookup (map (\(c,d) -> (d,c)) braceList)
+
+braceList :: [(Char,Char)]
+braceList = [('(',')'), ('[',']'), ('{','}')]
 
 ---------------
 -- Replace mode
