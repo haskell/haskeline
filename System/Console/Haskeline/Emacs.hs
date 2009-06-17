@@ -46,6 +46,8 @@ controlActions = choiceCmd
             , metaChar 'u' +> change (modifyWord (mapBaseChars toUpper))
             , ctrlChar '_' +> commandUndo
             , ctrlChar 'x' +> try (ctrlChar 'u' +> commandUndo)
+            , ctrlChar 'p' +> historyBack
+            , ctrlChar 'n' +> historyForward
             , simpleKey Home +> change moveToStart
             , simpleKey End +> change moveToEnd
             , choiceCmd
