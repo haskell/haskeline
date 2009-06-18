@@ -10,106 +10,107 @@ import System.Console.Haskeline.Command.Undo
 import System.Console.Haskeline.Key
 import System.Console.Haskeline.Term(Layout(..))
 import System.Console.Haskeline.LineState
-import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Prefs
 import System.Console.Haskeline.Completion
 import System.Console.Haskeline.Monads
 
 import Data.List(transpose, unfoldr)
 
-fullReplacement :: Completion -> String
-fullReplacement c   | isFinished c  = replacement c ++ " "
-                    | otherwise     = replacement c
+useCompletion :: InsertMode -> Completion -> InsertMode
+useCompletion im c = insertString r im
+    where r | isFinished c = replacement c ++ " "
+            | otherwise = replacement c
 
-makeCompletion :: Monad m => InsertMode -> InputCmdT m (InsertMode, [Completion])
-makeCompletion (IMode xs ys) = do
-    f <- asks complete
-    (rest,completions) <- liftCmdT (f (withRev graphemesToString xs, graphemesToString ys))
-    return (IMode (withRev stringToGraphemes rest) ys,completions)
+askIMCompletions :: (InsertMode -> [Completion] -> Command m InsertMode t) -> Command m InsertMode t
+askIMCompletions act = askState $ \(IMode xs ys) -> 
+    askCompletions (withRev graphemesToString xs, graphemesToString ys) $ \rest completions -> 
+        act (IMode (withRev stringToGraphemes rest) ys) completions
   where
     withRev f = reverse . f . reverse
 
 -- | Create a 'Command' for word completion.
-completionCmd :: Monad m => Key -> KeyCommand (InputCmdT m) InsertMode InsertMode
-completionCmd k = k +> saveForUndo >|> askState (\s -> commandM $ do
-    prefs <- ask
-    (rest,completions) <- makeCompletion s
-    return $ case completionType prefs of
-        MenuCompletion -> menuCompletion k s
-                        $ map (\c -> insertString (fullReplacement c) rest) completions
-        ListCompletion -> 
-                pagingCompletion prefs s rest completions k)
+completionCmd :: (MonadState Undo m, MonadReader Prefs m, MonadReader Layout m)
+                => Key -> KeyCommand m InsertMode InsertMode
+completionCmd k = k +> saveForUndo >|> askIMCompletions (\rest cs
+    -> case cs of
+        [] -> effect RingBell
+        [c] -> putState $ useCompletion rest c
+        _ -> presentCompletions k rest cs)
 
-pagingCompletion :: Monad m => Prefs
-                -> InsertMode -> InsertMode -> [Completion] 
-                -> Key -> Command (InputCmdT m) InsertMode InsertMode
-pagingCompletion _ oldIM _ [] _ = effect $ RingBell oldIM
-pagingCompletion _ _ im [newWord] _ 
-        = effect $ Change $ insertString (fullReplacement newWord) im
-pagingCompletion prefs oldIM im completions k
-    | oldIM /= withPartial = effect $ Change withPartial
-    | otherwise = commandM $ do
-        layout <- ask
-        let wordLines = makeLines (map display completions) layout
-        let printingCmd = if completionPaging prefs
-                        then printPage wordLines moreMessage
-                        else printAll wordLines withPartial
-        let pageAction = askFirst (completionPromptLimit prefs) (length completions) 
-                            withPartial printingCmd
-        if listCompletionsImmediately prefs
-            then return pageAction
-            else return $ effect (RingBell withPartial) >|> 
-                        try (k +> pageAction)
+presentCompletions :: (MonadReader Prefs m, MonadReader Layout m) => Key -> InsertMode
+            -> [Completion] -> Command m InsertMode InsertMode
+presentCompletions k rest cs = askState $ \oldIM -> commandM $ do
+    prefs <- ask
+    return $ case completionType prefs of
+        MenuCompletion -> menuCompletion k oldIM (map (useCompletion rest) cs)
+        ListCompletion -> let withPartial = makePartialCompletion rest cs
+                          in putState withPartial
+                                >|> if withPartial /= oldIM
+                                        then continue
+                                        else pagingCompletion k prefs cs
+
+menuCompletion :: Key -> InsertMode -> [InsertMode] -> Command m InsertMode InsertMode
+menuCompletion k oldIM = loop
+    where
+        loop [] = putState oldIM
+        loop (c:cs) = putState c >|> try (k +> loop cs)
+
+makePartialCompletion :: InsertMode -> [Completion] -> InsertMode
+makePartialCompletion im completions = insertString partial im
   where
-    withPartial = insertString partial im
     partial = foldl1 commonPrefix (map replacement completions)
     commonPrefix (c:cs) (d:ds) | c == d = c : commonPrefix cs ds
     commonPrefix _ _ = ""
-    moreMessage = Message withPartial "----More----"
 
-askFirst :: Monad m => Maybe Int -> Int -> InsertMode
-            -> Command (InputCmdT m) InsertMode InsertMode
-            -> Command (InputCmdT m) InsertMode InsertMode
-askFirst mlimit numCompletions im printingCmd = case mlimit of
-    Just limit | limit < numCompletions -> 
-        effect (Change (Message im ("Display all " ++ show numCompletions
-                            ++ " possibilities? (y or n)")))
+pagingCompletion :: MonadReader Layout m => Key -> Prefs
+                -> [Completion] -> Command m InsertMode InsertMode
+pagingCompletion k prefs completions = commandM $ do
+        ls <- asks $ makeLines (map display completions)
+        let pageAction = askFirst prefs (length completions) $ 
+                            if completionPaging prefs
+                                then change moreMessage >|> printPage ls
+                                else effect (PrintLines ls)
+        return $ if listCompletionsImmediately prefs
+            then pageAction
+            else effect RingBell >|> try (k +> pageAction)
+  where
+    moreMessage = flip Message "----More----"
+
+-- TODO: test that all prefs still work OK.
+
+askFirst :: Prefs -> Int -> Command m InsertMode InsertMode
+            -> Command m InsertMode InsertMode
+askFirst prefs n cmd
+    | maybe False (< n) (completionPromptLimit prefs)
+        = change (flip Message $ "Display all " ++ show n
+                            ++ " possibilities? (y or n)")
                     >|> keyChoiceCmd [
-                            simpleChar 'y' +> change messageState >|> printingCmd
+                            simpleChar 'y' +> change messageState >|> cmd
                             , simpleChar 'n' +> change messageState
                             ]
-    _ -> printingCmd
+    | otherwise = cmd
 
-printOneLine :: Monad m => [String] -> Message InsertMode
-                    -> Command (InputCmdT m) s InsertMode
-printOneLine (w:ws) im | not (null ws) =
-            effect (PrintLines [w] im) >|> pagingCommands ws
-printOneLine _ im = effect (Change (messageState im))
+printOneLine :: MonadReader Layout m => [String] -> Command m (Message InsertMode) InsertMode
+printOneLine (w:ws) = effect (PrintLines [w]) >|> pageCompletions ws
+printOneLine _ = change messageState -- shouldn't happen
 
-printPage :: Monad m => [String] -> Message InsertMode
-                    -> Command (InputCmdT m) s InsertMode
-printPage ws im = commandM $ do
+printPage :: MonadReader Layout m => [String] -> Command m (Message InsertMode) InsertMode
+printPage ws = commandM $ do
     layout <- ask
-    return $ case splitAt (height layout - 1) ws of
-        (_,[]) -> effect (PrintLines ws (messageState im))
-        (zs,rest) -> effect (PrintLines zs im)
-                    >|> pagingCommands rest
+    let (zs,rest) = splitAt (height layout - 1) ws
+    return $ effect (PrintLines zs) >|> pageCompletions rest
 
--- TODO: move testing of nullity into here
-pagingCommands :: Monad m => [String] -> Command (InputCmdT m) (Message InsertMode) InsertMode
-pagingCommands ws = keyChoiceCmd [
-                            simpleChar ' ' +> askState (printPage ws)
+pageCompletions :: MonadReader Layout m => [String] -> Command m (Message InsertMode) InsertMode
+pageCompletions [] = change messageState
+pageCompletions ws = keyChoiceCmd [
+                            simpleChar ' ' +> printPage ws
                             ,simpleChar 'q' +> change messageState
-                            ,simpleChar '\n' +> askState (printOneLine ws)
-                            ,simpleKey DownKey +> askState (printOneLine ws)
+                            ,simpleChar '\n' +> printOneLine ws
+                            ,simpleKey DownKey +> printOneLine ws
                             ]
 
-
-printAll :: Monad m => [String] -> InsertMode 
-            -> Command (InputCmdT m) InsertMode InsertMode
-printAll ws im = effect $ PrintLines ws im
-
-
+-----------------------------------------------
+-- Splitting the list of completions into lines for paging.
 makeLines :: [String] -> Layout -> [String]
 makeLines ws layout = let
     minColPad = 2
@@ -154,12 +155,4 @@ ceilDiv :: Integral a => a -> a -> a
 ceilDiv m n | m `rem` n == 0    =  m `div` n
             | otherwise         =  m `div` n + 1
 
-menuCompletion :: forall m . Monad m => Key -> InsertMode -> [InsertMode] 
-                    -> Command m InsertMode InsertMode
-menuCompletion _ oldState [] = effect (RingBell oldState)
-menuCompletion _ _ [c] = effect (Change c)
-menuCompletion k oldState (c:cs) = effect (Change c) >|> loop cs
-    where
-        loop [] = try $ k +> change (const oldState)
-        loop (d:ds) = try $ k +> change (const d) >|> loop ds
 

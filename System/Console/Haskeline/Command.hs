@@ -18,6 +18,7 @@ module System.Console.Haskeline.Command(
                         failCmd,
                         effect,
                         askState,
+                        putState,
                         commandM,
                         simpleCommand,
                         charCommand,
@@ -29,18 +30,19 @@ module System.Console.Haskeline.Command(
                         choiceCmd,
                         keyChoiceCmd,
                         doBefore,
+                        askCompletions
                         ) where
 
 import Data.Char(isPrint)
 import Control.Monad(mplus)
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Key
+import System.Console.Haskeline.Completion
 
 
-data Effect s = Change {effectState :: s} 
-              | PrintLines {linesToPrint :: [String], effectState :: s}
-              | Redraw {shouldClearScreen :: Bool, effectState :: s}
-              | RingBell {effectState :: s}
+data Effect = PrintLines {linesToPrint :: [String]}
+              | Redraw {shouldClearScreen :: Bool}
+              | RingBell
 
 data KeyMap m s = KeyMap {lookupKM :: Key -> Maybe (KeyConsumed (CmdStream m s))}
 
@@ -48,9 +50,12 @@ data KeyConsumed a = NotConsumed a | Consumed a
 
 data CmdStream m s = GetKey (KeyMap m s)
                    | AskState (s -> CmdStream m s)
-                   | forall t . LineState t => PutState (Effect t) (CmdStream m t)
+                   | forall t . LineState t => PutState t (CmdStream m t)
+                   | DoEffect Effect (CmdStream m s)
                    | StreamM (m (CmdStream m s))
                    | Finish (Maybe String)
+                   | AskCompletions (String,String) (String -> [Completion] -> CmdStream m s)
+                   -- TODO: also AskPrefs?
 
 newtype KeyCommand m s t = KeyCommand (CmdStream m t -> KeyMap m s)
 
@@ -109,10 +114,10 @@ infixr 6 +>
 (+>) :: Key -> Command m s t -> KeyCommand m s t
 k +> f = useKey k >+> f
 
-finish :: forall s m t . (Result s, Monad m) => Command m s t
+finish :: Result s => Command m s t
 finish = Command $ \_-> AskState $ \s -> Finish $ Just $ toResult s
 
-failCmd :: forall s m t . (LineState s, Monad m) => Command m s t
+failCmd :: Command m s t
 failCmd = Command $ \_-> Finish Nothing
 
 askState :: (s -> Command m s t) -> Command m s t
@@ -124,27 +129,32 @@ commandM f = Command $ \next -> StreamM $ do
                 Command cmd <- f
                 return (cmd next)
 
-simpleCommand :: (LineState t, Monad m) => (s -> m (Effect t)) 
-                    -> Command m s t
-simpleCommand f = Command $ \next -> AskState $ \s -> StreamM $ do
-                        t <- f s
-                        return $ PutState t next
+simpleCommand :: (LineState s, Monad m) => (s -> m (Either Effect s)) 
+                    -> Command m s s
+simpleCommand f = askState $ \s -> commandM $ do
+    et <- f s
+    return $ case et of
+        Left e -> effect e
+        Right t -> putState t
 
-charCommand :: (LineState t, Monad m) => (Char -> s -> m (Effect t))
-                    -> KeyCommand m s t
+charCommand :: (LineState s, Monad m) => (Char -> s -> m (Either Effect s))
+                    -> KeyCommand m s s
 charCommand f = useChar $ \c -> simpleCommand (f c)
 
-effect :: LineState t => Effect t -> Command m s t
-effect t = Command $ \next -> PutState t next
+effect :: Effect -> Command m s s
+effect = Command . DoEffect
 
-change :: (LineState t, Monad m) => (s -> t) -> Command m s t
-change f = askState $ effect . Change . f
+putState :: LineState t => t -> Command m s t
+putState t = Command (PutState t)
+
+change :: LineState t => (s -> t) -> Command m s t
+change f = askState $ putState . f
 
 changeFromChar :: (LineState t, Monad m) => (Char -> s -> t) -> KeyCommand m s t
-changeFromChar f = charCommand (\c s -> return $ Change (f c s))
+changeFromChar f = useChar $ \c -> change (f c)
 
 clearScreenCmd :: LineState s => Command m s s
-clearScreenCmd = askState $ effect . Redraw True
+clearScreenCmd = effect $ Redraw True
 
 doBefore :: Command m s t -> KeyCommand m t u -> KeyCommand m s u
 doBefore (Command cmd) (KeyCommand kcmd) = KeyCommand $ \next -> case kcmd next of
@@ -153,3 +163,7 @@ doBefore (Command cmd) (KeyCommand kcmd) = KeyCommand $ \next -> case kcmd next 
                     Just (NotConsumed f) -> Just $ NotConsumed $ cmd f
                     Just (Consumed f) -> Just $ Consumed $ cmd f
          
+askCompletions :: (String,String) -> (String -> [Completion] -> Command m s t) -> Command m s t
+askCompletions s use = Command $ \next -> AskCompletions s
+                    $ \partial cs -> case use partial cs of
+                                        Command act -> act next

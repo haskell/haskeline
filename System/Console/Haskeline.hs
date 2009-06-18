@@ -148,12 +148,16 @@ getInputCmdLine tops prefix = do
     emode <- asks (\prefs -> case editMode prefs of
                     Vi -> viActions
                     Emacs -> emacsCommands)
+    -- get the completion function
+    settings <- ask
+    let runCompletion = liftCmdT . complete settings
     -- Run the main event processing loop
     result <- runInputCmdT tops $ runTerm tops
                     $ \getEvent -> do
                             let ls = emptyIM
                             drawLine prefix ls 
-                            repeatTillFinish tops getEvent prefix ls emode
+                            repeatTillFinish tops getEvent runCompletion
+                                    prefix ls emode
     maybeAddHistory result
     return result
 
@@ -167,9 +171,10 @@ maybeAddHistory result = do
 
 repeatTillFinish :: forall m s d 
     . (MonadTrans d, Term (d m), LineState s, MonadReader Prefs m)
-            => TermOps -> d m Event -> String -> s -> KeyMap m s 
+            => TermOps -> d m Event -> CompletionFunc m
+            -> String -> s -> KeyMap m s 
             -> d m (Maybe String)
-repeatTillFinish tops getEvent prefix = loopKeys []
+repeatTillFinish tops getEvent runCompletion prefix = loopKeys []
     where 
         loopKeys :: forall t . LineState t
                     => [Key] -> t -> KeyMap m t -> d m (Maybe String)
@@ -189,11 +194,15 @@ repeatTillFinish tops getEvent prefix = loopKeys []
                     => [Key] -> t -> CmdStream m t -> d m (Maybe String)
         loopCmd ks s (GetKey next) = loopKeys ks s next
         loopCmd ks s (AskState next) = loopCmd ks s (next s)
-        loopCmd ks s (PutState t next) = do
-                                                drawEffect prefix s t
-                                                loopCmd ks (effectState t) next
+        loopCmd ks s (PutState t next) = drawLineStateDiff prefix s t
+                                            >> loopCmd ks t next
+        loopCmd ks s (DoEffect e next) = drawEffect prefix s e
+                                        >> loopCmd ks s next
         loopCmd ks s (StreamM nextM) = lift nextM >>= loopCmd ks s
         loopCmd _ s (Finish result) = movePast prefix s >> return result
+        loopCmd ks s (AskCompletions ls f) = do
+            (partial,cs) <- lift (runCompletion ls)
+            loopCmd ks s (f partial cs)
 
 simpleFileLoop :: MonadIO m => String -> RunTerm -> m (Maybe String)
 simpleFileLoop prefix rterm = liftIO $ do
@@ -210,20 +219,19 @@ simpleFileLoop prefix rterm = liftIO $ do
                         _ -> B.getLine
             fmap Just $ decodeForTerm rterm line
 
-drawEffect :: (LineState s, LineState t, Term (d m), 
+drawEffect :: (LineState s, Term (d m), 
                 MonadTrans d, MonadReader Prefs m) 
-    => String -> s -> Effect t -> d m ()
-drawEffect prefix s (Redraw shouldClear t) = if shouldClear
-    then clearLayout >> drawLine prefix t
-    else clearLine prefix s >> drawLine prefix t
-drawEffect prefix s (Change t) = drawLineStateDiff prefix s t
-drawEffect prefix s (PrintLines ls t) = do
+    => String -> s -> Effect -> d m ()
+drawEffect prefix s (Redraw shouldClear) = if shouldClear
+    then clearLayout >> drawLine prefix s
+    else clearLine prefix s >> drawLine prefix s
+drawEffect prefix s (PrintLines ls) = do
     if isTemporary s
         then clearLine prefix s
         else movePast prefix s
     printLines ls
-    drawLine prefix t
-drawEffect prefix s (RingBell t) = drawLineStateDiff prefix s t >> actBell
+    drawLine prefix s
+drawEffect _ _ RingBell = actBell
 
 drawLine :: (LineState s, Term m) => String -> s -> m ()
 drawLine prefix s = drawLineStateDiff prefix Cleared s

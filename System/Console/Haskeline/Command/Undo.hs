@@ -63,6 +63,6 @@ saveForUndo = askState $ \s -> commandM $ do
     return continue
 
 commandUndo, commandRedo :: (MonadState Undo m, Save s) => Command m s s
-commandUndo = simpleCommand $ liftM Change . update . undoPast
-commandRedo = simpleCommand $ liftM Change . update . redoFuture
+commandUndo = simpleCommand $ liftM Right . update . undoPast
+commandRedo = simpleCommand $ liftM Right . update . redoFuture
 

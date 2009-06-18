@@ -37,10 +37,10 @@ pasteCommand :: (Save s, MonadState KillRing m, MonadState Undo m)
 pasteCommand use = simpleCommand $ \s -> do
     ms <- liftM peek get
     case ms of
-        Nothing -> return $ Change s
+        Nothing -> return $ Right s
         Just p -> do
             modify (saveToUndo s)
-            return $ Change $ use p s
+            return $ Right $ use p s
 
 deleteFromDiff' :: InsertMode -> InsertMode -> ([Grapheme],InsertMode)
 deleteFromDiff' (IMode xs1 ys1) (IMode xs2 ys2)
@@ -52,24 +52,24 @@ deleteFromDiff' (IMode xs1 ys1) (IMode xs2 ys2)
 killFromHelper :: (MonadState KillRing m, MonadState Undo m,
                         Save s, Save t)
                 => KillHelper -> Command m s t
-killFromHelper helper = saveForUndo >|> simpleCommand (\oldS -> do
+killFromHelper helper = saveForUndo >|> askState (\oldS -> commandM $ do
     let (gs,newIM) = applyHelper helper (save oldS)
     modify (push gs)
-    return (Change (restore newIM)))
+    return (putState (restore newIM)))
 
 killFromArgHelper :: (MonadState KillRing m, MonadState Undo m, Save s, Save t)
                 => KillHelper -> Command m (ArgMode s) t
-killFromArgHelper helper = saveForUndo >|> simpleCommand (\oldS -> do
+killFromArgHelper helper = saveForUndo >|> askState (\oldS -> commandM $ do
     let (gs,newIM) = applyArgHelper helper (fmap save oldS)
     modify (push gs)
-    return (Change (restore newIM)))
+    return (putState (restore newIM)))
 
 copyFromArgHelper :: (MonadState KillRing m, Save s)
                 => KillHelper -> Command m (ArgMode s) s
-copyFromArgHelper helper = simpleCommand $ \oldS -> do
+copyFromArgHelper helper = askState$ \oldS -> commandM $ do
     let (gs,_) = applyArgHelper helper (fmap save oldS)
     modify (push gs)
-    return $ Change $ argState oldS
+    return $ putState $ argState oldS
 
 
 data KillHelper = SimpleMove (InsertMode -> InsertMode)

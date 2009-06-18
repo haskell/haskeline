@@ -48,8 +48,8 @@ historyBack = simpleCommand $ histUpdate prevHistory
 historyForward = simpleCommand $ reverseHist . histUpdate prevHistory
 
 histUpdate :: MonadState HistLog m => (s -> HistLog -> (t,HistLog))
-                        -> s -> m (Effect t)
-histUpdate f = liftM Change . update . f
+                        -> s -> m (Either Effect t)
+histUpdate f = liftM Right . update . f
 
 reverseHist :: MonadState HistLog m => m b -> m b
 reverseHist f = do
@@ -118,7 +118,7 @@ searchBackwards useCurrent s h = let
     hists' = if useCurrent then (toResult s,h):hists else hists
     in searchHistories (direction s) text hists'
 
-doSearch :: MonadState HistLog m => Bool -> SearchMode -> m (Effect SearchMode)
+doSearch :: MonadState HistLog m => Bool -> SearchMode -> m (Either Effect SearchMode)
 doSearch useCurrent sm = case direction sm of
     Reverse -> searchHist
     Forward -> reverseHist searchHist
@@ -126,8 +126,8 @@ doSearch useCurrent sm = case direction sm of
     searchHist = do
         hist <- get
         case searchBackwards useCurrent sm hist of
-            Just (sm',hist') -> put hist' >> return (Change sm')
-            Nothing -> return (RingBell sm)
+            Just (sm',hist') -> put hist' >> return (Right sm')
+            Nothing -> return $ Left RingBell
 
 searchHistory :: MonadState HistLog m => KeyCommand m InsertMode InsertMode
 searchHistory = choiceCmd [
