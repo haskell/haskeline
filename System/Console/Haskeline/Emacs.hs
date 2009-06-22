@@ -15,13 +15,26 @@ import Data.Char
 type InputCmd s t = forall m . Monad m => Command (InputCmdT m) s t
 type InputKeyCmd s t = forall m . Monad m => KeyCommand (InputCmdT m) s t
 
-emacsCommands :: Monad m => KeyMap (InputCmdT m) InsertMode
-emacsCommands = runCommand $ choiceCmd [simpleActions, controlActions]
+emacsCommands :: InputKeyCmd InsertMode (Maybe String)
+emacsCommands = choiceCmd [
+                    choiceCmd [simpleActions, controlActions] >+> 
+                        keyCommand emacsCommands
+                    , enders]
+
+enders :: InputKeyCmd InsertMode (Maybe String)
+enders = choiceCmd [simpleChar '\n' +> finish, eotKey +> deleteCharOrEOF]
+    where
+        eotKey = ctrlChar 'd'
+        deleteCharOrEOF s
+            | s == emptyIM  = return Nothing
+            | otherwise = change deleteNext s >> justDelete s
+        justDelete = keyChoiceCmd [eotKey +> change deleteNext >|> justDelete
+                            , emacsCommands]
+
 
 simpleActions, controlActions :: InputKeyCmd InsertMode InsertMode
 simpleActions = choiceCmd 
-            [ simpleChar '\n' +> finish
-            , simpleKey LeftKey +> change goLeft
+            [ simpleKey LeftKey +> change goLeft
             , simpleKey RightKey +> change goRight
             , simpleKey Backspace +> change deletePrev
             , simpleKey Delete +> change deleteNext 
@@ -37,7 +50,6 @@ controlActions = choiceCmd
             , ctrlChar 'e' +> change moveToEnd
             , ctrlChar 'b' +> change goLeft
             , ctrlChar 'f' +> change goRight
-            , deleteCharOrEOF (ctrlChar 'd')
             , ctrlChar 'l' +> clearScreenCmd
             , metaChar 'f' +> change wordRight
             , metaChar 'b' +> change wordLeft
@@ -61,21 +73,13 @@ controlActions = choiceCmd
             ]
 
 rotatePaste :: InputCmd InsertMode InsertMode
-rotatePaste = askState $ \im -> commandM $ do
-                kr <- get
-                return $ loop im kr
+rotatePaste im = get >>= loop
   where
-    loop im kr = case peek kr of
-                    Nothing -> continue
-                    Just s -> change (const (insertGraphemes s im))
-                                >|> try (metaChar 'y' +> loop im (rotate kr))
+    loop kr = case peek kr of
+                    Nothing -> return im
+                    Just s -> setState (insertGraphemes s im)
+                            >>= try (metaChar 'y' +> \_ -> loop (rotate kr))
 
-deleteCharOrEOF :: Key -> InputKeyCmd InsertMode InsertMode
-deleteCharOrEOF k = k +> askState (\s -> if s == emptyIM
-                                            then failCmd
-                                            else change deleteNext >|> justDelete) 
-    where
-        justDelete = try $ k +> change deleteNext >|> justDelete
 
 wordRight, wordLeft, bigWordLeft :: InsertMode -> InsertMode
 wordRight = goRightUntil (atStart (not . isAlphaNum))

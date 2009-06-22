@@ -175,10 +175,11 @@ lookupChars (TreeMap tm) (c:cs) = case Map.lookup c tm of
 
 -----------------------------
 
-withPosixGetEvent :: (MonadTrans t, MonadIO m, MonadException (t m), MonadReader Prefs m) 
-                        => Chan Event -> Encoders -> [(String,Key)] -> (t m Event -> t m a) -> t m a
-withPosixGetEvent eventChan enc termKeys f = do
-    baseMap <- lift $ getKeySequences termKeys
+withPosixGetEvent :: (MonadException m, MonadReader Prefs m) 
+        => Chan Event -> Handle -> Encoders -> [(String,Key)]
+                -> (m Event -> m a) -> m a
+withPosixGetEvent eventChan h enc termKeys f = wrapTerminalOps h $ do
+    baseMap <- getKeySequences termKeys
     withWindowHandler eventChan
         $ f $ liftIO $ getEvent enc baseMap eventChan
 
@@ -258,7 +259,7 @@ posixRunTerm tOps = do
         Just h -> return fileRT {
                     closeTerm = closeTerm fileRT >> hClose h,
                     -- NOTE: could also alloc Encoders once for each call to wrapRunTerm
-                    termOps = Just (wrapRunTerm (wrapTerminalOps h) (tOps encoders h))
+                    termOps = Just $ tOps encoders h
                 }
 
 type PosixT m = ReaderT Encoders (ReaderT Handle m)
@@ -301,10 +302,6 @@ wrapTerminalOps outH =
     bracketSet (hGetBuffering stdin) (hSetBuffering stdin) NoBuffering
     . bracketSet (hGetBuffering outH) (hSetBuffering outH) LineBuffering
     . bracketSet (hGetEcho stdin) (hSetEcho stdin) False
-
-wrapRunTerm :: (forall m a . MonadException m => m a -> m a) -> TermOps -> TermOps
-wrapRunTerm wrap tops = tops {runTerm = \getE -> wrap (runTerm tops getE)
-                                }
 
 bracketSet :: (Eq a, MonadException m) => IO a -> (a -> IO ()) -> a -> m b -> m b
 bracketSet getState set newState f = bracket (liftIO getState)

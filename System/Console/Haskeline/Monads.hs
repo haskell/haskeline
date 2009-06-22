@@ -22,19 +22,15 @@ import qualified Control.Monad.State as State
 
 class Monad m => MonadReader r m where
     ask :: m r
-    local :: r -> m a -> m a
 
 instance Monad m => MonadReader r (ReaderT r m) where
     ask = Reader.ask
-    local r = Reader.local (const r)
 
-instance MonadReader r m => MonadReader r (ReaderT t m) where
+instance Monad m => MonadReader s (StateT s m) where
+    ask = get
+
+instance (MonadReader r m, MonadTrans t, Monad (t m)) => MonadReader r (t m) where
     ask = lift ask
-    local r = mapReaderT (local r)
-    
-instance MonadReader r m => MonadReader r (StateT s m) where
-    ask = lift ask
-    local r = mapStateT (local r)
 
 asks :: MonadReader r m => (r -> a) -> m a
 asks f = liftM f ask
@@ -47,13 +43,10 @@ instance Monad m => MonadState s (StateT s m) where
     get = State.get
     put = State.put
 
-instance MonadState s m => MonadState s (StateT t m) where
+instance (MonadState s m, MonadTrans t, Monad (t m)) => MonadState s (t m) where
     get = lift get
     put = lift . put
 
-instance MonadState s m => MonadState s (ReaderT r m) where
-    get = lift get
-    put = lift . put
 
 modify :: MonadState s m => (s -> s) -> m ()
 modify f = get >>= put . f

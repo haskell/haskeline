@@ -43,11 +43,12 @@ Library
     Build-depends:  filepath==1.1.*, mtl==1.1.*,
                     utf8-string==0.3.* && >=0.3.1.1,
                     extensible-exceptions==0.1.* && >=0.1.1.0
-    Extensions:     ForeignFunctionInterface, RankNTypes, FlexibleInstances,
+    Extensions:     ForeignFunctionInterface, Rank2Types, FlexibleInstances,
                 TypeSynonymInstances
                 FlexibleContexts, ExistentialQuantification
                 ScopedTypeVariables, GeneralizedNewtypeDeriving
                 MultiParamTypeClasses, OverlappingInstances
+                UndecidableInstances
                 PatternSignatures, CPP, DeriveDataTypeable,
                 PatternGuards
     Exposed-Modules:
@@ -70,6 +71,7 @@ Library
                 System.Console.Haskeline.LineState
                 System.Console.Haskeline.Monads
                 System.Console.Haskeline.Prefs
+                System.Console.Haskeline.RunCommand
                 System.Console.Haskeline.Term
                 System.Console.Haskeline.Command.Undo
                 System.Console.Haskeline.Vi

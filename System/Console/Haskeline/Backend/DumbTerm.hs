@@ -24,9 +24,7 @@ newtype DumbTerm m a = DumbTerm {unDumbTerm :: StateT Window (PosixT m) a}
                           MonadState Window,
                           MonadReader Handle, MonadReader Encoders)
 
-instance MonadReader Layout m => MonadReader Layout (DumbTerm m) where
-    ask = lift ask
-    local r = DumbTerm . local r . unDumbTerm
+type DumbTermM a = forall m . (MonadIO m, MonadReader Layout m) => DumbTerm m a
 
 instance MonadTrans DumbTerm where
     lift = DumbTerm . lift . lift . lift
@@ -36,14 +34,15 @@ runDumbTerm = do
     ch <- newChan
     posixRunTerm $ \enc h ->
                 TermOps {
-                        getLayout = tryGetLayouts (posixLayouts h),
-                        runTerm = \f -> 
-                                runPosixT enc h $ evalStateT' initWindow
-                                $ unDumbTerm
-                                $ withPosixGetEvent ch enc [] f
+                        getLayout = tryGetLayouts (posixLayouts h)
+                        , withGetEvent = withPosixGetEvent ch h enc []
+                        , runTerm = \(RunTermType f) -> 
+                                    runPosixT enc h
+                                    $ evalStateT' initWindow
+                                    $ unDumbTerm f
                         }
                                 
-instance (MonadException m, MonadLayout m) => Term (DumbTerm m) where
+instance (MonadException m, MonadReader Layout m) => Term (DumbTerm m) where
     reposition _ s = refitLine s
     drawLineDiff = drawLineDiff'
     
@@ -69,16 +68,16 @@ backs n = replicate n '\b'
 spaces n = replicate n ' '
 
 
-clearLayoutD :: MonadLayout m => DumbTerm m ()
+clearLayoutD :: DumbTermM ()
 clearLayoutD = do
     w <- maxWidth
     printText (cr ++ spaces w ++ cr)
 
 -- Don't want to print in the last column, as that may wrap to the next line.
-maxWidth :: MonadLayout m => DumbTerm m Int
+maxWidth :: DumbTermM Int
 maxWidth = asks (\lay -> width lay - 1)
 
-drawLineDiff' :: MonadLayout m => LineChars -> LineChars -> DumbTerm m ()
+drawLineDiff' :: LineChars -> LineChars -> DumbTermM ()
 drawLineDiff' (xs1,ys1) (xs2,ys2) = do
     Window {pos=p} <- get
     w <- maxWidth
@@ -102,7 +101,7 @@ drawLineDiff' (xs1,ys1) (xs2,ys2) = do
                         ++ graphemesToString (xs2' ++ ys2') ++ clearDeadText extraLength
                         ++ backs (length ys2')
 
-refitLine :: MonadLayout m => ([Grapheme],[Grapheme]) -> DumbTerm m ()
+refitLine :: ([Grapheme],[Grapheme]) -> DumbTermM ()
 refitLine (xs,ys) = do
     w <- maxWidth
     let xs' = dropFrames w xs

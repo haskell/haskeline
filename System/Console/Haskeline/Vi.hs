@@ -1,6 +1,7 @@
 module System.Console.Haskeline.Vi where
 
 import System.Console.Haskeline.Command
+import System.Console.Haskeline.Monads
 import System.Console.Haskeline.Key
 import System.Console.Haskeline.Command.Completion
 import System.Console.Haskeline.Command.History
@@ -11,19 +12,35 @@ import System.Console.Haskeline.InputT
 
 import Data.Char(isAlphaNum,isSpace)
 
-type InputCmd s t = forall m . Monad m => Command (InputCmdT m) s t
-type InputKeyCmd s t = forall m . Monad m => KeyCommand (InputCmdT m) s t
+type EitherMode = Either CommandMode InsertMode
 
-viActions :: Monad m => KeyMap (InputCmdT m) InsertMode
-viActions = runCommand insertionCommands
+data ViState m = ViState {
+                lastCommand :: Command (ViT m) CommandMode EitherMode
+                }
 
-insertionCommands :: InputKeyCmd InsertMode InsertMode
-insertionCommands = choiceCmd [startCommand, simpleInsertions]
-                            
+emptyViState :: Monad m => ViState m
+emptyViState = ViState {lastCommand = return . Left}
+
+type ViT m = StateT (ViState m) (InputCmdT m)
+
+type InputCmd s t = forall m . Monad m => Command (ViT m) s t
+type InputKeyCmd s t = forall m . Monad m => KeyCommand (ViT m) s t
+
+viKeyCommands :: InputKeyCmd InsertMode (Maybe String)
+viKeyCommands = choiceCmd [
+                simpleChar '\n' +> finish
+                , ctrlChar 'd' +> eofIfEmpty viCommands
+                , simpleInsertions >+> viCommands
+                , simpleChar '\ESC' +> change enterCommandMode
+                    >|> viCommandActions
+                ]
+
+viCommands :: InputCmd InsertMode (Maybe String)
+viCommands = keyCommand viKeyCommands
+
 simpleInsertions :: InputKeyCmd InsertMode InsertMode
 simpleInsertions = choiceCmd
-                [ simpleChar '\n' +> finish
-                   , simpleKey LeftKey +> change goLeft 
+                [  simpleKey LeftKey +> change goLeft 
                    , simpleKey RightKey +> change goRight
                    , simpleKey Backspace +> change deletePrev 
                    , simpleKey Delete +> change deleteNext 
@@ -31,7 +48,6 @@ simpleInsertions = choiceCmd
                    , simpleKey End +> change moveToEnd
                    , changeFromChar insertChar
                    , ctrlChar 'l' +> clearScreenCmd
-                   , ctrlChar 'd' +> eofIfEmpty
                    , simpleKey UpKey +> historyBack
                    , simpleKey DownKey +> historyForward
                    , searchHistory
@@ -41,17 +57,24 @@ simpleInsertions = choiceCmd
 
 -- If we receive a ^D and the line is empty, return Nothing
 -- otherwise, ignore it.
-eofIfEmpty :: Save s => InputCmd s s
-eofIfEmpty = askState $ \s -> if save s == emptyIM
-                    then failCmd
-                    else continue
+eofIfEmpty :: (Monad m, Save s) => Command m s (Maybe String)
+                        -> Command m s (Maybe String)
+eofIfEmpty next s
+    | save s == emptyIM = return Nothing
+    | otherwise = next s
 
-startCommand :: InputKeyCmd InsertMode InsertMode
-startCommand = simpleChar '\ESC' +> change enterCommandMode
-                    >|> viCommandActions
-
-viCommandActions :: InputCmd CommandMode InsertMode
-viCommandActions = keyCommand $ simpleCmdActions `loopUntil` exitingCommands
+viCommandActions :: InputCmd CommandMode (Maybe String)
+viCommandActions = keyChoiceCmd [
+                    simpleChar '\n' +> finish
+                    , ctrlChar 'd' +> eofIfEmpty viCommandActions
+                    , simpleCmdActions >+> viCommandActions
+                    , exitingCommands >+> viCommands
+                    , repeatedCommands >+> chooseEitherMode
+                    ]
+    where
+        chooseEitherMode :: InputCmd EitherMode (Maybe String)
+        chooseEitherMode (Left cm) = viCommandActions cm
+        chooseEitherMode (Right im) = viCommands im
 
 exitingCommands :: InputKeyCmd CommandMode InsertMode
 exitingCommands =  choiceCmd [ 
@@ -64,20 +87,17 @@ exitingCommands =  choiceCmd [
                     , simpleChar 's' +> change (insertFromCommandMode . deleteChar)
                     , simpleChar 'S' +> killFromHelper killAll
                     , simpleChar 'C' +> killFromHelper (SimpleMove moveToEnd)
-                    , repeatedCommands
                     ]
 
 simpleCmdActions :: InputKeyCmd CommandMode CommandMode
-simpleCmdActions = choiceCmd [ simpleChar '\n'  +> finish
-                    , simpleChar '\ESC' +> change id -- helps break out of loops
-                    , ctrlChar 'd' +> eofIfEmpty
+simpleCmdActions = choiceCmd [ 
+                    simpleChar '\ESC' +> change id -- helps break out of loops
                     , simpleChar 'r'   +> replaceOnce 
                     , simpleChar 'R'   +> replaceLoop
                     , simpleChar 'D' +> killFromHelper (SimpleMove moveToEnd)
                     , ctrlChar 'l' +> clearScreenCmd
                     , simpleChar 'u' +> commandUndo
                     , ctrlChar 'r' +> commandRedo
-                    , simpleChar '.' +> commandRedo
                     -- vi-mode quirk: history is put at the start of the line.
                     , simpleChar 'j' +> historyForward >|> change moveToStart
                     , simpleChar 'k' +> historyBack >|> change moveToStart
@@ -86,12 +106,26 @@ simpleCmdActions = choiceCmd [ simpleChar '\n'  +> finish
                     , simpleKey KillLine +> killFromHelper (SimpleMove moveToStart)
                     , simpleChar 'p' +> pasteCommand pasteGraphemesAfter
                     , simpleChar 'P' +> pasteCommand pasteGraphemesBefore
+                    -- , simpleChar '.' +> useLastCommand
                     ]
+
+{-
+useLastCommand :: Monad m => Command (ViT m) CommandMode CommandMode
+useLastCommand = commandM $ do
+    lastCmd <- liftM lastCommand get
+    return $ case lastCmd of
+        Nothing -> continue
+        Just cmd -> spliceStream cmd
+
+storeLastCommand :: Monad m => KeyCommand (ViT m) CommandMode CommandMode
+                            -> KeyCommand (ViT m) CommandMode CommandMode
+storeLastCommand = storeStream $ \stream -> put ViState {lastCommand = Just stream}
+-}
 
 replaceOnce :: InputCmd CommandMode CommandMode
 replaceOnce = try $ changeFromChar replaceChar
 
-repeatedCommands :: InputKeyCmd CommandMode InsertMode
+repeatedCommands :: InputKeyCmd CommandMode EitherMode
 repeatedCommands = choiceCmd [argumented, withNoArg repeatableCommands]
     where
         withNoArg = doBefore (change (hiddenArg 1))
@@ -101,7 +135,7 @@ repeatedCommands = choiceCmd [argumented, withNoArg repeatableCommands]
         loop = keyChoiceCmd [addDigit >+> loop
                             , repeatableCommands
                             -- if no match, bail out.
-                            , withoutConsuming (change argState) >+> viCommandActions
+                            , withoutConsuming (change argState) >+> return . Left
                             ]
 
 pureMovements :: InputKeyCmd (ArgMode CommandMode) CommandMode
@@ -129,12 +163,13 @@ useMovementsForKill alternate useHelper = choiceCmd $
                                     useChar (useHelper . SimpleMove . move)
                                     , withoutConsuming alternate]
 
-repeatableCommands :: Monad m => KeyCommand (InputCmdT m) (ArgMode CommandMode) InsertMode
-repeatableCommands = choiceCmd 
+
+repeatableCommands :: InputKeyCmd (ArgMode CommandMode) EitherMode
+repeatableCommands = choiceCmd $
                         [ repeatableCmdToIMode
-                        , repeatableCmdMode >+> viCommandActions
+                        , repeatableCmdMode >+> return . Left
                         ]
-                
+
 
 repeatableCmdMode :: InputKeyCmd (ArgMode CommandMode) CommandMode
 repeatableCmdMode = choiceCmd $ 
@@ -145,7 +180,7 @@ repeatableCmdMode = choiceCmd $
                     , pureMovements
                     ]
 
-repeatableCmdToIMode :: InputKeyCmd (ArgMode CommandMode) InsertMode
+repeatableCmdToIMode :: InputKeyCmd (ArgMode CommandMode) EitherMode
 repeatableCmdToIMode = simpleChar 'c' +> deletionToInsertCmd
 
 deletionCmd :: InputCmd (ArgMode CommandMode) CommandMode
@@ -155,14 +190,17 @@ deletionCmd = keyChoiceCmd $
                     , withoutConsuming (change argState)
                     ]
 
-deletionToInsertCmd :: InputCmd (ArgMode CommandMode) InsertMode
+deletionToInsertCmd :: InputCmd (ArgMode CommandMode) EitherMode
 deletionToInsertCmd = keyChoiceCmd $
         [simpleChar 'c' +> killFromArgHelper killAll
+                            >|> return . Right
         -- vim, for whatever reason, treats cw same as ce and cW same as cE.
         -- readline does this too, so we should also.
         , simpleChar 'w' +> killFromArgHelper (SimpleMove goToWordDelEnd)
+                                >|> return . Right
         , simpleChar 'W' +> killFromArgHelper (SimpleMove goToBigWordDelEnd)
-        , withoutConsuming (change argState) >+> viCommandActions
+                                >|> return . Right
+        , withoutConsuming (return . Left . argState)
         ]
 
 

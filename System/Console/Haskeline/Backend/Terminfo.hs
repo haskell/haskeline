@@ -99,9 +99,7 @@ newtype Draw m a = Draw {unDraw :: (ReaderT Actions
               MonadReader Actions, MonadReader Terminal, MonadState TermPos,
               MonadReader Handle, MonadReader Encoders)
 
-instance MonadReader Layout m => MonadReader Layout (Draw m) where
-    ask = lift ask
-    local r = Draw . local r . unDraw
+type DrawM a = forall m . (MonadReader Layout m, MonadIO m) => Draw m a
 
 instance MonadTrans Draw where
     lift = Draw . lift . lift . lift . lift . lift
@@ -119,15 +117,16 @@ runTerminfoDraw = do
             Just actions -> fmap Just $ posixRunTerm $ \enc h ->
                 TermOps {
                     getLayout = tryGetLayouts (posixLayouts h
-                                                ++ [tinfoLayout term]),
-                    runTerm = \f ->
+                                                ++ [tinfoLayout term])
+                    , withGetEvent = wrapKeypad h term
+                                        . withPosixGetEvent ch h enc
+                                            (terminfoKeys term)
+                    , runTerm = \(RunTermType f) -> 
                              runPosixT enc h
                               $ evalStateT' initTermPos
                               $ runReaderT' term
                               $ runReaderT' actions
-                              $ unDraw
-                              $ wrapKeypad h term
-                              $ withPosixGetEvent ch enc (terminfoKeys term) f
+                              $ unDraw f
                     }
 
 -- If the keypad on/off capabilities are defined, wrap the computation with them.
@@ -171,7 +170,7 @@ output f = do
 
 
 
-changeRight, changeLeft :: MonadLayout m => Int -> Draw m ()
+changeRight, changeLeft :: Int -> DrawM ()
 changeRight n = do
     w <- asks width
     TermPos {termRow=r,termCol=c} <- get
@@ -201,13 +200,13 @@ changeLeft n = do
                 output $ cr <#> up linesUp <#> right newCol
                 
 -- TODO: I think if we wrap this all up in one call to output, it'll be faster...
-printText :: MonadLayout m => [Grapheme] -> Draw m ()
+printText :: [Grapheme] -> DrawM ()
 printText [] = return ()
 printText xs = fillLine xs >>= printText
 
 -- Draws as much of the string as possible in the line, and returns the rest.
 -- If we fill up the line completely, wrap to the next row.
-fillLine :: MonadLayout m => [Grapheme] -> Draw m [Grapheme]
+fillLine :: [Grapheme] -> DrawM [Grapheme]
 fillLine str = do
     w <- asks width
     TermPos {termRow=r,termCol=c} <- get
@@ -224,7 +223,7 @@ fillLine str = do
                 put TermPos {termRow=r+1,termCol=0}
                 return rest
 
-drawLineDiffT :: MonadLayout m => LineChars -> LineChars -> Draw m ()
+drawLineDiffT :: LineChars -> LineChars -> DrawM ()
 drawLineDiffT (xs1,ys1) (xs2,ys2) = case matchInit xs1 xs2 of
     ([],[])     | ys1 == ys2            -> return ()
     (xs1',[])   | xs1' ++ ys1 == ys2    -> changeLeft (length xs1')
@@ -244,7 +243,7 @@ linesLeft Layout {width=w} TermPos {termCol = c} n
 lsLinesLeft :: Layout -> TermPos -> LineChars -> Int
 lsLinesLeft layout pos s = linesLeft layout pos (lengthToEnd s)
 
-clearDeadText :: MonadLayout m => Int -> Draw m ()
+clearDeadText :: Int -> DrawM ()
 clearDeadText n
     | n <= 0    = return ()
     | otherwise = do
@@ -258,21 +257,20 @@ clearDeadText n
                     , up (numLinesToClear - 1)
                     , right (termCol pos)]
 
-clearLayoutT :: MonadLayout m => Draw m ()
+clearLayoutT :: DrawM ()
 clearLayoutT = do
     h <- asks height
     output (clearAll h)
     put initTermPos
 
-moveToNextLineT :: MonadLayout m => LineChars -> Draw m ()
+moveToNextLineT :: LineChars -> DrawM ()
 moveToNextLineT s = do
     pos <- get
     layout <- ask
     output $ mreplicate (lsLinesLeft layout pos s) nl
     put initTermPos
 
-repositionT :: (MonadLayout m, MonadException m) =>
-                Layout -> LineChars -> Draw m ()
+repositionT :: Layout -> LineChars -> DrawM ()
 repositionT oldLayout s = do
     oldPos <- get
     let l = lsLinesLeft oldLayout oldPos s - 1
@@ -281,7 +279,7 @@ repositionT oldLayout s = do
     put initTermPos
     drawLineDiffT ([],[]) s
 
-instance (MonadException m, MonadLayout m) => Term (Draw m) where
+instance (MonadException m, MonadReader Layout m) => Term (Draw m) where
     drawLineDiff = drawLineDiffT
     reposition = repositionT
     

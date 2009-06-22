@@ -60,19 +60,18 @@ instance Monad m => State.MonadState History (InputT m) where
     put = put
 
 -- for internal use only
-type InputCmdT m = ReaderT Layout (UndoT (StateT HistLog (StateT KillRing
+type InputCmdT m = StateT Layout (UndoT (StateT HistLog (StateT KillRing
                 (ReaderT Prefs (ReaderT (Settings m) m)))))
-
-instance MonadIO m => MonadLayout (InputCmdT m) where
 
 runInputCmdT :: MonadIO m => TermOps -> InputCmdT m a -> InputT m a
 runInputCmdT tops f = InputT $ do
     layout <- liftIO $ getLayout tops
-    lift $ runHistLog $ runUndoT $ runReaderT' layout f
+    lift $ runHistLog $ runUndoT $ evalStateT' layout f
 
-
-liftCmdT :: Monad m => m a -> InputCmdT m a
-liftCmdT = lift  . lift . lift . lift . lift . lift
+instance Monad m => CommandMonad (InputCmdT m) where
+    runCompletion lcs = do
+        settings <- ask
+        lift $ lift $ lift $ lift $ lift $ lift $ complete settings lcs
 
 runInputTWithPrefs :: MonadException m => Prefs -> Settings m -> InputT m a -> m a
 runInputTWithPrefs prefs settings (InputT f) = bracket (liftIO myRunTerm)

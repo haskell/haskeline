@@ -52,24 +52,24 @@ deleteFromDiff' (IMode xs1 ys1) (IMode xs2 ys2)
 killFromHelper :: (MonadState KillRing m, MonadState Undo m,
                         Save s, Save t)
                 => KillHelper -> Command m s t
-killFromHelper helper = saveForUndo >|> askState (\oldS -> commandM $ do
+killFromHelper helper = saveForUndo >|> \oldS -> do
     let (gs,newIM) = applyHelper helper (save oldS)
     modify (push gs)
-    return (putState (restore newIM)))
+    setState (restore newIM)
 
 killFromArgHelper :: (MonadState KillRing m, MonadState Undo m, Save s, Save t)
                 => KillHelper -> Command m (ArgMode s) t
-killFromArgHelper helper = saveForUndo >|> askState (\oldS -> commandM $ do
+killFromArgHelper helper = saveForUndo >|> \oldS -> do
     let (gs,newIM) = applyArgHelper helper (fmap save oldS)
     modify (push gs)
-    return (putState (restore newIM)))
+    setState (restore newIM)
 
 copyFromArgHelper :: (MonadState KillRing m, Save s)
                 => KillHelper -> Command m (ArgMode s) s
-copyFromArgHelper helper = askState$ \oldS -> commandM $ do
+copyFromArgHelper helper = \oldS -> do
     let (gs,_) = applyArgHelper helper (fmap save oldS)
     modify (push gs)
-    return $ putState $ argState oldS
+    setState (argState oldS)
 
 
 data KillHelper = SimpleMove (InsertMode -> InsertMode)

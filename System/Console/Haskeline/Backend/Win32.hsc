@@ -235,10 +235,6 @@ newtype Draw m a = Draw {runDraw :: ReaderT HANDLE m a}
 instance MonadTrans Draw where
     lift = Draw . lift
 
-instance MonadReader Layout m => MonadReader Layout (Draw m) where
-    ask = lift ask
-    local r = Draw . local r . runDraw
-
 getPos :: MonadIO m => Draw m Coord
 getPos = ask >>= liftIO . getPosition
     

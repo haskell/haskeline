@@ -59,7 +59,6 @@ module System.Console.Haskeline.LineState(
                     applyArg,
                     applyCmdArg,
                     -- ** Other line state types
-                    Cleared(..),
                     Message(..),
                     ) where
 
@@ -116,10 +115,6 @@ class LineState s where
                     -> [Grapheme] -- ^ The text to the left of the cursor, reversed.  (This 
                                   -- includes the prefix.)
     afterCursor :: s -> [Grapheme] -- ^ The text under and to the right of the cursor.
-    isTemporary :: s -> Bool        -- ^ When several lines are printed from a completion
-                                    -- attempt, should this state remain on the screen or
-                                    -- be cleared?
-    isTemporary _ = False
 
 -- | The characters in the line (with the cursor in the middle).  NOT in a zippered format;
 -- both lists are in the order left->right that appears on the screen.
@@ -291,6 +286,7 @@ withCommandMode f = enterCommandModeRight . f . insertFromCommandMode
 ----------------------
 -- Supplementary modes
 
+-- TODO: overwritePrefix arg not needed anymore.
 -- | Used for commands which take an integer argument.
 data ArgMode s = ArgMode {arg :: Int, argState :: s,
                             overwritePrefix :: Bool}
@@ -331,18 +327,12 @@ applyCmdArg :: (InsertMode -> InsertMode) -> ArgMode CommandMode -> CommandMode
 applyCmdArg f am = withCommandMode (repeatN (arg am) f) (argState am)
 
 ---------------
-data Cleared = Cleared
-
-instance LineState Cleared where
-    beforeCursor _ Cleared = []
-    afterCursor Cleared = []
-
+-- TODO: messageState param not needed anymore.
 data Message s = Message {messageState :: s, messageText :: String}
 
-instance LineState s => LineState (Message s) where
+instance LineState (Message s) where
     beforeCursor _ = stringToGraphemes . messageText
     afterCursor _ = []
-    isTemporary _ = True
 
 -----------------
 atStart, atEnd :: (Char -> Bool) -> InsertMode -> Bool
