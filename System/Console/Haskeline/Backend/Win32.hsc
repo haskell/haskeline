@@ -232,6 +232,8 @@ withWindowMode f = do
 newtype Draw m a = Draw {runDraw :: ReaderT HANDLE m a}
     deriving (Monad,MonadIO,MonadException, MonadReader HANDLE)
 
+type DrawM a = (MonadIO m, MonadReader Layout m) => Draw m ()
+
 instance MonadTrans Draw where
     lift = Draw . lift
 
@@ -248,12 +250,12 @@ printText txt = do
     h <- ask
     liftIO (writeConsole h txt)
     
-printAfter :: MonadLayout m => String -> Draw m ()
+printAfter :: String -> DrawM ()
 printAfter str = do
     printText str
     movePos $ negate $ length str
     
-drawLineDiffWin :: MonadLayout m => LineChars -> LineChars -> Draw m ()
+drawLineDiffWin :: LineChars -> LineChars -> DrawM ()
 drawLineDiffWin (xs1,ys1) (xs2,ys2) = case matchInit xs1 xs2 of
     ([],[])     | ys1 == ys2            -> return ()
     (xs1',[])   | xs1' ++ ys1 == ys2    -> movePos $ negate $ length xs1'
@@ -265,7 +267,7 @@ drawLineDiffWin (xs1,ys1) (xs2,ys2) = case matchInit xs1 xs2 of
         printText (graphemesToString xs2')
         printAfter (graphemesToString ys2 ++ deadText)
 
-movePos :: MonadLayout m => Int -> Draw m ()
+movePos :: Int -> DrawM ()
 movePos n = do
     Coord {coordX = x, coordY = y} <- getPos
     w <- asks width
@@ -275,7 +277,7 @@ movePos n = do
 crlf :: String
 crlf = "\r\n"
 
-instance (MonadException m, MonadLayout m) => Term (Draw m) where
+instance (MonadException m, MonadReader Layout m) => Term (Draw m) where
     drawLineDiff = drawLineDiffWin
     -- TODO now that we capture resize events.
     -- first, looks like the cursor stays on the same line but jumps
@@ -313,14 +315,17 @@ win32Term = do
                         return fileRT {
                             wrapInterrupt = withWindowMode . withCtrlCHandler,
                             termOps = Just TermOps {
-                                            getLayout = getBufferSize h,
-                                            runTerm = consoleRunTerm h ch},
+                                getLayout = getBufferSize h
+                                , withGetEvent = win32WithEvent ch
+                                , runTerm = \(RunTermType f) ->
+                                        runReaderT' h $ runDraw f
+                                },
                             closeTerm = closeHandle h}
 
-consoleRunTerm :: HANDLE -> Chan Event -> RunTermType
-consoleRunTerm conOut eventChan f = do
+win32WithEvent :: MonadException m => Chan Event -> (m Event -> m a) -> m a
+win32WithEvent eventChan f = do
     inH <- liftIO $ getStdHandle sTD_INPUT_HANDLE
-    runReaderT' conOut $ runDraw $ f $ liftIO $ getEvent inH eventChan
+    f $ liftIO $ getEvent inH eventChan
 
 -- stdin is not a terminal, but we still need to check the right way to output unicode to stdout.
 fileRunTerm :: IO RunTerm
