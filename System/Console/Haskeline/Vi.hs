@@ -163,7 +163,7 @@ repeatableCommands :: InputKeyCmd (ArgMode CommandMode) EitherMode
 repeatableCommands = choiceCmd $
                         [ repeatableCmdToIMode
                         , repeatableCmdMode >+> return . Left
-                        , simpleChar '.' +> runLastCommand
+                        , simpleChar '.' +> saveForUndo >|> runLastCommand
                         ]
     where
         runLastCommand s = liftM lastCommand get >>= ($ s)
