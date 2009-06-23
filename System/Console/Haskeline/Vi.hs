@@ -11,15 +11,16 @@ import System.Console.Haskeline.LineState
 import System.Console.Haskeline.InputT
 
 import Data.Char(isAlphaNum,isSpace)
+import Control.Monad(liftM)
 
 type EitherMode = Either CommandMode InsertMode
 
-data ViState m = ViState {
-                lastCommand :: Command (ViT m) CommandMode EitherMode
-                }
+type SavedCommand m = Command (ViT m) (ArgMode CommandMode) EitherMode
+
+data ViState m = ViState { lastCommand :: SavedCommand m }
 
 emptyViState :: Monad m => ViState m
-emptyViState = ViState {lastCommand = return . Left}
+emptyViState = ViState {lastCommand = return . Left . argState}
 
 type ViT m = StateT (ViState m) (InputCmdT m)
 
@@ -85,8 +86,8 @@ exitingCommands =  choiceCmd [
                     , simpleChar 'A' +> change (moveToEnd . appendFromCommandMode)
                     , simpleKey End +> change (moveToStart  . insertFromCommandMode)
                     , simpleChar 's' +> change (insertFromCommandMode . deleteChar)
-                    , simpleChar 'S' +> killFromHelper killAll
-                    , simpleChar 'C' +> killFromHelper (SimpleMove moveToEnd)
+                    , simpleChar 'S' +> noArg >|> killAndStoreI killAll
+                    , simpleChar 'C' +> noArg >|> killAndStoreI (SimpleMove moveToEnd)
                     ]
 
 simpleCmdActions :: InputKeyCmd CommandMode CommandMode
@@ -94,7 +95,7 @@ simpleCmdActions = choiceCmd [
                     simpleChar '\ESC' +> change id -- helps break out of loops
                     , simpleChar 'r'   +> replaceOnce 
                     , simpleChar 'R'   +> replaceLoop
-                    , simpleChar 'D' +> killFromHelper (SimpleMove moveToEnd)
+                    , simpleChar 'D' +> noArg >|> killAndStoreCmd (SimpleMove moveToEnd)
                     , ctrlChar 'l' +> clearScreenCmd
                     , simpleChar 'u' +> commandUndo
                     , ctrlChar 'r' +> commandRedo
@@ -103,32 +104,15 @@ simpleCmdActions = choiceCmd [
                     , simpleChar 'k' +> historyBack >|> change moveToStart
                     , simpleKey DownKey +> historyForward  >|> change moveToStart
                     , simpleKey UpKey +> historyBack >|> change moveToStart
-                    , simpleKey KillLine +> killFromHelper (SimpleMove moveToStart)
-                    , simpleChar 'p' +> pasteCommand pasteGraphemesAfter
-                    , simpleChar 'P' +> pasteCommand pasteGraphemesBefore
-                    -- , simpleChar '.' +> useLastCommand
+                    , simpleKey KillLine +> noArg >|> killAndStoreCmd (SimpleMove moveToStart)
                     ]
-
-{-
-useLastCommand :: Monad m => Command (ViT m) CommandMode CommandMode
-useLastCommand = commandM $ do
-    lastCmd <- liftM lastCommand get
-    return $ case lastCmd of
-        Nothing -> continue
-        Just cmd -> spliceStream cmd
-
-storeLastCommand :: Monad m => KeyCommand (ViT m) CommandMode CommandMode
-                            -> KeyCommand (ViT m) CommandMode CommandMode
-storeLastCommand = storeStream $ \stream -> put ViState {lastCommand = Just stream}
--}
 
 replaceOnce :: InputCmd CommandMode CommandMode
 replaceOnce = try $ changeFromChar replaceChar
 
 repeatedCommands :: InputKeyCmd CommandMode EitherMode
-repeatedCommands = choiceCmd [argumented, withNoArg repeatableCommands]
+repeatedCommands = choiceCmd [argumented, doBefore noArg repeatableCommands]
     where
-        withNoArg = doBefore (change (hiddenArg 1))
         start = foreachDigit startArg ['1'..'9']
         addDigit = foreachDigit addNum ['0'..'9']
         argumented = start >+> loop
@@ -168,13 +152,19 @@ repeatableCommands :: InputKeyCmd (ArgMode CommandMode) EitherMode
 repeatableCommands = choiceCmd $
                         [ repeatableCmdToIMode
                         , repeatableCmdMode >+> return . Left
+                        , simpleChar '.' +> runLastCommand
                         ]
-
+    where
+        runLastCommand s = liftM lastCommand get >>= ($ s)
 
 repeatableCmdMode :: InputKeyCmd (ArgMode CommandMode) CommandMode
 repeatableCmdMode = choiceCmd $ 
-                    [ simpleChar 'x' +> saveForUndo >|> change (applyArg deleteChar)
-                    , simpleChar 'X' +> saveForUndo >|> change (applyArg (withCommandMode deletePrev))
+                    [ simpleChar 'x' +> storedCmdAction 
+                                    (saveForUndo >|> change (applyArg deleteChar))
+                    , simpleChar 'X' +> storedCmdAction
+                                (saveForUndo >|> change (applyArg (withCommandMode deletePrev)))
+                    , simpleChar 'p' +> storedCmdAction (pasteCommand pasteGraphemesAfter)
+                    , simpleChar 'P' +> storedCmdAction (pasteCommand pasteGraphemesBefore)
                     , simpleChar 'd' +> deletionCmd
                     , simpleChar 'y' +> yankCommand
                     , pureMovements
@@ -185,31 +175,30 @@ repeatableCmdToIMode = simpleChar 'c' +> deletionToInsertCmd
 
 deletionCmd :: InputCmd (ArgMode CommandMode) CommandMode
 deletionCmd = keyChoiceCmd $
-                    [simpleChar 'd' +> killFromArgHelper killAll
-                    , useMovementsForKill (change argState) killFromArgHelper
+                    [simpleChar 'd' +> killAndStoreCmd killAll
+                    , useMovementsForKill (change argState) killAndStoreCmd
                     , withoutConsuming (change argState)
                     ]
 
 deletionToInsertCmd :: InputCmd (ArgMode CommandMode) EitherMode
 deletionToInsertCmd = keyChoiceCmd $
-        [simpleChar 'c' +> killFromArgHelper killAll
-                            >|> return . Right
+        [simpleChar 'c' +> killAndStoreIE killAll
         -- vim, for whatever reason, treats cw same as ce and cW same as cE.
         -- readline does this too, so we should also.
-        , simpleChar 'w' +> killFromArgHelper (SimpleMove goToWordDelEnd)
-                                >|> return . Right
-        , simpleChar 'W' +> killFromArgHelper (SimpleMove goToBigWordDelEnd)
-                                >|> return . Right
+        , simpleChar 'w' +> killAndStoreIE (SimpleMove goToWordDelEnd)
+        , simpleChar 'W' +> killAndStoreIE (SimpleMove goToBigWordDelEnd)
         , withoutConsuming (return . Left . argState)
         ]
 
 
 yankCommand :: InputCmd (ArgMode CommandMode) CommandMode
 yankCommand = keyChoiceCmd $ 
-                [simpleChar 'y' +> copyFromArgHelper killAll
-                , useMovementsForKill (change argState) copyFromArgHelper
+                [simpleChar 'y' +> copyAndStore killAll
+                , useMovementsForKill (change argState) copyAndStore
                 , withoutConsuming (change argState)
                 ]
+    where
+        copyAndStore = storedCmdAction . copyFromArgHelper
 
 goToWordDelEnd, goToBigWordDelEnd :: InsertMode -> InsertMode
 goToWordDelEnd = goRightUntil $ atStart (not . isWordChar)
@@ -323,3 +312,34 @@ replaceLoop = saveForUndo >|> change insertFromCommandMode >|> loop
                 , simpleKey RightKey +> change goRight
                 , changeFromChar replaceCharIM
                 ]
+
+
+---------------------------
+-- Saving previous commands
+
+-- TODOs:
+-- - make . use original argument amount, if none given
+-- - repeat insertions too?  not sure how to do that cleanly...
+--    easy: read multiple characters together as one loop.
+storedAction :: Monad m => SavedCommand m -> SavedCommand m
+storedAction act = \s -> put (ViState act) >> act s
+
+storedCmdAction :: Monad m => Command (ViT m) (ArgMode CommandMode) CommandMode
+                            -> Command (ViT m) (ArgMode CommandMode) CommandMode
+storedCmdAction act = \s -> put (ViState (liftM Left . act)) >> act s
+
+storedIAction :: Monad m => Command (ViT m) (ArgMode CommandMode) InsertMode
+                        -> Command (ViT m) (ArgMode CommandMode) InsertMode
+storedIAction act = \s -> put (ViState (liftM Right . act)) >> act s
+
+killAndStoreCmd :: Monad m => KillHelper -> Command (ViT m) (ArgMode CommandMode) CommandMode
+killAndStoreCmd = storedCmdAction . killFromArgHelper
+
+killAndStoreI :: Monad m => KillHelper -> Command (ViT m) (ArgMode CommandMode) InsertMode
+killAndStoreI = storedIAction . killFromArgHelper
+
+killAndStoreIE :: Monad m => KillHelper -> Command (ViT m) (ArgMode CommandMode) EitherMode
+killAndStoreIE helper = storedAction (killFromArgHelper helper >|> return . Right)
+
+noArg :: Monad m => Command m s (ArgMode s)
+noArg = return . hiddenArg 1

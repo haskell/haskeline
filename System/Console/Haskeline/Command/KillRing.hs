@@ -33,14 +33,14 @@ runKillRing = evalStateT' emptyStack
 
 
 pasteCommand :: (Save s, MonadState KillRing m, MonadState Undo m)
-            => ([Grapheme] -> s -> s) -> Command m s s
-pasteCommand use = simpleCommand $ \s -> do
+            => ([Grapheme] -> s -> s) -> Command m (ArgMode s) s
+pasteCommand use = \s -> do
     ms <- liftM peek get
     case ms of
-        Nothing -> return $ Right s
+        Nothing -> return $ argState s
         Just p -> do
-            modify (saveToUndo s)
-            return $ Right $ use p s
+            modify $ saveToUndo $ argState s
+            setState $ applyArg (use p) s
 
 deleteFromDiff' :: InsertMode -> InsertMode -> ([Grapheme],InsertMode)
 deleteFromDiff' (IMode xs1 ys1) (IMode xs2 ys2)
