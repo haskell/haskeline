@@ -54,7 +54,6 @@ module System.Console.Haskeline.LineState(
                     -- ** ArgMode
                     ArgMode(..),
                     startArg,
-                    hiddenArg,
                     addNum,
                     applyArg,
                     applyCmdArg,
@@ -286,34 +285,27 @@ withCommandMode f = enterCommandModeRight . f . insertFromCommandMode
 ----------------------
 -- Supplementary modes
 
--- TODO: overwritePrefix arg not needed anymore.
 -- | Used for commands which take an integer argument.
-data ArgMode s = ArgMode {arg :: Int, argState :: s,
-                            overwritePrefix :: Bool}
+data ArgMode s = ArgMode {arg :: Int, argState :: s}
 
 instance Functor ArgMode where
     fmap f am = am {argState = f (argState am)}
 
 instance LineState s => LineState (ArgMode s) where
-    beforeCursor prefix am = let pre' = if overwritePrefix am
-                                            then "(arg: " ++ show (arg am) ++ ") "
-                                            else prefix
-                             in beforeCursor pre' (argState am) 
+    beforeCursor _ am = let pre = "(arg: " ++ show (arg am) ++ ") "
+                             in beforeCursor pre (argState am) 
     afterCursor = afterCursor . argState
 
 instance Result s => Result (ArgMode s) where
     toResult = toResult . argState
 
 startArg :: Int -> s -> ArgMode s
-startArg n s = ArgMode n s True
+startArg n s = ArgMode n s
 
 addNum :: Int -> ArgMode s -> ArgMode s
 addNum n am
     | arg am >= 1000 = am -- shouldn't ever need more than 4 digits
     | otherwise = am {arg = arg am * 10 + n} 
-
-hiddenArg :: Int -> s -> ArgMode s
-hiddenArg n s = ArgMode n s False
 
 -- todo: negatives
 applyArg :: (s -> s) -> ArgMode s -> s

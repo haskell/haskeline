@@ -317,8 +317,6 @@ replaceLoop = saveForUndo >|> change insertFromCommandMode >|> loop
 ---------------------------
 -- Saving previous commands
 
--- TODOs:
--- - make . use original argument amount, if none given
 -- - repeat insertions too?  not sure how to do that cleanly...
 --    easy: read multiple characters together as one loop.
 storedAction :: Monad m => SavedCommand m -> SavedCommand m
@@ -342,4 +340,4 @@ killAndStoreIE :: Monad m => KillHelper -> Command (ViT m) (ArgMode CommandMode)
 killAndStoreIE helper = storedAction (killFromArgHelper helper >|> return . Right)
 
 noArg :: Monad m => Command m s (ArgMode s)
-noArg = return . hiddenArg 1
+noArg = return . startArg 1
