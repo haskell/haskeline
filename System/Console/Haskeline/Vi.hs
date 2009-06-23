@@ -47,7 +47,7 @@ simpleInsertions = choiceCmd
                    , simpleKey Delete +> change deleteNext 
                    , simpleKey Home +> change moveToStart
                    , simpleKey End +> change moveToEnd
-                   , changeFromChar insertChar
+                   , insertChars
                    , ctrlChar 'l' +> clearScreenCmd
                    , simpleKey UpKey +> historyBack
                    , simpleKey DownKey +> historyForward
@@ -55,6 +55,17 @@ simpleInsertions = choiceCmd
                    , simpleKey KillLine +> killFromHelper (SimpleMove moveToStart)
                    , completionCmd (simpleChar '\t')
                    ]
+
+insertChars :: InputKeyCmd InsertMode InsertMode
+insertChars = useChar $ loop []
+    where
+        loop ds d = change (insertChar d) >|> keyChoiceCmd [
+                        useChar $ loop (d:ds)
+                        , withoutConsuming (storeCharInsertion (reverse ds))
+                        ]
+        storeCharInsertion s = storeLastCmd $ change (applyArg 
+                                                        $ withCommandMode $ insertString s)
+                                                >|> return . Left
 
 -- If we receive a ^D and the line is empty, return Nothing
 -- otherwise, ignore it.
@@ -317,18 +328,19 @@ replaceLoop = saveForUndo >|> change insertFromCommandMode >|> loop
 ---------------------------
 -- Saving previous commands
 
--- - repeat insertions too?  not sure how to do that cleanly...
---    easy: read multiple characters together as one loop.
+storeLastCmd :: Monad m => SavedCommand m -> Command (ViT m) s s
+storeLastCmd act = \s -> put (ViState act) >> return s
+
 storedAction :: Monad m => SavedCommand m -> SavedCommand m
-storedAction act = \s -> put (ViState act) >> act s
+storedAction act = storeLastCmd act >|> act
 
 storedCmdAction :: Monad m => Command (ViT m) (ArgMode CommandMode) CommandMode
                             -> Command (ViT m) (ArgMode CommandMode) CommandMode
-storedCmdAction act = \s -> put (ViState (liftM Left . act)) >> act s
+storedCmdAction act = storeLastCmd (liftM Left . act) >|> act
 
 storedIAction :: Monad m => Command (ViT m) (ArgMode CommandMode) InsertMode
                         -> Command (ViT m) (ArgMode CommandMode) InsertMode
-storedIAction act = \s -> put (ViState (liftM Right . act)) >> act s
+storedIAction act = storeLastCmd (liftM Right . act) >|> act
 
 killAndStoreCmd :: Monad m => KillHelper -> Command (ViT m) (ArgMode CommandMode) CommandMode
 killAndStoreCmd = storedCmdAction . killFromArgHelper
