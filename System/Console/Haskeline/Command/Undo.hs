@@ -6,24 +6,6 @@ import System.Console.Haskeline.Monads
 
 import Control.Monad
 
-
-class LineState s => Save s where
-    save :: s -> InsertMode
-    restore :: InsertMode -> s
-
-instance Save InsertMode where
-    save = id
-    restore = id
-
-instance Save CommandMode where
-    save = insertFromCommandMode
-    restore = enterCommandModeRight
-
-instance Save s => Save (ArgMode s) where
-    save = save . argState
-    restore s = startArg 0 (restore s)
-
-
 data Undo = Undo {pastUndo, futureRedo :: [InsertMode]}
 
 type UndoT = StateT Undo

@@ -17,7 +17,9 @@ module System.Console.Haskeline.LineState(
                     lengthToEnd,
                     -- ** Supplementary classes
                     Result(..),
-                    FromString(..),
+                    Save(..),
+                    listSave,
+                    listRestore,
                     Move(..),
                     -- * Instances
                     -- ** InsertMode
@@ -130,8 +132,15 @@ lengthToEnd = length . snd
 class LineState s => Result s where
     toResult :: s -> String
 
-class (Result s) => FromString s where
-    fromString :: String -> s
+class LineState s => Save s where
+    save :: s -> InsertMode
+    restore :: InsertMode -> s
+
+listSave :: Save s => s -> [Grapheme]
+listSave s = case save s of IMode xs ys -> reverse xs ++ ys
+
+listRestore :: Save s => [Grapheme] -> s
+listRestore xs = restore $ IMode (reverse xs) []
 
 class Move s where
     goLeft, goRight, moveToStart, moveToEnd :: s -> s
@@ -148,6 +157,10 @@ instance LineState InsertMode where
 instance Result InsertMode where
     toResult (IMode xs ys) = graphemesToString $ reverse xs ++ ys
 
+instance Save InsertMode where
+    save = id
+    restore = id
+
 instance Move InsertMode where
     goLeft im@(IMode [] _) = im 
     goLeft (IMode (x:xs) ys) = IMode xs (x:ys)
@@ -157,9 +170,6 @@ instance Move InsertMode where
 
     moveToStart (IMode xs ys) = IMode [] (reverse xs ++ ys)
     moveToEnd (IMode xs ys) = IMode (reverse ys ++ xs) []
-
-instance FromString InsertMode where
-    fromString s = IMode (reverse (stringToGraphemes s)) []
 
 emptyIM :: InsertMode
 emptyIM = IMode [] []
@@ -222,6 +232,10 @@ instance Result CommandMode where
     toResult CEmpty = ""
     toResult (CMode xs c ys) = graphemesToString $ reverse xs ++ (c:ys)
 
+instance Save CommandMode where
+    save = insertFromCommandMode
+    restore = enterCommandModeRight
+
 instance Move CommandMode where
     goLeft (CMode (x:xs) c ys) = CMode xs x (c:ys)
     goLeft cm = cm
@@ -234,11 +248,6 @@ instance Move CommandMode where
 
     moveToEnd (CMode xs c ys) = let zs = reverse ys ++ (c:xs) in CMode (tail zs) (head zs) []
     moveToEnd CEmpty = CEmpty
-
-instance FromString CommandMode where
-    fromString s = case reverse (stringToGraphemes s) of
-                    [] -> CEmpty
-                    (c:cs) -> CMode cs c []
 
 deleteChar :: CommandMode -> CommandMode
 deleteChar (CMode xs _ (y:ys)) = CMode xs y ys
@@ -298,6 +307,10 @@ instance LineState s => LineState (ArgMode s) where
 
 instance Result s => Result (ArgMode s) where
     toResult = toResult . argState
+
+instance Save s => Save (ArgMode s) where
+    save = save . argState
+    restore s = startArg 0 (restore s)
 
 startArg :: Int -> s -> ArgMode s
 startArg n s = ArgMode n s
