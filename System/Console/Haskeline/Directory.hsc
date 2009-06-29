@@ -15,6 +15,9 @@ import Foreign
 import Foreign.C
 import System.Win32.Types
 import Data.Bits
+#if __GLASGOW_HASKELL__ >= 611
+import qualified System.Directory
+#endif
 
 #include <windows.h>
 #include <Shlobj.h>
@@ -52,6 +55,10 @@ doesDirectoryExist file = do
     return $ attrs /= (#const INVALID_FILE_ATTRIBUTES)
             && (attrs .&. (#const FILE_ATTRIBUTE_DIRECTORY)) /= 0
 
+#if __GLASGOW_HASKELL__ >= 611
+getHomeDirectory :: IO FilePath
+getHomeDirectory = System.Directory.getHomeDirectory
+#else
 type HRESULT = #type HRESULT
 
 foreign import stdcall "SHGetFolderPathW" c_SHGetFolderPath
@@ -60,9 +67,11 @@ foreign import stdcall "SHGetFolderPathW" c_SHGetFolderPath
 getHomeDirectory :: IO FilePath
 getHomeDirectory = allocaBytes ((#const MAX_PATH) * (#size TCHAR)) $ \pathPtr -> do
     result <- c_SHGetFolderPath nullPtr (#const CSIDL_PROFILE) nullPtr 0 pathPtr
+
     if result /= (#const S_OK)
         then return ""
         else peekCWString pathPtr
+#endif
 
 #else
 
