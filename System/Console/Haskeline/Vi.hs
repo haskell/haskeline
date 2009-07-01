@@ -121,8 +121,10 @@ simpleCmdActions = choiceCmd [
                     , simpleChar 'k' +> historyBack >|> change moveToStart
                     , simpleKey DownKey +> historyForward  >|> change moveToStart
                     , simpleKey UpKey +> historyBack >|> change moveToStart
-                    , simpleChar '/' +> viSearch '/' Reverse
-                    , simpleChar '?' +> viSearch '?' Forward
+                    , simpleChar '/' +> viEnterSearch '/' Reverse
+                    , simpleChar '?' +> viEnterSearch '?' Forward
+                    , simpleChar 'n' +> viSearchHist Reverse []
+                    , simpleChar 'N' +> viSearchHist Forward []
                     , simpleKey KillLine +> noArg >|> killAndStoreCmd (SimpleMove moveToStart)
                     ]
 
@@ -372,19 +374,23 @@ data SearchEntry = SearchEntry {
                     searchChar :: Char
                     }
 
+searchText :: SearchEntry -> [Grapheme]
+searchText SearchEntry {entryState = IMode xs ys} = reverse xs ++ ys
+
 instance LineState SearchEntry where
     beforeCursor prefix se = beforeCursor (prefix ++ [searchChar se])
                                 (entryState se)
     afterCursor = afterCursor . entryState
 
-viSearch :: Monad m => Char -> Direction
+viEnterSearch :: Monad m => Char -> Direction
                     -> Command (ViT m) CommandMode CommandMode
-viSearch c dir s = setState (SearchEntry emptyIM c) >>= loopEntry
+viEnterSearch c dir s = setState (SearchEntry emptyIM c) >>= loopEntry
     where
         modifySE f se = se {entryState = f (entryState se)}
         loopEntry = keyChoiceCmd [
                         editEntry >+> loopEntry
-                        , simpleChar '\n' +> searchHist dir s
+                        , simpleChar '\n' +> \se -> 
+                            viSearchHist dir (searchText se) s
                         , withoutConsuming (change (const s))
                         ]
         editEntry = choiceCmd [
@@ -395,11 +401,10 @@ viSearch c dir s = setState (SearchEntry emptyIM c) >>= loopEntry
                         , simpleKey Delete +> change (modifySE deleteNext)
                         ] 
 
-searchHist :: forall m . Monad m
-    => Direction -> CommandMode -> SearchEntry -> CmdM (ViT m) CommandMode
-searchHist dir cm SearchEntry {entryState = IMode xs ys} = do
+viSearchHist :: forall m . Monad m
+    => Direction -> [Grapheme] -> Command (ViT m) CommandMode CommandMode
+viSearchHist dir toSearch cm = do
     vstate :: ViState m <- get
-    let toSearch = reverse xs ++ ys
     let toSearch' = if null toSearch
                         then (lastSearch vstate)
                         else toSearch
