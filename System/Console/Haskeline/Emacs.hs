@@ -60,6 +60,8 @@ controlActions = choiceCmd
             , ctrlChar 'x' +> try (ctrlChar 'u' +> commandUndo)
             , ctrlChar 'p' +> historyBack
             , ctrlChar 'n' +> historyForward
+            , metaChar '<' +> historyStart
+            , metaChar '>' +> historyEnd
             , simpleKey Home +> change moveToStart
             , simpleKey End +> change moveToEnd
             , choiceCmd

@@ -40,14 +40,23 @@ runHistLog f = do
     lift (evalStateT' (histLog history) f)
 
 
-prevHistory :: Save s => s -> HistLog -> (s, HistLog)
+prevHistory, firstHistory :: Save s => s -> HistLog -> (s, HistLog)
 prevHistory s h = let (s',h') = fromMaybe (listSave s,h) 
                                     $ prevHistoryM (listSave s) h
                   in (listRestore s',h')
 
+firstHistory s h = let prevs = (listSave s,h):prevHistories (listSave s) h
+                       -- above makes sure we don't take the last of an empty list.
+                       (s',h') = last prevs
+                   in (listRestore s',h')
+
 historyBack, historyForward :: (Save s, MonadState HistLog m) => Command m s s
 historyBack = simpleCommand $ histUpdate prevHistory
 historyForward = simpleCommand $ reverseHist . histUpdate prevHistory
+
+historyStart, historyEnd :: (Save s, MonadState HistLog m) => Command m s s
+historyStart = simpleCommand $ histUpdate firstHistory
+historyEnd = simpleCommand $ reverseHist . histUpdate firstHistory
 
 histUpdate :: MonadState HistLog m => (s -> HistLog -> (t,HistLog))
                         -> s -> m (Either Effect t)
