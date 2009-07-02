@@ -58,6 +58,7 @@ controlActions = choiceCmd
             , metaChar 'u' +> change (modifyWord (mapBaseChars toUpper))
             , ctrlChar '_' +> commandUndo
             , ctrlChar 'x' +> try (ctrlChar 'u' +> commandUndo)
+            , ctrlChar 't' +> change transposeChars
             , ctrlChar 'p' +> historyBack
             , ctrlChar 'n' +> historyForward
             , metaChar '<' +> historyStart

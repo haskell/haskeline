@@ -33,6 +33,7 @@ module System.Console.Haskeline.LineState(
                     deletePrev,
                     skipLeft,
                     skipRight,
+                    transposeChars,
                     -- *** Moving to word boundaries
                     goRightUntil,
                     goLeftUntil,
@@ -200,6 +201,11 @@ skipLeft f (IMode xs ys) = let (ws,zs) = span (f . baseChar) xs
                            in IMode zs (reverse ws ++ ys)
 skipRight f (IMode xs ys) = let (ws,zs) = span (f . baseChar) ys 
                             in IMode (reverse ws ++ xs) zs
+
+transposeChars :: InsertMode -> InsertMode
+transposeChars (IMode (x:xs) (y:ys)) = IMode (x:y:xs) ys
+transposeChars (IMode (y:x:xs) []) = IMode (x:y:xs) []
+transposeChars im = im
 
 insertGraphemes :: [Grapheme] -> InsertMode -> InsertMode
 insertGraphemes s (IMode xs ys) = IMode (reverse s ++ xs) ys
