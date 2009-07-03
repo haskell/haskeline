@@ -10,7 +10,7 @@ import System.Console.Haskeline.Command.Undo
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.InputT
 
-import Data.Char(isAlphaNum,isSpace)
+import Data.Char
 import Control.Monad(liftM)
 
 type EitherMode = Either CommandMode InsertMode
@@ -180,16 +180,24 @@ repeatableCommands = choiceCmd $
 
 repeatableCmdMode :: InputKeyCmd (ArgMode CommandMode) CommandMode
 repeatableCmdMode = choiceCmd $ 
-                    [ simpleChar 'x' +> storedCmdAction 
-                                    (saveForUndo >|> change (applyArg deleteChar))
-                    , simpleChar 'X' +> storedCmdAction
-                                (saveForUndo >|> change (applyArg (withCommandMode deletePrev)))
+                    [ simpleChar 'x' +> repeatableChange deleteChar
+                    , simpleChar 'X' +> repeatableChange (withCommandMode deletePrev)
+                    , simpleChar '~' +> repeatableChange (goRight . flipCase)
                     , simpleChar 'p' +> storedCmdAction (pasteCommand pasteGraphemesAfter)
                     , simpleChar 'P' +> storedCmdAction (pasteCommand pasteGraphemesBefore)
                     , simpleChar 'd' +> deletionCmd
                     , simpleChar 'y' +> yankCommand
                     , pureMovements
                     ]
+    where
+        repeatableChange f = storedCmdAction (saveForUndo >|> change (applyArg f))
+
+flipCase :: CommandMode -> CommandMode
+flipCase CEmpty = CEmpty
+flipCase (CMode xs y zs) = CMode xs (modifyBaseChar flipCaseG y) zs
+    where
+        flipCaseG c | isLower c = toUpper c
+                    | otherwise = toLower c
 
 repeatableCmdToIMode :: InputKeyCmd (ArgMode CommandMode) EitherMode
 repeatableCmdToIMode = simpleChar 'c' +> deletionToInsertCmd
