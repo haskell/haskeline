@@ -41,8 +41,6 @@ module System.Console.Haskeline.IO(
 
 import System.Console.Haskeline hiding (completeFilename)
 import Control.Concurrent
-import Control.Concurrent.MVar
-import System.IO
 
 import Control.Monad.Trans
 
