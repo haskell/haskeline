@@ -14,7 +14,6 @@ module System.Console.Haskeline.Directory(
 import Foreign
 import Foreign.C
 import System.Win32.Types
-import Data.Bits
 #if __GLASGOW_HASKELL__ >= 611
 import qualified System.Directory
 #endif

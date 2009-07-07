@@ -10,8 +10,6 @@ import System.Win32 hiding (multiByteToWideChar)
 import Graphics.Win32.Misc(getStdHandle, sTD_INPUT_HANDLE, sTD_OUTPUT_HANDLE)
 import Data.List(intercalate)
 import Control.Concurrent hiding (throwTo)
-import Control.Concurrent.Chan
-import Data.Bits
 import Data.Char(isPrint)
 import Data.Maybe(mapMaybe)
 import Control.Monad
