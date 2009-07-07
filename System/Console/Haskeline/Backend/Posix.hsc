@@ -16,7 +16,6 @@ import qualified Data.Map as Map
 import System.Posix.Terminal hiding (Interrupt)
 import Control.Monad
 import Control.Concurrent hiding (throwTo)
-import Control.Concurrent.Chan
 import Data.Maybe (catMaybes)
 import System.Posix.Signals.Exts
 import System.Posix.IO(stdInput)
@@ -36,7 +35,6 @@ import System.Console.Haskeline.Backend.IConv
 import GHC.IO.FD (fdFD)
 import Data.Dynamic (cast)
 import System.IO.Error
-import GHC.IO.Handle
 import GHC.IO.Exception
 import GHC.IO.Handle.Types hiding (getState)
 import GHC.IO.Handle.Internals

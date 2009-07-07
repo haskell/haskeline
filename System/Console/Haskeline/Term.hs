@@ -7,7 +7,6 @@ import System.Console.Haskeline.Prefs(Prefs)
 import System.Console.Haskeline.Completion(Completion)
 
 import Control.Concurrent
-import Control.Concurrent.Chan
 import Data.Typeable
 import Data.ByteString (ByteString)
 import Control.Exception.Extensible (fromException, AsyncException(..),bracket_)
