@@ -59,7 +59,7 @@ readHistory file = handle (\(_::IOException) -> return emptyHistory) $ do
         -- which cause confusion when switching between systems.
         then fmap UTF8.toString (B.readFile file)
         else return ""
-    evaluate (length contents) -- force file closed
+    _ <- evaluate (length contents) -- force file closed
     return $ History {histLines = Seq.fromList $ lines contents,
                     stifleAmt = Nothing}
 

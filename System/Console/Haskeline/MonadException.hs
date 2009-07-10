@@ -35,8 +35,8 @@ finally :: MonadException m => m a -> m b -> m a
 finally f ender = block (do
     r <- catch
             (unblock f)
-            (\(e::SomeException) -> do {ender; throwIO e})
-    ender
+            (\(e::SomeException) -> do {_ <- ender; throwIO e})
+    _ <- ender
     return r)
 
 throwIO :: (MonadIO m, Exception e) => e -> m a
@@ -51,8 +51,8 @@ bracket before after thing =
     a <- before 
     r <- catch 
 	   (unblock (thing a))
-	   (\(e::SomeException) -> do { after a; throwIO e })
-    after a
+	   (\(e::SomeException) -> do { _ <- after a; throwIO e })
+    _ <- after a
     return r
  )
 
