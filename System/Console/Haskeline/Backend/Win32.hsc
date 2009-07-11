@@ -365,7 +365,7 @@ withCtrlCHandler :: MonadException m => m a -> m a
 withCtrlCHandler f = bracket (liftIO $ do
                                     tid <- myThreadId
                                     fp <- wrapHandler (handler tid)
-                                    c_SetConsoleCtrlHandler fp True
+                                    failIfFalse_ "SetConsoleCtrlHandler" $ c_SetConsoleCtrlHandler fp True
                                     return fp)
                                 (\fp -> liftIO $ c_SetConsoleCtrlHandler fp False)
                                 (const f)
