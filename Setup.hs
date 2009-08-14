@@ -15,23 +15,22 @@ import System.Exit
 import System.Directory
 import Control.Exception.Extensible
 
--- TODO: it's a hack that we use the autoconfUserHooks when we're not actually
--- using autoconf...
 main :: IO ()
 main = defaultMainWithHooks myHooks
 
 myHooks :: UserHooks
 myHooks
     | buildOS == Windows    = simpleUserHooks
-    | otherwise = autoconfUserHooks {
-            postConf = \args flags pkgDescr lbi -> do
-                            let Just lib = library pkgDescr
-                            let bi = libBuildInfo lib
-                            bi' <- maybeSetLibiconv flags bi lbi
-                            let pkgDescr' = pkgDescr {
+    | otherwise = simpleUserHooks {
+            confHook = \genericDescript flags -> do
+                        lbi <- confHook simpleUserHooks genericDescript flags
+                        let pkgDescr = localPkgDescr lbi
+                        let Just lib = library pkgDescr
+                        let bi = libBuildInfo lib
+                        bi' <- maybeSetLibiconv flags bi lbi
+                        return lbi {localPkgDescr = pkgDescr {
                                                 library = Just lib {
-                                                    libBuildInfo = bi'}}
-                            postConf simpleUserHooks args flags pkgDescr' lbi
+                                                    libBuildInfo = bi'}}}
             }
 
 -- Test whether compiling a c program that links against libiconv needs -liconv.
@@ -42,7 +41,6 @@ maybeSetLibiconv flags bi lbi = do
     if hasFlagSet flags (FlagName "libiconv")
         then do
             putStrLn "Using -liconv."
-            writeBuildInfo "iconv"
             return biWithIconv
         else do
     putStr "checking whether to use -liconv... "
@@ -51,20 +49,14 @@ maybeSetLibiconv flags bi lbi = do
     if worksWithout
         then do
             putStrLn "not needed."
-            writeBuildInfo ""
             return bi
         else do
     worksWith <- tryCompile iconv_prog biWithIconv lbi verb
     if worksWith
         then do
             putStrLn "using -liconv."
-            writeBuildInfo "iconv"
             return biWithIconv
         else error "Unable to link against the iconv library."
-  where
-    -- Cabal (at least 1.6.0.1) won't parse an empty buildinfo file.
-    writeBuildInfo libs = writeFile "haskeline.buildinfo"
-                            $ unlines ["extra-libraries: " ++ libs]
 
 hasFlagSet :: ConfigFlags -> FlagName -> Bool
 hasFlagSet cflags flag = Just True == lookup flag (configConfigurationsFlags cflags)
