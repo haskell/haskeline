@@ -32,6 +32,7 @@ import System.Console.Haskeline.Prefs
 
 import System.Console.Haskeline.Backend.IConv
 
+#ifdef NEW_BASE
 import GHC.IO.FD (fdFD)
 import Data.Dynamic (cast)
 import System.IO.Error
@@ -39,6 +40,10 @@ import GHC.IO.Exception
 import GHC.IO.Handle.Types hiding (getState)
 import GHC.IO.Handle.Internals
 import System.Posix.Internals (FD)
+#else
+import GHC.IOBase(haFD,FD)
+import GHC.Handle (withHandle_)
+#endif
 
 #ifdef USE_TERMIOS_H
 #include <termios.h>
@@ -64,6 +69,7 @@ ioctlLayout h = allocaBytes (#size struct winsize) $ \ws -> do
                     else return Nothing
 
 unsafeHandleToFD :: Handle -> IO FD
+#ifdef NEW_BASE
 unsafeHandleToFD h =
   withHandle_ "unsafeHandleToFd" h $ \Handle__{haDevice=dev} -> do
   case cast dev of
@@ -71,6 +77,9 @@ unsafeHandleToFD h =
                                            "unsafeHandleToFd" (Just h) Nothing)
                         "handle is not a file descriptor")
     Just fd -> return (fdFD fd)
+#else
+unsafeHandleToFD h = withHandle_ "unsafeHandleToFd" h (return . haFD)
+#endif
 
 envLayout :: IO (Maybe Layout)
 envLayout = handle (\(_::IOException) -> return Nothing) $ do

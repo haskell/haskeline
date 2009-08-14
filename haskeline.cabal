@@ -21,7 +21,7 @@ Stability:      Experimental
 Build-Type:     Custom
 extra-source-files: examples/Test.hs
 
-flag old-base
+flag base2
     Description: Use the base packages from before version 6.8
 
 flag terminfo
@@ -33,12 +33,21 @@ flag libiconv
     Default: False
 
 Library
-    if flag(old-base)
+    if flag(base2) {
         Build-depends: base == 2.*
         cpp-options:    -DOLD_BASE
-    else
-        Build-depends: base>=3 && <5 , containers>=0.1, directory>=1.0,
-                        bytestring==0.9.*
+    }
+    else {
+        if impl(ghc>=6.11) {
+            Build-depends: base==4.1.*, containers>=0.1 && < 0.3, directory==1.0.*,
+                           bytestring==0.9.*
+            cpp-options:    -DNEW_BASE
+        }
+        else {
+            Build-depends: base>=3 && <4.1 , containers>=0.1 && < 0.3, directory==1.0.*,
+                           bytestring==0.9.*
+        }
+    }
     Build-depends:  filepath==1.1.*, mtl==1.1.*,
                     utf8-string==0.3.* && >=0.3.1.1,
                     extensible-exceptions==0.1.* && >=0.1.1.0
