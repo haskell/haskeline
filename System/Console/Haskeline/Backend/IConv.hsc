@@ -145,8 +145,8 @@ partialIconv cd outSize inBuff inBytesLeft =
     createAndTrim' outSize $ \outPtr ->
     with outPtr $ \outBuff ->
     with (toEnum outSize) $ \outBytesLeft -> do
-        throwErrnoIfMinus1Retry_ "iconv" $
-            c_iconv cd_p inBuff inBytesLeft (castPtr outBuff) outBytesLeft
+        -- ignore the return value; checking the errno is more reliable.
+        _ <- c_iconv cd_p inBuff inBytesLeft (castPtr outBuff) outBytesLeft
         outLeft <- fmap fromEnum $ peek outBytesLeft
         inLeft <- peek inBytesLeft
         errno <- if inLeft > 0
