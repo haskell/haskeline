@@ -27,7 +27,7 @@ enders = choiceCmd [simpleChar '\n' +> finish, eotKey +> deleteCharOrEOF]
         eotKey = ctrlChar 'd'
         deleteCharOrEOF s
             | s == emptyIM  = return Nothing
-            | otherwise = change deleteNext s >> justDelete s
+            | otherwise = change deleteNext s >>= justDelete
         justDelete = keyChoiceCmd [eotKey +> change deleteNext >|> justDelete
                             , emacsCommands]
 
