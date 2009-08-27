@@ -71,7 +71,10 @@ import Data.Char
 -- be treated as one unit.
 data Grapheme = Grapheme {gBaseChar :: Char,
                             combiningChars :: [Char]}
-                    deriving (Show, Eq)
+                    deriving Eq
+
+instance Show Grapheme where
+    show g = show (gBaseChar g : combiningChars g)
 
 baseChar :: Grapheme -> Char
 baseChar = gBaseChar
