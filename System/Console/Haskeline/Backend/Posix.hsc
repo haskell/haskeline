@@ -32,7 +32,7 @@ import System.Console.Haskeline.Prefs
 
 import System.Console.Haskeline.Backend.IConv
 
-#ifdef NEW_BASE
+#if __GLASGOW_HASKELL__ >= 611
 import GHC.IO.FD (fdFD)
 import Data.Dynamic (cast)
 import System.IO.Error
@@ -69,7 +69,7 @@ ioctlLayout h = allocaBytes (#size struct winsize) $ \ws -> do
                     else return Nothing
 
 unsafeHandleToFD :: Handle -> IO FD
-#ifdef NEW_BASE
+#if __GLASGOW_HASKELL__ >= 611
 unsafeHandleToFD h =
   withHandle_ "unsafeHandleToFd" h $ \Handle__{haDevice=dev} -> do
   case cast dev of
