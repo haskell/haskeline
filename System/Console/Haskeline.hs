@@ -235,7 +235,8 @@ getInputCmdChar tops prefix = runInputCmdT tops
         $ runCommandLoop tops prefix acceptOneChar
 
 acceptOneChar :: Monad m => KeyCommand m InsertMode (Maybe Char)
-acceptOneChar = choiceCmd [useChar $ \c _ -> return $ Just c
+acceptOneChar = choiceCmd [useChar $ \c s -> change (insertChar c) s
+                                                >> return (Just c)
                           , ctrlChar 'd' +> failCmd]
 
 ------------
