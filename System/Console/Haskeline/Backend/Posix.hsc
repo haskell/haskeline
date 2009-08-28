@@ -214,11 +214,22 @@ getEvent enc baseMap = keyEventLoop readKeyEvents
         -- Read at least one character of input, and more if available.
         -- In particular, the characters making up a control sequence will all
         -- be available at once, so we can process them together with lexKeys.
-        threadWaitRead stdInput -- hWaitForInput doesn't work with -threaded on
-                                -- ghc < 6.10 (#2363 in ghc's trac)
+        blockUntilInput
         bs <- B.hGetNonBlocking stdin bufferSize
         cs <- convert (localeToUnicode enc) bs
         return $ map KeyInput $ lexKeys baseMap cs
+
+-- Different versions of ghc work better using different functions.
+blockUntilInput :: IO ()
+#if __GLASGOW_HASKELL__ >= 611
+-- threadWaitRead doesn't work with the new ghc IO library,
+-- because it keeps a buffer even when NoBuffering is set.
+blockUntilInput = hWaitForInput stdin (-1) >> return ()
+#else
+-- hWaitForInput doesn't work with -threaded on ghc < 6.10
+-- (#2363 in ghc's trac)
+blockUntilInput = threadWaitRead stdInput
+#endif
 
 -- try to convert to the locale encoding using iconv.
 -- if the buffer has an incomplete shift sequence,
