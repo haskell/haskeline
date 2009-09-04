@@ -262,7 +262,9 @@ openTTY = do
     inIsTerm <- hIsTerminalDevice stdin
     if inIsTerm
         then handle (\(_::IOException) -> return Nothing) $ do
-                h <- openFile "/dev/tty" WriteMode
+            -- NB: we open the tty as a binary file since otherwise the terminfo
+            -- backend, which writes output as Chars, would double-encode on ghc-6.12.
+                h <- openBinaryFile "/dev/tty" WriteMode
                 return (Just h)
         else return Nothing
 
