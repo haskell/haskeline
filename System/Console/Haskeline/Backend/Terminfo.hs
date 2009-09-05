@@ -158,6 +158,8 @@ terminfoKeys term = catMaybes $ map getSequence keyCapabilities
                 ,(keyDeleteChar, simpleKey Delete)
                 ,(keyHome,       simpleKey Home)
                 ,(keyEnd,        simpleKey End)
+                ,(keyPageDown,   simpleKey PageDown)
+                ,(keyPageUp,     simpleKey PageUp)
                 ]
 
     

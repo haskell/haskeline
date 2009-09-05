@@ -36,7 +36,7 @@ data BaseKey = KeyChar Char
              | FunKey Int
              | LeftKey | RightKey | DownKey | UpKey
              -- TODO: is KillLine really a key?
-             | KillLine | Home | End
+             | KillLine | Home | End | PageDown | PageUp
              | Backspace | Delete
             deriving (Show,Eq,Ord)
 
@@ -64,6 +64,8 @@ specialKeys = [("left",LeftKey)
               ,("killline",KillLine)
               ,("home",Home)
               ,("end",End)
+              ,("pagedown",PageDown)
+              ,("pageup",PageUp)
               ,("backspace",Backspace)
               ,("delete",Delete)
               ,("return",KeyChar '\n')

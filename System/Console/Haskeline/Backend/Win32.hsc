@@ -91,6 +91,8 @@ keyFromCode (#const VK_DOWN) = Just DownKey
 keyFromCode (#const VK_DELETE) = Just Delete
 keyFromCode (#const VK_HOME) = Just Home
 keyFromCode (#const VK_END) = Just End
+keyFromCode (#const VK_PRIOR) = Just PageUp
+keyFromCode (#const VK_NEXT) = Just PageDown
 -- The Windows console will return '\r' when return is pressed.
 keyFromCode (#const VK_RETURN) = Just (KeyChar '\n')
 -- TODO: KillLine?
