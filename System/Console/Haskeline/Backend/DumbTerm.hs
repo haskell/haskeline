@@ -46,8 +46,8 @@ instance (MonadException m, MonadReader Layout m) => Term (DumbTerm m) where
     reposition _ s = refitLine s
     drawLineDiff = drawLineDiff'
     
-    printLines = mapM_ (\s -> printText (s ++ crlf))
-    moveToNextLine = \_ -> printText crlf
+    printLines = mapM_ (printText . (++ crlf))
+    moveToNextLine _ = printText crlf
     clearLayout = clearLayoutD
     ringBell True = printText "\a"
     ringBell False = return ()

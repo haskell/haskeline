@@ -319,10 +319,10 @@ instance Result s => Result (ArgMode s) where
 
 instance Save s => Save (ArgMode s) where
     save = save . argState
-    restore s = startArg 0 (restore s)
+    restore = startArg 0 . restore
 
 startArg :: Int -> s -> ArgMode s
-startArg n s = ArgMode n s
+startArg = ArgMode
 
 addNum :: Int -> ArgMode s -> ArgMode s
 addNum n am

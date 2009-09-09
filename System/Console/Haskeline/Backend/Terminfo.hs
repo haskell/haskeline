@@ -10,7 +10,7 @@ import Data.List(intersperse)
 import System.IO
 import qualified Control.Exception.Extensible as Exception
 import qualified Data.ByteString.Char8 as B
-import Data.Maybe (fromMaybe, catMaybes)
+import Data.Maybe (fromMaybe, mapMaybe)
 import Control.Concurrent.Chan
 
 import System.Console.Haskeline.Monads as Monads
@@ -66,12 +66,12 @@ getWrapLine nl' left1 = (autoRightMargin >>= guard >> withAutoMargin)
 type TermAction = Actions -> TermOutput
     
 left,right,up :: Int -> TermAction
-left n = flip leftA n
-right n = flip rightA n
-up n = flip upA n
+left = flip leftA
+right = flip rightA
+up = flip upA
 
 clearAll :: LinesAffected -> TermAction
-clearAll la = flip clearAllA la
+clearAll = flip clearAllA
 
 --------
 
@@ -134,8 +134,8 @@ wrapKeypad :: MonadException m => Handle -> Terminal -> m a -> m a
 wrapKeypad h term f = (maybeOutput keypadOn >> f)
                             `finally` maybeOutput keypadOff
   where
-    maybeOutput cap = liftIO $ hRunTermOutput h term $
-                            fromMaybe mempty (getCapability term cap)
+    maybeOutput = liftIO . hRunTermOutput h term .
+                            fromMaybe mempty . getCapability term
 
 tinfoLayout :: Terminal -> IO (Maybe Layout)
 tinfoLayout term = return $ getCapability term $ do
@@ -144,7 +144,7 @@ tinfoLayout term = return $ getCapability term $ do
                         return Layout {height=r,width=c}
 
 terminfoKeys :: Terminal -> [(String,Key)]
-terminfoKeys term = catMaybes $ map getSequence keyCapabilities
+terminfoKeys term = mapMaybe getSequence keyCapabilities
     where
         getSequence (cap,x) = do
                             keys <- getCapability term cap
@@ -243,7 +243,7 @@ linesLeft Layout {width=w} TermPos {termCol = c} n
     | otherwise = 1 + div (c+n) w
 
 lsLinesLeft :: Layout -> TermPos -> LineChars -> Int
-lsLinesLeft layout pos s = linesLeft layout pos (lengthToEnd s)
+lsLinesLeft layout pos = linesLeft layout pos . lengthToEnd
 
 clearDeadText :: Int -> DrawM ()
 clearDeadText n

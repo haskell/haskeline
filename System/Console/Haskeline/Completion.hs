@@ -62,7 +62,7 @@ completeWord esc ws f (line, _) = do
   where
     escapedBreak e (c:d:cs) | d == e && c `elem` (e:ws)
             = let (xs,ys) = escapedBreak e cs in (c:xs,ys)
-    escapedBreak e (c:cs) | not (elem c ws)
+    escapedBreak e (c:cs) | notElem c ws
             = let (xs,ys) = escapedBreak e cs in (c:xs,ys)
     escapedBreak _ cs = ("",cs)
     
@@ -156,7 +156,7 @@ listFiles path = liftIO $ do
             return $ setReplacement fullName $ alterIfDir isDir c
   where
     (dir, file) = splitFileName path
-    filterPrefix = filter (\f -> not (f `elem` [".",".."])
+    filterPrefix = filter (\f -> notElem f [".",".."]
                                         && file `isPrefixOf` f)
     alterIfDir False c = c
     alterIfDir True c = c {replacement = addTrailingPathSeparator (replacement c),
@@ -167,7 +167,7 @@ listFiles path = liftIO $ do
     -- an absolute path (strange, but it can happen).
     -- The FilePath docs state that (++) is an exact inverse of splitFileName, so
     -- that's the right function to user here.
-    fullName f = dir ++ f
+    fullName = (dir ++)
 
 -- turn a user-visible path into an internal version useable by System.FilePath.
 fixPath :: String -> IO String

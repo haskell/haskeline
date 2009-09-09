@@ -95,12 +95,12 @@ settors = [("bellstyle", mkSettor $ \x p -> p {bellStyle = x})
           ]
 
 addCustomBinding :: String -> Prefs -> Prefs
-addCustomBinding str p = case sequence $ map parseKey (words str) of
+addCustomBinding str p = case mapM parseKey (words str) of
     Just (k:ks) -> p {customBindings = Map.insert k ks (customBindings p)}
     _ -> p
 
 addCustomKeySequence :: String -> Prefs -> Prefs
-addCustomKeySequence str = maybe id addKS $ maybeParse
+addCustomKeySequence str = maybe id addKS maybeParse
     where
         maybeParse :: Maybe (Maybe String, String,Key)
         maybeParse = case words str of

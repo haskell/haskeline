@@ -60,7 +60,7 @@ readHistory file = handle (\(_::IOException) -> return emptyHistory) $ do
         then fmap UTF8.toString (B.readFile file)
         else return ""
     _ <- evaluate (length contents) -- force file closed
-    return $ History {histLines = Seq.fromList $ lines contents,
+    return History {histLines = Seq.fromList $ lines contents,
                     stifleAmt = Nothing}
 
 -- | Writes the line history to the given file.  If there is an

@@ -72,9 +72,8 @@ import System.Console.Haskeline.Key
 import System.Console.Haskeline.RunCommand
 
 import System.IO
-import Data.Char (isSpace)
+import Data.Char (isSpace, isPrint)
 import Control.Monad
-import Data.Char(isPrint)
 import qualified Data.ByteString.Char8 as B
 import System.IO.Error (isEOFError)
 
@@ -106,7 +105,7 @@ outputStr xs = do
 
 -- | Write a string to the standard output, followed by a newline.
 outputStrLn :: MonadIO m => String -> InputT m ()
-outputStrLn xs = outputStr (xs++"\n")
+outputStrLn = outputStr . (++ "\n")
 
 
 {- $inputfncs

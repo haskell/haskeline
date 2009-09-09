@@ -47,7 +47,7 @@ data KeyMap a = KeyMap {lookupKM :: Key -> Maybe (KeyConsumed a)}
 data KeyConsumed a = NotConsumed a | Consumed a
 
 instance Functor KeyMap where
-    fmap f km = KeyMap $ \k -> fmap (fmap f) (lookupKM km k)
+    fmap f km = KeyMap $ fmap (fmap f) . lookupKM km
 
 instance Functor KeyConsumed where
     fmap f (NotConsumed x) = NotConsumed (f x)
@@ -119,10 +119,10 @@ try f = keyChoiceCmd [f,withoutConsuming return]
 
 infixr 6 +>
 (+>) :: Key -> a -> KeyMap a
-k +> f = useKey k f
+(+>) = useKey
 
 finish :: (Monad m, Result s) => Command m s (Maybe String)
-finish s = return $ Just $ toResult s
+finish = return . Just . toResult
 
 failCmd :: Monad m => Command m s (Maybe a)
 failCmd _ = return Nothing
@@ -131,7 +131,7 @@ effect :: Effect -> CmdM m ()
 effect e = DoEffect e $ Result ()
 
 clearScreenCmd :: Command m s s
-clearScreenCmd x = DoEffect ClearScreen (Result x)
+clearScreenCmd = DoEffect ClearScreen . Result
 
 simpleCommand :: (LineState s, Monad m) => (s -> m (Either Effect s))
         -> Command m s s
@@ -149,7 +149,7 @@ setState :: (Monad m, LineState s) => Command m s s
 setState s = effect (lineChange s) >> return s
 
 change :: (LineState t, Monad m) => (s -> t) -> Command m s t
-change f = setState . f
+change = (setState .)
 
 changeFromChar :: (LineState t, Monad m) => (Char -> s -> t) -> KeyCommand m s t
 changeFromChar f = useChar $ change . f

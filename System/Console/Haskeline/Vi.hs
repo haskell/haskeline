@@ -170,7 +170,7 @@ useMovementsForKill alternate useHelper = choiceCmd $
 
 
 repeatableCommands :: InputKeyCmd (ArgMode CommandMode) EitherMode
-repeatableCommands = choiceCmd $
+repeatableCommands = choiceCmd
                         [ repeatableCmdToIMode
                         , repeatableCmdMode >+> return . Left
                         , simpleChar '.' +> saveForUndo >|> runLastCommand
@@ -179,7 +179,7 @@ repeatableCommands = choiceCmd $
         runLastCommand s = liftM lastCommand get >>= ($ s)
 
 repeatableCmdMode :: InputKeyCmd (ArgMode CommandMode) CommandMode
-repeatableCmdMode = choiceCmd $ 
+repeatableCmdMode = choiceCmd
                     [ simpleChar 'x' +> repeatableChange deleteChar
                     , simpleChar 'X' +> repeatableChange (withCommandMode deletePrev)
                     , simpleChar '~' +> repeatableChange (goRight . flipCase)
@@ -203,14 +203,14 @@ repeatableCmdToIMode :: InputKeyCmd (ArgMode CommandMode) EitherMode
 repeatableCmdToIMode = simpleChar 'c' +> deletionToInsertCmd
 
 deletionCmd :: InputCmd (ArgMode CommandMode) CommandMode
-deletionCmd = keyChoiceCmd $
+deletionCmd = keyChoiceCmd
                     [simpleChar 'd' +> killAndStoreCmd killAll
                     , useMovementsForKill (change argState) killAndStoreCmd
                     , withoutConsuming (change argState)
                     ]
 
 deletionToInsertCmd :: InputCmd (ArgMode CommandMode) EitherMode
-deletionToInsertCmd = keyChoiceCmd $
+deletionToInsertCmd = keyChoiceCmd
         [simpleChar 'c' +> killAndStoreIE killAll
         -- vim, for whatever reason, treats cw same as ce and cW same as cE.
         -- readline does this too, so we should also.
@@ -221,7 +221,7 @@ deletionToInsertCmd = keyChoiceCmd $
 
 
 yankCommand :: InputCmd (ArgMode CommandMode) CommandMode
-yankCommand = keyChoiceCmd $ 
+yankCommand = keyChoiceCmd
                 [simpleChar 'y' +> copyAndStore killAll
                 , useMovementsForKill (change argState) copyAndStore
                 , withoutConsuming (change argState)
@@ -282,7 +282,7 @@ isWordChar = isAlphaNum .||. (=='_')
 isOtherChar = not . (isSpace .||. isWordChar)
 
 (.||.) :: (a -> Bool) -> (a -> Bool) -> a -> Bool
-f .||. g = \x -> f x || g x
+(f .||. g) x = f x || g x
 
 foreachDigit :: (Monad m, LineState t) => (Int -> s -> t) -> [Char] 
                 -> KeyCommand m s t
@@ -414,7 +414,7 @@ viSearchHist :: forall m . Monad m
 viSearchHist dir toSearch cm = do
     vstate :: ViState m <- get
     let toSearch' = if null toSearch
-                        then (lastSearch vstate)
+                        then lastSearch vstate
                         else toSearch
     result <- doSearch False SearchMode {
                                     searchTerm = toSearch',
