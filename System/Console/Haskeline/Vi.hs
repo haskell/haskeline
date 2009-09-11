@@ -59,6 +59,7 @@ simpleInsertions = choiceCmd
                    , simpleKey DownKey +> historyForward
                    , searchHistory
                    , simpleKey KillLine +> killFromHelper (SimpleMove moveToStart)
+                   , ctrlChar 'w' +> killFromHelper wordErase
                    , completionCmd (simpleChar '\t')
                    ]
 
@@ -186,6 +187,7 @@ repeatableCmdMode = choiceCmd
                     , simpleChar 'P' +> storedCmdAction (pasteCommand pasteGraphemesBefore)
                     , simpleChar 'd' +> deletionCmd
                     , simpleChar 'y' +> yankCommand
+                    , ctrlChar 'w' +> killAndStoreCmd wordErase
                     , pureMovements
                     ]
     where
@@ -288,6 +290,12 @@ foreachDigit :: (Monad m, LineState t) => (Int -> s -> t) -> [Char]
 foreachDigit f ds = choiceCmd $ map digitCmd ds
     where digitCmd d = simpleChar d +> change (f (toDigit d))
           toDigit d = fromEnum d - fromEnum '0'
+
+
+-- This mimics the ctrl-w command in readline's vi mode, which corresponds to
+-- the tty's werase character.
+wordErase :: KillHelper
+wordErase = SimpleMove $ goLeftUntil $ atStart isBigWordChar
 
 ------------------
 -- Matching braces
