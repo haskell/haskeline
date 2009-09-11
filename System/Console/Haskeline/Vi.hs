@@ -36,7 +36,7 @@ type InputKeyCmd s t = forall m . Monad m => KeyCommand (ViT m) s t
 viKeyCommands :: InputKeyCmd InsertMode (Maybe String)
 viKeyCommands = choiceCmd [
                 simpleChar '\n' +> finish
-                , ctrlChar 'd' +> eofIfEmpty viCommands
+                , ctrlChar 'd' +> eofIfEmpty
                 , simpleInsertions >+> viCommands
                 , simpleChar '\ESC' +> change enterCommandMode
                     >|> viCommandActions
@@ -74,17 +74,16 @@ insertChars = useChar $ loop []
                                                 >|> return . Left
 
 -- If we receive a ^D and the line is empty, return Nothing
--- otherwise, ignore it.
-eofIfEmpty :: (Monad m, Save s) => Command m s (Maybe String)
-                        -> Command m s (Maybe String)
-eofIfEmpty next s
+-- otherwise, act like '\n' (mimicing how Readline behaves)
+eofIfEmpty :: (Monad m, Save s, Result s) => Command m s (Maybe String)
+eofIfEmpty s
     | save s == emptyIM = return Nothing
-    | otherwise = next s
+    | otherwise = finish s
 
 viCommandActions :: InputCmd CommandMode (Maybe String)
 viCommandActions = keyChoiceCmd [
                     simpleChar '\n' +> finish
-                    , ctrlChar 'd' +> eofIfEmpty viCommandActions
+                    , ctrlChar 'd' +> eofIfEmpty
                     , simpleCmdActions >+> viCommandActions
                     , exitingCommands >+> viCommands
                     , repeatedCommands >+> chooseEitherMode
