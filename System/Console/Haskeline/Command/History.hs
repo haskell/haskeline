@@ -145,9 +145,13 @@ doSearch useCurrent sm = case direction sm of
 
 searchHistory :: MonadState HistLog m => KeyCommand m InsertMode InsertMode
 searchHistory = choiceCmd [
+            metaChar 'j' +> searchForPrefix Forward
+            , metaChar 'k' +> searchForPrefix Reverse
+            , choiceCmd [
                  backKey +> change (startSearchMode Reverse)
                  , forwardKey +> change (startSearchMode Forward)
                  ] >+> keepSearching
+            ]
     where
         backKey = ctrlChar 'r'
         forwardKey = ctrlChar 's'
@@ -164,3 +168,35 @@ searchHistory = choiceCmd [
         minit xs = if null xs then [] else init xs
         oneMoreChar c = doSearch True . addChar c
         searchMore d s = doSearch False s {direction=d}
+
+
+searchForPrefix :: MonadState HistLog m => Direction
+                    -> Command m InsertMode InsertMode
+searchForPrefix dir s@(IMode xs _) = do
+    next <- findFirst prefixed dir s
+    maybe (return s) setState next
+  where
+    prefixed gs = if rxs `isPrefixOf` gs
+                    then Just $ IMode xs (drop (length xs) gs)
+                    else Nothing
+    rxs = reverse xs
+
+-- Search for the first entry in the history which satisfies the constraint.
+-- If it succeeds, the HistLog is updated and the result is returned.
+-- If it fails, the HistLog is unchanged.
+-- TODO: make the other history searching functions use this instead.
+findFirst :: forall s m . (Save s, MonadState HistLog m)
+    => ([Grapheme] -> Maybe s) -> Direction -> s -> m (Maybe s)
+findFirst cond Forward s = reverseHist $ findFirst cond Reverse s
+findFirst cond Reverse s = do
+    hist <- get
+    case search (prevHistories (listSave s) hist) of
+        Nothing -> return Nothing
+        Just (s',hist') -> put hist' >> return (Just s')
+  where
+    search :: [([Grapheme],HistLog)] -> Maybe (s,HistLog)
+    search [] = Nothing
+    search ((g,h):gs) = case cond g of
+        Nothing -> search gs
+        Just s' -> Just (s',h)
+
