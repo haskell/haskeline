@@ -14,6 +14,7 @@ import System.IO
 import System.Exit
 import System.Directory
 import Control.Exception.Extensible
+import Control.Monad(when)
 
 main :: IO ()
 main = defaultMainWithHooks myHooks
@@ -23,6 +24,7 @@ myHooks
     | buildOS == Windows    = simpleUserHooks
     | otherwise = simpleUserHooks {
             confHook = \genericDescript flags -> do
+                        warnIfNotTerminfo flags
                         lbi <- confHook simpleUserHooks genericDescript flags
                         let pkgDescr = localPkgDescr lbi
                         let Just lib = library pkgDescr
@@ -104,3 +106,6 @@ iconv_prog = unlines $
     , "}"
     ]
     
+warnIfNotTerminfo flags = when (not (hasFlagSet flags (FlagName "terminfo"))) $
+  putStrLn $
+    "*** Warning: running on POSIX but not building the terminfo backend. ***"
