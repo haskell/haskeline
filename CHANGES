@@ -1,0 +1,23 @@
+Changed in version 0.6.2:
+
+  User interface changes:
+   * A multitude of new emacs and vi commands
+
+   * New preference 'historyDuplicates' to prevent storage of duplicate lines
+
+   * Support PageUp and PageDown keys
+
+   * Let ctrl-L (clear-screen) work during getInputChar
+
+  Internal/API changes:
+   * Compatibility with ghc-6.12
+
+   * Calculate the correct width for Unicode combining characters
+
+   * Removed RankNTypes requirement; added Rank2Types and UndecidableInstances
+
+   * Use simpleUserHooks instead of autoconfUserHooks in the Setup script
+
+   * Internal refactoring to make command declaration more flexible
+
+   * Read the .haskeline file completely before starting the UI (laziness issue)
