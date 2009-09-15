@@ -19,7 +19,7 @@ Description:
 Homepage:       http://trac.haskell.org/haskeline
 Stability:      Experimental
 Build-Type:     Custom
-extra-source-files: examples/Test.hs
+extra-source-files: examples/Test.hs CHANGES
 
 flag base2
     Description: Use the base packages from before version 6.8
