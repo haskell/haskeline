@@ -5,6 +5,7 @@ module System.Console.Haskeline.Prefs(
                         CompletionType(..),
                         BellStyle(..),
                         EditMode(..),
+                        HistoryDuplicates(..),
                         lookupKeyBinding
                         ) where
 
@@ -31,6 +32,7 @@ unparseable lines are ignored.  For example:
 data Prefs = Prefs { bellStyle :: !BellStyle,
                      editMode :: !EditMode,
                      maxHistorySize :: !(Maybe Int),
+                     historyDuplicates :: HistoryDuplicates,
                      completionType :: !CompletionType,
                      completionPaging :: !Bool, 
                         -- ^ When listing completion alternatives, only display
@@ -59,6 +61,9 @@ data BellStyle = NoBell | VisualBell | AudibleBell
 data EditMode = Vi | Emacs
                     deriving (Show,Read)
 
+data HistoryDuplicates = AlwaysAdd | IgnoreConsecutive | IgnoreAll
+                    deriving (Show,Read)
+
 -- | The default preferences which may be overwritten in the
 -- @.haskeline@ file.
 defaultPrefs :: Prefs
@@ -69,6 +74,7 @@ defaultPrefs = Prefs {bellStyle = AudibleBell,
                       completionPaging = True,
                       completionPromptLimit = Just 100,
                       listCompletionsImmediately = True,
+                      historyDuplicates = AlwaysAdd,
                       customBindings = Map.empty,
                       customKeySequences = []
                     }
@@ -90,6 +96,7 @@ settors = [("bellstyle", mkSettor $ \x p -> p {bellStyle = x})
           ,("completionpaging", mkSettor $ \x p -> p {completionPaging = x})
           ,("completionpromptlimit", mkSettor $ \x p -> p {completionPromptLimit = x})
           ,("listcompletionsimmediately", mkSettor $ \x p -> p {listCompletionsImmediately = x})
+          ,("historyduplicates", mkSettor $ \x p -> p {historyDuplicates = x})
           ,("bind", addCustomBinding)
           ,("keyseq", addCustomKeySequence)
           ]

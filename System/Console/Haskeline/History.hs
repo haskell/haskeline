@@ -15,6 +15,8 @@ module System.Console.Haskeline.History(
                         History(),
                         emptyHistory,
                         addHistory,
+                        addHistoryUnlessConsecutiveDupe,
+                        addHistoryRemovingAllDupes,
                         historyLines,
                         readHistory,
                         writeHistory,
@@ -23,7 +25,8 @@ module System.Console.Haskeline.History(
                         ) where
 
 import qualified Data.Sequence as Seq
-import Data.Foldable
+import Data.Sequence ( Seq, (<|), ViewL(..), ViewR(..), viewl, viewr )
+import Data.Foldable (toList)
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as UTF8
@@ -31,7 +34,7 @@ import Control.Exception.Extensible
 
 import System.Directory(doesFileExist)
 
-data History = History {histLines :: Seq.Seq String,
+data History = History {histLines :: Seq String,
                         stifleAmt :: Maybe Int}
                     -- stored in reverse
 
@@ -81,10 +84,27 @@ stifleHistory a@(Just n) hist = History {histLines = stifleFnc (histLines hist),
                         else Seq.fromList . take n . toList
 
 addHistory :: String -> History -> History
-addHistory s h = h {histLines = s Seq.<| stifledLines}
+addHistory s h = h {histLines = maybeDropLast (stifleAmt h) (s <| (histLines h))}
+
+-- If the sequence is too big, drop the last entry.
+maybeDropLast :: Ord a => Maybe Int -> Seq a -> Seq a
+maybeDropLast maxAmt hs
+    | rightSize = hs
+    | otherwise = case Seq.viewr hs of
+                    EmptyR -> hs
+                    hs' :> _ -> hs'
   where
-    stifledLines = if maybe True (> Seq.length (histLines h)) (stifleAmt h)
-                    then histLines h
-                    else case Seq.viewr (histLines h) of
-                            Seq.EmptyR -> histLines h -- shouldn't ever happen
-                            ls Seq.:> _ -> ls
+    rightSize = maybe True (>= Seq.length hs) maxAmt
+
+-- | Add a line to the history unless it matches the previously recorded line.
+addHistoryUnlessConsecutiveDupe :: String -> History -> History
+addHistoryUnlessConsecutiveDupe h hs = case viewl (histLines hs) of
+    h1 :< _ | h==h1   -> hs
+    _                   -> addHistory h hs
+
+-- | Add a line to the history, and remove all previous entries which are the 
+-- same as it.
+addHistoryRemovingAllDupes :: String -> History -> History
+addHistoryRemovingAllDupes h hs = addHistory h hs {histLines = filteredHS}
+  where
+    filteredHS = Seq.fromList $ filter (/= h) $ toList $ histLines hs

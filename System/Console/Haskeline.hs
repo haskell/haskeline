@@ -154,9 +154,14 @@ getInputCmdLine tops prefix = do
 maybeAddHistory :: forall m . Monad m => Maybe String -> InputT m ()
 maybeAddHistory result = do
     settings :: Settings m <- ask
+    histDupes <- asks historyDuplicates
     case result of
         Just line | autoAddHistory settings && not (all isSpace line) 
-            -> modify (addHistory line)
+            -> let adder = case histDupes of
+                        AlwaysAdd -> addHistory
+                        IgnoreConsecutive -> addHistoryUnlessConsecutiveDupe
+                        IgnoreAll -> addHistoryRemovingAllDupes
+               in modify (adder line)
         _ -> return ()
 
 simpleFileLoop :: MonadIO m => String -> RunTerm -> m (Maybe String)
