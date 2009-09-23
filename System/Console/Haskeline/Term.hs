@@ -10,6 +10,11 @@ import Control.Concurrent
 import Data.Typeable
 import Data.ByteString (ByteString)
 import Control.Exception.Extensible (fromException, AsyncException(..),bracket_)
+import System.IO(Handle)
+
+#if __GLASGOW_HASKELL__ >= 611
+import System.IO (hGetEncoding, hSetEncoding, hSetBinaryMode)
+#endif
 
 class (MonadReader Layout m, MonadException m) => Term m where
     reposition :: Layout -> LineChars -> m ()
@@ -102,3 +107,14 @@ instance Exception Interrupt where
 
 data Layout = Layout {width, height :: Int}
                     deriving (Show,Eq)
+
+--------
+-- Utility function since we're not using the new IO library yet.
+hWithBinaryMode :: MonadException m => Handle -> m a -> m a
+#if __GLASGOW_HASKELL__ >= 611
+hWithBinaryMode h = bracket (liftIO $ hGetEncoding h)
+                        (maybe (return ()) (liftIO . hSetEncoding h))
+                        . const . (liftIO (hSetBinaryMode h True) >>)
+#else
+hWithBinaryMode _ = id
+#endif

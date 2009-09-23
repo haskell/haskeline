@@ -175,7 +175,8 @@ simpleFileLoop prefix rterm = liftIO $ do
             -- error if stdin is set to NoBuffering.
             buff <- hGetBuffering stdin
             line <- case buff of
-                        NoBuffering -> fmap B.pack System.IO.getLine
+                        NoBuffering -> hWithBinaryMode stdin
+                                $ fmap B.pack System.IO.getLine
                         _ -> B.getLine
             fmap Just $ decodeForTerm rterm line
 

@@ -246,9 +246,8 @@ convert decoder bs = do
         Invalid rest -> fmap ((cs ++) . ('?':)) $ convert decoder (B.drop 1 rest)
         _ -> return cs
 
--- NOTE: relys on getChar reading only 8 bytes.
 getMultiByteChar :: (B.ByteString -> IO (String,Result)) -> IO Char
-getMultiByteChar decoder = do
+getMultiByteChar decoder = hWithBinaryMode stdin $ do
     b <- getChar
     cs <- convert decoder (Char8.pack [b])
     case cs of

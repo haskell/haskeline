@@ -421,7 +421,7 @@ foreign import stdcall "IsDBCSLeadByteEx" c_IsDBCSLeadByteEx
         :: CodePage -> BYTE -> BOOL
 
 getMultiByteChar :: CodePage -> IO Char
-getMultiByteChar cp = do
+getMultiByteChar cp = hWithBinaryMode stdin $ do
     b1 <- getByte
     bs <- if c_IsDBCSLeadByteEx cp b1
             then getByte >>= \b2 -> return [b1,b2]
