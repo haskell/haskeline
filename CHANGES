@@ -1,3 +1,11 @@
+Changed in version 0.6.2.1:
+  Internal/API changes:
+   * Make sure to always use binary mode when expecting Char-as-byte.
+
+   * Eliminate unused import warnings on ghc>=6.11
+
+   * Increase upper bound on some dependencies for ghc-6.12
+
 Changed in version 0.6.2:
 
   User interface changes:
