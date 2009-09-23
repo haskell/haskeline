@@ -90,7 +90,7 @@ addHistory s h = h {histLines = maybeDropLast (stifleAmt h) (s <| (histLines h))
 maybeDropLast :: Ord a => Maybe Int -> Seq a -> Seq a
 maybeDropLast maxAmt hs
     | rightSize = hs
-    | otherwise = case Seq.viewr hs of
+    | otherwise = case viewr hs of
                     EmptyR -> hs
                     hs' :> _ -> hs'
   where
