@@ -209,7 +209,6 @@ advancePos Layout {width=w} k p
 ----------------------------------------------------------------
 -- Text printing actions
 
--- TODO: I think if we wrap this all up in one call to output, it'll be faster...
 printText :: [Grapheme] -> DrawM ()
 printText [] = return ()
 printText gs = do
@@ -229,9 +228,16 @@ drawLineDiffT (xs1,ys1) (xs2,ys2) = case matchInit xs1 xs2 of
     ([],xs2')   | ys1 == xs2' ++ ys2    -> changeRight (length xs2')
     (xs1',xs2')                         -> do
         changeLeft (length xs1')
-        printText (xs2' ++ ys2)
+        -- TODO: is splitting up stuff bad?
+        -- Maybe it'd be better if there was some sort of flushing...
+        -- or we could just concat all of the TermActions together...
+        printText xs2'
+        p <- get
+        printText ys2
+        -- TODO: maybe better to precompute before starting to output?
+        -- hard to say...
         clearDeadText $ length xs1' + length ys1 - (length xs2' + length ys2)
-        changeLeft (length ys2)
+        moveToPos p 
 
 linesLeft :: Layout -> TermPos -> Int -> Int
 linesLeft Layout {width=w} TermPos {termCol = c} n
@@ -247,13 +253,12 @@ clearDeadText n
     | otherwise = do
         layout <- ask
         pos <- get
-        let numLinesToClear = linesLeft layout pos n
-        output clearToLineEnd
-        when (numLinesToClear > 1) $ output $ mconcat [
-                    mreplicate (numLinesToClear - 1) 
+        let extraLines = linesLeft layout pos n - 1
+        output clearToLineEnd -- don't always do this?
+        when (extraLines > 0) $ do
+            output $ mreplicate extraLines
                             $ nl <#> clearToLineEnd
-                    , up (numLinesToClear - 1)
-                    , right (termCol pos)]
+            put TermPos {termRow = termRow pos + extraLines, termCol=0}
 
 clearLayoutT :: DrawM ()
 clearLayoutT = do
