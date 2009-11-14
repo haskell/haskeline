@@ -19,6 +19,9 @@ import System.Console.Haskeline.Term
 import System.Console.Haskeline.Backend.Posix
 import System.Console.Haskeline.Key
 
+----------------------------------------------------------------
+-- Low-level terminal output
+
 -- | Keep track of all of the output capabilities we can use.
 -- 
 -- We'll be frequently using the (automatic) 'Monoid' instance for 
@@ -73,13 +76,14 @@ up = flip upA
 clearAll :: LinesAffected -> TermAction
 clearAll = flip clearAllA
 
---------
-
-
 mreplicate :: Monoid m => Int -> m -> m
 mreplicate n m
     | n <= 0    = mempty
     | otherwise = m `mappend` mreplicate (n-1) m
+
+
+----------------------------------------------------------------
+-- The Draw monad
 
 -- denote in modular arithmetic;
 -- in particular, 0 <= termCol < width
@@ -90,7 +94,6 @@ initTermPos :: TermPos
 initTermPos = TermPos {termRow = 0, termCol = 0}
 
 
---------------
 
 newtype Draw m a = Draw {unDraw :: (ReaderT Actions
                                     (ReaderT Terminal (StateT TermPos
@@ -169,7 +172,7 @@ output f = do
     liftIO $ hRunTermOutput ttyh term toutput
 
 
--------------------
+----------------------------------------------------------------
 -- Movement actions
 
 changePos :: TermPos -> TermPos -> TermAction
@@ -206,10 +209,8 @@ posToIndex :: Layout -> TermPos -> Int
 posToIndex Layout {width=w} p = w * termRow p + termCol p
 
 
-
----------------------------
--- Printing actions
-
+----------------------------------------------------------------
+-- Text printing actions
 
 -- TODO: I think if we wrap this all up in one call to output, it'll be faster...
 printText :: [Grapheme] -> DrawM ()
@@ -234,6 +235,10 @@ fillLine str = do
                 output (text bstr <#> wrapLine)
                 put TermPos {termRow=r+1,termCol=0}
                 return rest
+
+
+----------------------------------------------------------------
+-- High-level Term implementation
 
 drawLineDiffT :: LineChars -> LineChars -> DrawM ()
 drawLineDiffT (xs1,ys1) (xs2,ys2) = case matchInit xs1 xs2 of
