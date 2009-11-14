@@ -6,6 +6,7 @@ module System.Console.Haskeline.Monads(
                 asks,
                 StateT(..),
                 evalStateT',
+                gets,
                 modify,
                 update,
                 MonadReader(..),
@@ -17,7 +18,7 @@ import System.Console.Haskeline.MonadException
 
 import Control.Monad.Reader hiding (MonadReader,ask,asks,local)
 import qualified Control.Monad.Reader as Reader
-import Control.Monad.State hiding (MonadState,get,put,modify)
+import Control.Monad.State hiding (MonadState,get,put,gets,modify)
 import qualified Control.Monad.State as State
 
 class Monad m => MonadReader r m where
@@ -47,6 +48,8 @@ instance (MonadState s m, MonadTrans t, Monad (t m)) => MonadState s (t m) where
     get = lift get
     put = lift . put
 
+gets :: MonadState s m => (s -> a) -> m a
+gets f = liftM f get
 
 modify :: MonadState s m => (s -> s) -> m ()
 modify f = get >>= put . f
