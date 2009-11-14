@@ -109,8 +109,6 @@ runTerminfoDraw = do
     mterm <- Exception.try setupTermFromEnv
     ch <- newChan
     case mterm of
-        -- XXX narrow this: either an ioexception (from getenv) or a 
-        -- usererror.
         Left (_::SetupTermError) -> return Nothing
         Right term -> case getCapability term getActions of
             Nothing -> return Nothing
