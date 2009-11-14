@@ -171,36 +171,48 @@ output f = do
     liftIO $ hRunTermOutput ttyh term toutput
 
 
+-------------------
+-- Movement actions
+
+changePos :: TermPos -> TermPos -> TermAction
+changePos TermPos {termRow=r1, termCol=c1} TermPos {termRow=r2, termCol=c2}
+    | r1 == r2 = if c1 < c2 then right (c2-c1) else left (c1-c2)
+    | r1 > r2 = cr <#> up (r1-r2) <#> right c2
+    | otherwise = cr <#> mreplicate (r2-r1) nl <#> right c2
+
+moveToPos :: TermPos -> DrawM ()
+moveToPos p = do
+    oldP <- get
+    output (changePos oldP p)
+    put p
+
+moveRelative :: Int -> DrawM ()
+moveRelative n = do
+    p <- get
+    l <- ask
+    moveToPos $ indexToPos l $ n + posToIndex l p
 
 changeRight, changeLeft :: Int -> DrawM ()
-changeRight n = do
-    w <- asks width
-    TermPos {termRow=r,termCol=c} <- get
-    if c+n < w  
-        then do
-                put TermPos {termRow=r,termCol=c+n}
-                output (right n)
-        else do
-              let m = c+n
-              let linesDown = m `div` w
-              let newCol = m `rem` w
-              put TermPos {termRow=r+linesDown, termCol=newCol}
-              output $ cr <#> mreplicate linesDown nl <#> right newCol
-                      
-changeLeft n = do
-    w <- asks width
-    TermPos {termRow=r,termCol=c} <- get
-    if c - n >= 0 
-        then do 
-                put TermPos {termRow = r,termCol = c-n}
-                output (left n)
-        else do      
-                let m = n - c
-                let linesUp = 1 + ((m-1) `div` w)
-                let newCol = (-m) `mod` w -- mod returns positive #
-                put TermPos {termRow = r - linesUp, termCol=newCol}
-                output $ cr <#> up linesUp <#> right newCol
-                
+changeRight n   | n <= 0 = return ()
+                | otherwise = moveRelative n
+changeLeft n    | n <= 0 = return ()
+                | otherwise = moveRelative (negate n)
+
+-- TODO: these can be made more efficient by only computing the differences
+-- between positions.
+-- But first, let's get it correct.
+indexToPos :: Layout -> Int -> TermPos
+indexToPos Layout {width=w} n = TermPos {termRow = n `div` w, termCol = n `mod` w}
+
+posToIndex :: Layout -> TermPos -> Int
+posToIndex Layout {width=w} p = w * termRow p + termCol p
+
+
+
+---------------------------
+-- Printing actions
+
+
 -- TODO: I think if we wrap this all up in one call to output, it'll be faster...
 printText :: [Grapheme] -> DrawM ()
 printText [] = return ()
