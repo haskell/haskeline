@@ -35,6 +35,10 @@ data Actions = Actions {leftA, rightA, upA :: Int -> TermOutput,
 
 getActions :: Capability Actions
 getActions = do
+    -- This capability is not strictly necessary, but is very widely supported
+    -- and assuming it makes for a much simpler implementation of printText.
+    autoRightMargin >>= guard
+
     leftA' <- moveLeft
     rightA' <- moveRight
     upA' <- moveUp
@@ -45,29 +49,26 @@ getActions = do
     -- Don't require the bell capabilities
     bellAudible' <- bell `mplus` return mempty
     bellVisual' <- visualBell `mplus` return mempty
-    wrapLine' <- getWrapLine nl' (leftA' 1)
+    wrapLine' <- getWrapLine (leftA' 1)
     return Actions{leftA = leftA', rightA = rightA',upA = upA',
                 clearToLineEnd = clearToLineEnd', nl = nl',cr = cr',
                 bellAudible = bellAudible', bellVisual = bellVisual',
                 clearAllA = clearAll',
                  wrapLine = wrapLine'}
 
-text :: B.ByteString -> Actions -> TermOutput
-text str _ = termText $ B.unpack str
-
-getWrapLine :: TermOutput -> TermOutput -> Capability TermOutput
-getWrapLine nl' left1 = (autoRightMargin >>= guard >> withAutoMargin)
-                    `mplus` return nl'
-  where 
-    -- If the wraparound glitch is in effect, force a wrap by printing a space.
-    -- Otherwise, it'll wrap automatically.
-    withAutoMargin = (do
-                        wraparoundGlitch >>= guard
-                        return (termText " " <#> left1)
-                     )`mplus` return mempty
+-- If the wraparound glitch is in effect, force a wrap by printing a space.
+-- Otherwise, it'll wrap automatically.
+getWrapLine :: TermOutput -> Capability TermOutput
+getWrapLine left1 = (do
+    wraparoundGlitch >>= guard
+    return (termText " " <#> left1)
+    ) `mplus` return mempty
 
 type TermAction = Actions -> TermOutput
     
+text :: B.ByteString -> TermAction
+text str _ = termText $ B.unpack str
+
 left,right,up :: Int -> TermAction
 left = flip leftA
 right = flip rightA
@@ -191,7 +192,7 @@ moveRelative :: Int -> DrawM ()
 moveRelative n = do
     p <- get
     l <- ask
-    moveToPos $ indexToPos l $ n + posToIndex l p
+    moveToPos $ advancePos l n p
 
 changeRight, changeLeft :: Int -> DrawM ()
 changeRight n   | n <= 0 = return ()
@@ -199,15 +200,11 @@ changeRight n   | n <= 0 = return ()
 changeLeft n    | n <= 0 = return ()
                 | otherwise = moveRelative (negate n)
 
--- TODO: these can be made more efficient by only computing the differences
--- between positions.
--- But first, let's get it correct.
-indexToPos :: Layout -> Int -> TermPos
-indexToPos Layout {width=w} n = TermPos {termRow = n `div` w, termCol = n `mod` w}
-
-posToIndex :: Layout -> TermPos -> Int
-posToIndex Layout {width=w} p = w * termRow p + termCol p
-
+advancePos :: Layout -> Int -> TermPos -> TermPos
+advancePos Layout {width=w} k p 
+    = TermPos {termRow = n `div` w, termCol = n `mod` w}
+  where
+    n = k + w * termRow p + termCol p
 
 ----------------------------------------------------------------
 -- Text printing actions
@@ -215,27 +212,12 @@ posToIndex Layout {width=w} p = w * termRow p + termCol p
 -- TODO: I think if we wrap this all up in one call to output, it'll be faster...
 printText :: [Grapheme] -> DrawM ()
 printText [] = return ()
-printText xs = fillLine xs >>= printText
-
--- Draws as much of the string as possible in the line, and returns the rest.
--- If we fill up the line completely, wrap to the next row.
-fillLine :: [Grapheme] -> DrawM [Grapheme]
-fillLine str = do
-    w <- asks width
-    TermPos {termRow=r,termCol=c} <- get
-    let roomLeft = w - c
-    if length str < roomLeft
-        then do
-                posixEncode (graphemesToString str) >>= output . text
-                put TermPos{termRow=r, termCol=c+length str}
-                return []
-        else do
-                let (thisLine,rest) = splitAt roomLeft str
-                bstr <- posixEncode (graphemesToString thisLine)
-                output (text bstr <#> wrapLine)
-                put TermPos {termRow=r+1,termCol=0}
-                return rest
-
+printText gs = do
+    l <- ask
+    modify $ advancePos l (length gs)
+    strOutput <- posixEncode $ graphemesToString gs
+    wrap <- gets $ \p -> if termCol p==0 then wrapLine else mempty
+    output (text strOutput <#> wrap)
 
 ----------------------------------------------------------------
 -- High-level Term implementation
@@ -248,8 +230,7 @@ drawLineDiffT (xs1,ys1) (xs2,ys2) = case matchInit xs1 xs2 of
     (xs1',xs2')                         -> do
         changeLeft (length xs1')
         printText (xs2' ++ ys2)
-        let m = length xs1' + length ys1 - (length xs2' + length ys2)
-        clearDeadText m
+        clearDeadText $ length xs1' + length ys1 - (length xs2' + length ys2)
         changeLeft (length ys2)
 
 linesLeft :: Layout -> TermPos -> Int -> Int
