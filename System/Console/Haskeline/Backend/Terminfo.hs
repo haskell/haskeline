@@ -83,7 +83,7 @@ mreplicate n m
 
 -- denote in modular arithmetic;
 -- in particular, 0 <= termCol < width
-data TermPos = TermPos {termRow,termCol :: Int}
+data TermPos = TermPos {termRow,termCol :: !Int}
     deriving Show
 
 initTermPos :: TermPos
