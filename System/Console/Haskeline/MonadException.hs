@@ -74,9 +74,3 @@ instance MonadException m => MonadException (ReaderT r m) where
                             (\e -> runReaderT (h e) r)
     block = mapReaderT block
     unblock = mapReaderT unblock
-
-instance MonadException m => MonadException (StateT s m) where
-    catch f h = StateT $ \s -> catch (runStateT f s)
-                                (\e -> runStateT (h e) s)
-    block = mapStateT block
-    unblock = mapStateT unblock

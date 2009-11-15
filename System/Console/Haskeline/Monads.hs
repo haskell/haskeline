@@ -4,7 +4,8 @@ module System.Console.Haskeline.Monads(
                 ReaderT(..),
                 runReaderT',
                 asks,
-                StateT(..),
+                StateT,
+                runStateT,
                 evalStateT',
                 gets,
                 modify,
@@ -15,11 +16,10 @@ module System.Console.Haskeline.Monads(
 
 import Control.Monad.Trans
 import System.Console.Haskeline.MonadException
+import Prelude hiding (catch)
 
 import Control.Monad.Reader hiding (MonadReader,ask,asks,local)
 import qualified Control.Monad.Reader as Reader
-import Control.Monad.State hiding (MonadState,get,put,gets,modify)
-import qualified Control.Monad.State as State
 
 class Monad m => MonadReader r m where
     ask :: m r
@@ -40,14 +40,6 @@ class Monad m => MonadState s m where
     get :: m s
     put :: s -> m ()
 
-instance Monad m => MonadState s (StateT s m) where
-    get = State.get
-    put = State.put
-
-instance (MonadState s m, MonadTrans t, Monad (t m)) => MonadState s (t m) where
-    get = lift get
-    put = lift . put
-
 gets :: MonadState s m => (s -> a) -> m a
 gets f = liftM f get
 
@@ -64,5 +56,41 @@ update f = do
 runReaderT' :: Monad m => r -> ReaderT r m a -> m a
 runReaderT' = flip runReaderT
 
+newtype StateT s m a = StateT { getStateTFunc 
+                                    :: forall r . s -> m ((a -> s -> r) -> r)}
+
+instance Monad m => Monad (StateT s m) where
+    return x = StateT $ \s -> return $ \f -> f x s
+    StateT f >>= g = StateT $ \s -> do
+        useX <- f s
+        useX $ \x s' -> getStateTFunc (g x) s'
+
+instance MonadTrans (StateT s) where
+    lift m = StateT $ \s -> do
+        x <- m
+        return $ \f -> f x s
+
+instance MonadIO m => MonadIO (StateT s m) where
+    liftIO = lift . liftIO
+
+runStateT :: Monad m => StateT s m a -> s -> m (a, s)
+runStateT f s = do
+    useXS <- getStateTFunc f s
+    return $ useXS $ \x s' -> (x,s')
+
+instance Monad m => MonadState s (StateT s m) where
+    get = StateT $ \s -> return $ \f -> f s s
+    put s = s `seq` StateT $ \_ -> return $ \f -> f () s
+
+instance (MonadState s m, MonadTrans t, Monad (t m)) => MonadState s (t m) where
+    get = lift get
+    put = lift . put
+
 evalStateT' :: Monad m => s -> StateT s m a -> m a
-evalStateT' = flip evalStateT
+evalStateT' s f = liftM fst $ runStateT f s
+
+instance MonadException m => MonadException (StateT s m) where
+    block m = StateT $ \s -> block $ getStateTFunc m s
+    unblock m = StateT $ \s -> unblock $ getStateTFunc m s
+    catch f h = StateT $ \s -> catch (getStateTFunc f s)
+                            $ \e -> getStateTFunc (h e) s
