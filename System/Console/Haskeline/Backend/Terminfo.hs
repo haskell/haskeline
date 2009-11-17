@@ -6,17 +6,19 @@ module System.Console.Haskeline.Backend.Terminfo(
 
 import System.Console.Terminfo
 import Control.Monad
-import Data.List(intersperse)
+import Data.List(intersperse, foldl')
 import System.IO
 import qualified Control.Exception.Extensible as Exception
 import qualified Data.ByteString.Char8 as B
 import Data.Maybe (fromMaybe, mapMaybe)
 import Control.Concurrent.Chan
+import qualified Data.IntMap as Map
 
 import System.Console.Haskeline.Monads as Monads
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.Backend.Posix
+import System.Console.Haskeline.Backend.WCWidth
 import System.Console.Haskeline.Key
 
 ----------------------------------------------------------------
@@ -82,6 +84,11 @@ mreplicate n m
     | n <= 0    = mempty
     | otherwise = m `mappend` mreplicate (n-1) m
 
+-- We don't need to bother encoding the spaces.
+spaces :: Int -> TermAction
+spaces 0 = mempty
+spaces 1 = const $ termText " " -- share when possible
+spaces n = const $ termText $ replicate n ' '
 
 ----------------------------------------------------------------
 -- The Draw monad
@@ -94,19 +101,27 @@ data TermPos = TermPos {termRow,termCol :: !Int}
 initTermPos :: TermPos
 initTermPos = TermPos {termRow = 0, termCol = 0}
 
+-- IDEA: instead of row lengths, keep track on index of first char of the row.
+data TermRows = TermRows {rowLengths :: !(Map.IntMap Int), lastRow :: !Int}
+    deriving Show
 
+initTermRows :: TermRows
+initTermRows = TermRows {rowLengths = Map.singleton 0 0, lastRow=0}
 
 newtype Draw m a = Draw {unDraw :: (ReaderT Actions
-                                    (ReaderT Terminal (StateT TermPos
-                                    (PosixT m)))) a}
+                                    (ReaderT Terminal
+                                    (StateT TermRows
+                                    (StateT TermPos
+                                    (PosixT m))))) a}
     deriving (Monad, MonadIO, MonadException,
               MonadReader Actions, MonadReader Terminal, MonadState TermPos,
+              MonadState TermRows,
               MonadReader Handle, MonadReader Encoders)
 
 type DrawM a = forall m . (MonadReader Layout m, MonadIO m) => Draw m a
 
 instance MonadTrans Draw where
-    lift = Draw . lift . lift . lift . lift . lift
+    lift = Draw . lift . lift . lift . lift . lift . lift
     
 runTerminfoDraw :: IO (Maybe RunTerm)
 runTerminfoDraw = do
@@ -126,6 +141,7 @@ runTerminfoDraw = do
                     , runTerm = \(RunTermType f) -> 
                              runPosixT enc h
                               $ evalStateT' initTermPos
+                              $ evalStateT' initTermRows
                               $ runReaderT' term
                               $ runReaderT' actions
                               $ unDraw f
@@ -182,41 +198,91 @@ changePos TermPos {termRow=r1, termCol=c1} TermPos {termRow=r2, termCol=c2}
     | r1 > r2 = cr <#> up (r1-r2) <#> right c2
     | otherwise = cr <#> mreplicate (r2-r1) nl <#> right c2
 
-moveToPos :: TermPos -> DrawM ()
+-- TODO: when drawLineDiffT calls this, shouldn't move if same.
+moveToPos :: TermPos -> DrawM TermAction
 moveToPos p = do
     oldP <- get
-    output (changePos oldP p)
     put p
+    return $ changePos oldP p
 
 moveRelative :: Int -> DrawM ()
-moveRelative n = do
-    p <- get
-    l <- ask
-    moveToPos $ advancePos l n p
+moveRelative n = liftM3 (advancePos n) ask get get
+                    >>= moveToPos >>= output
 
+-- Note that these move by a certain number of cells, not graphemes.
 changeRight, changeLeft :: Int -> DrawM ()
 changeRight n   | n <= 0 = return ()
                 | otherwise = moveRelative n
 changeLeft n    | n <= 0 = return ()
                 | otherwise = moveRelative (negate n)
 
-advancePos :: Layout -> Int -> TermPos -> TermPos
-advancePos Layout {width=w} k p 
-    = TermPos {termRow = n `div` w, termCol = n `mod` w}
+-- TODO: this could be more efficient by only checking intermediate rows.
+-- TODO: this is worth handling with QuickCheck.
+-- TODO: intermediates checking would be simpler if each row was given the
+-- index of col 0.
+advancePos :: Int -> Layout -> TermRows -> TermPos -> TermPos
+advancePos k Layout {width=w} rs p = indexToPos $ k + posIndex
   where
-    n = k + w * termRow p + termCol p
+    posIndex = termCol p + sum' (map (lookupCells rs)
+                                            [0..termRow p-1])
+    indexToPos n = loopFindRow 0 n
+    loopFindRow r m = r `seq` m `seq` let
+        thisRowSize = lookupCells rs r
+        in if m < thisRowSize
+                || (m == thisRowSize && m < w)
+                || thisRowSize <= 0 -- This shouldn't happen in practice,
+                                    -- but double-check to prevent an infinite loop
+                then TermPos {termRow=r, termCol=m}
+                else loopFindRow (r+1) (m-thisRowSize)
+
+lookupCells :: TermRows -> Int -> Int
+lookupCells (TermRows rc _) r = Map.findWithDefault 0 r rc
+
+sum' :: [Int] -> Int
+sum' = foldl' (+) 0
 
 ----------------------------------------------------------------
 -- Text printing actions
 
-printText :: [Grapheme] -> DrawM ()
-printText [] = return ()
+
+setRow :: Int -> Int -> TermRows -> TermRows
+setRow r len rs = TermRows {rowLengths = Map.insert r len (rowLengths rs),
+                            lastRow=r}
+
+encodeGraphemes :: MonadIO m => [Grapheme] -> Draw m TermAction
+encodeGraphemes = liftM text . posixEncode . graphemesToString
+
+printText :: [Grapheme] -> DrawM TermAction
 printText gs = do
-    l <- ask
-    modify $ advancePos l (length gs)
-    strOutput <- posixEncode $ graphemesToString gs
-    wrap <- gets $ \p -> if termCol p==0 then wrapLine else mempty
-    output (text strOutput <#> wrap)
+    act <- textAction mempty gs
+    -- Work around some corner cases...
+    -- TODO: this isn't always necessary.
+    get >>= \p -> modify $ setRow (termRow p) (termCol p)
+    return act
+
+-- To prevent flicker, we queue all text into one big TermAction and then
+-- output it all at once.
+textAction :: TermAction -> [Grapheme] -> DrawM TermAction
+textAction prevOutput [] = return prevOutput
+textAction prevOutput gs = do
+    -- First, get the monadic parameters:
+    w <- asks width
+    TermPos {termRow=r, termCol=c} <- get
+    -- Now, split the line
+    let (thisLine,rest,spaceLeft) = splitAtWidth (w-c) gs
+    let lineWidth = w-spaceLeft
+    modify $ setRow r lineWidth
+    ts <- encodeGraphemes thisLine
+    -- Finally, actually print out the relevant text.
+    if null rest && lineWidth < w
+        then do -- everything fits on one line without wrapping
+            put TermPos {termRow=r, termCol=lineWidth}
+            return (prevOutput <#> ts)
+        else do -- Must wrap to the next line
+            put TermPos {termRow=r+1,termCol=0}
+            -- TODO: this isn't right.
+            let wrap = if lineWidth == w then wrapLine else spaces spaceLeft
+            textAction (prevOutput <#> ts <#> wrap) rest
 
 ----------------------------------------------------------------
 -- High-level Term implementation
@@ -224,41 +290,42 @@ printText gs = do
 drawLineDiffT :: LineChars -> LineChars -> DrawM ()
 drawLineDiffT (xs1,ys1) (xs2,ys2) = case matchInit xs1 xs2 of
     ([],[])     | ys1 == ys2            -> return ()
-    (xs1',[])   | xs1' ++ ys1 == ys2    -> changeLeft (length xs1')
-    ([],xs2')   | ys1 == xs2' ++ ys2    -> changeRight (length xs2')
+    (xs1',[])   | xs1' ++ ys1 == ys2    -> changeLeft (gsWidth xs1')
+    ([],xs2')   | ys1 == xs2' ++ ys2    -> changeRight (gsWidth xs2')
     (xs1',xs2')                         -> do
-        changeLeft (length xs1')
-        -- TODO: is splitting up stuff bad?
-        -- Maybe it'd be better if there was some sort of flushing...
-        -- or we could just concat all of the TermActions together...
-        printText xs2'
+        oldRS <- get
+        -- TODO: Merge this with the rest of the output.  However, it's not as
+        -- important since when typing new text xs1' is empty.
+        changeLeft (gsWidth xs1')
+        xsOut <- printText xs2'
         p <- get
-        printText ys2
-        -- TODO: maybe better to precompute before starting to output?
-        -- hard to say...
-        clearDeadText $ length xs1' + length ys1 - (length xs2' + length ys2)
-        moveToPos p 
+        restOut <- liftM mconcat $ sequence
+                        [ printText ys2
+                        , get >>= clearDeadText oldRS
+                        , moveToPos p
+                        ]
+        output (xsOut <#> restOut)
 
-linesLeft :: Layout -> TermPos -> Int -> Int
-linesLeft Layout {width=w} TermPos {termCol = c} n
-    | c + n < w = 1
-    | otherwise = 1 + div (c+n) w
+-- the number of lines after this one.
+getLinesLeft :: DrawM Int
+getLinesLeft = do
+    p <- get
+    rc <- get
+    return (lastRow rc - termRow p)
 
-lsLinesLeft :: Layout -> TermPos -> LineChars -> Int
-lsLinesLeft layout pos = linesLeft layout pos . lengthToEnd
-
-clearDeadText :: Int -> DrawM ()
-clearDeadText n
-    | n <= 0    = return ()
+clearDeadText :: TermRows -> TermRows -> DrawM TermAction
+clearDeadText oldRS newRS
+    | extraRows < 0
+        || (extraRows == 0 && lookupCells oldRS r <= lookupCells newRS r)
+            = return mempty
     | otherwise = do
-        layout <- ask
-        pos <- get
-        let extraLines = linesLeft layout pos n - 1
-        output clearToLineEnd -- don't always do this?
-        when (extraLines > 0) $ do
-            output $ mreplicate extraLines
-                            $ nl <#> clearToLineEnd
-            put TermPos {termRow = termRow pos + extraLines, termCol=0}
+        when (extraRows /= 0) $ do
+            p <- get
+            put TermPos {termRow = termRow p + extraRows, termCol=0}
+        return $ clearToLineEnd <#> mreplicate extraRows (nl <#> clearToLineEnd)
+  where
+    extraRows = lastRow oldRS - lastRow newRS
+    r = lastRow newRS
 
 clearLayoutT :: DrawM ()
 clearLayoutT = do
@@ -267,19 +334,20 @@ clearLayoutT = do
     put initTermPos
 
 moveToNextLineT :: LineChars -> DrawM ()
-moveToNextLineT s = do
-    pos <- get
-    layout <- ask
-    output $ mreplicate (lsLinesLeft layout pos s) nl
+moveToNextLineT _ = do
+    lleft <- getLinesLeft
+    output $ mreplicate (lleft+1) nl
     put initTermPos
+    put initTermRows
 
 repositionT :: Layout -> LineChars -> DrawM ()
-repositionT oldLayout s = do
+repositionT _ s = do
     oldPos <- get
-    let l = lsLinesLeft oldLayout oldPos s - 1
+    l <- getLinesLeft
     output $ cr <#> mreplicate l nl
             <#> mreplicate (l + termRow oldPos) (clearToLineEnd <#> up 1)
     put initTermPos
+    put initTermRows
     drawLineDiffT ([],[]) s
 
 instance (MonadException m, MonadReader Layout m) => Term (Draw m) where
