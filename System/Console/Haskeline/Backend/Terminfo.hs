@@ -280,9 +280,7 @@ textAction prevOutput gs = do
             return (prevOutput <#> ts)
         else do -- Must wrap to the next line
             put TermPos {termRow=r+1,termCol=0}
-            let spaceLeft = w-c-lineWidth
-            -- TODO: this isn't right.
-            let wrap = if lineWidth == w then wrapLine else spaces spaceLeft
+            let wrap = if lineWidth == w then wrapLine else spaces (w-lineWidth)
             textAction (prevOutput <#> ts <#> wrap) rest
 
 ----------------------------------------------------------------
