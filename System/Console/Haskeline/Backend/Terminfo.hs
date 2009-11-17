@@ -101,12 +101,27 @@ data TermPos = TermPos {termRow,termCol :: !Int}
 initTermPos :: TermPos
 initTermPos = TermPos {termRow = 0, termCol = 0}
 
--- IDEA: instead of row lengths, keep track on index of first char of the row.
-data TermRows = TermRows {rowLengths :: !(Map.IntMap Int), lastRow :: !Int}
+data TermRows = TermRows {
+                    rowLengths :: !(Map.IntMap Int),
+                    -- ^ The length of each nonempty row
+                    lastRow :: !Int
+                    -- ^ The last nonempty row, or zero if the entire line
+                    -- is empty.  Note that when the cursor wraps to the first
+                    -- column of the next line, termRow > lastRow.
+                         }
     deriving Show
 
 initTermRows :: TermRows
-initTermRows = TermRows {rowLengths = Map.singleton 0 0, lastRow=0}
+initTermRows = TermRows {rowLengths = Map.empty, lastRow=0}
+
+setRow :: Int -> Int -> TermRows -> TermRows
+setRow r len rs = TermRows {rowLengths = Map.insert r len (rowLengths rs),
+                            lastRow=r}
+
+lookupCells :: TermRows -> Int -> Int
+lookupCells (TermRows rc _) r = Map.findWithDefault 0 r rc
+
+sum' :: [Int] -> Int
 
 newtype Draw m a = Draw {unDraw :: (ReaderT Actions
                                     (ReaderT Terminal
@@ -218,8 +233,6 @@ changeLeft n    | n <= 0 = return ()
 
 -- TODO: this could be more efficient by only checking intermediate rows.
 -- TODO: this is worth handling with QuickCheck.
--- TODO: intermediates checking would be simpler if each row was given the
--- index of col 0.
 advancePos :: Int -> Layout -> TermRows -> TermPos -> TermPos
 advancePos k Layout {width=w} rs p = indexToPos $ k + posIndex
   where
@@ -235,45 +248,29 @@ advancePos k Layout {width=w} rs p = indexToPos $ k + posIndex
                 then TermPos {termRow=r, termCol=m}
                 else loopFindRow (r+1) (m-thisRowSize)
 
-lookupCells :: TermRows -> Int -> Int
-lookupCells (TermRows rc _) r = Map.findWithDefault 0 r rc
-
-sum' :: [Int] -> Int
 sum' = foldl' (+) 0
 
 ----------------------------------------------------------------
 -- Text printing actions
 
-
-setRow :: Int -> Int -> TermRows -> TermRows
-setRow r len rs = TermRows {rowLengths = Map.insert r len (rowLengths rs),
-                            lastRow=r}
-
 encodeGraphemes :: MonadIO m => [Grapheme] -> Draw m TermAction
 encodeGraphemes = liftM text . posixEncode . graphemesToString
 
 printText :: [Grapheme] -> DrawM TermAction
-printText gs = do
-    act <- textAction mempty gs
-    -- Work around some corner cases...
-    -- TODO: this isn't always necessary.
-    get >>= \p -> modify $ setRow (termRow p) (termCol p)
-    return act
+printText = textAction mempty
 
--- To prevent flicker, we queue all text into one big TermAction and then
--- output it all at once.
 textAction :: TermAction -> [Grapheme] -> DrawM TermAction
 textAction prevOutput [] = return prevOutput
 textAction prevOutput gs = do
     -- First, get the monadic parameters:
     w <- asks width
     TermPos {termRow=r, termCol=c} <- get
-    -- Now, split the line
+    -- Now, split off as much as will fit on the rest of this row:
     let (thisLine,rest,thisWidth) = splitAtWidth (w-c) gs
     let lineWidth = c + thisWidth
-    modify $ setRow r lineWidth
     ts <- encodeGraphemes thisLine
     -- Finally, actually print out the relevant text.
+    modify $ setRow r lineWidth
     if null rest && lineWidth < w
         then do -- everything fits on one line without wrapping
             put TermPos {termRow=r, termCol=lineWidth}
@@ -285,6 +282,9 @@ textAction prevOutput gs = do
 
 ----------------------------------------------------------------
 -- High-level Term implementation
+--
+-- To prevent flicker, we combine all of the drawing commands into one big
+-- TermAction, and output them all at once.
 
 drawLineDiffT :: LineChars -> LineChars -> DrawM ()
 drawLineDiffT (xs1,ys1) (xs2,ys2) = case matchInit xs1 xs2 of
@@ -293,38 +293,38 @@ drawLineDiffT (xs1,ys1) (xs2,ys2) = case matchInit xs1 xs2 of
     ([],xs2')   | ys1 == xs2' ++ ys2    -> changeRight (gsWidth xs2')
     (xs1',xs2')                         -> do
         oldRS <- get
-        -- TODO: Merge this with the rest of the output.  However, it's not as
-        -- important since when typing new text xs1' is empty.
+        -- TODO: this changeLeft could be merged with the rest of the output.
+        -- For now, we'll leave it separate since xs1' is often empty
+        -- (e.g. when typing new characters).
         changeLeft (gsWidth xs1')
         xsOut <- printText xs2'
         p <- get
         restOut <- liftM mconcat $ sequence
                         [ printText ys2
-                        , get >>= clearDeadText oldRS
+                        , clearDeadText oldRS
                         , moveToPos p
                         ]
         output (xsOut <#> restOut)
 
--- the number of lines after this one.
+-- The number of nonempty lines after the current row position.
 getLinesLeft :: DrawM Int
 getLinesLeft = do
     p <- get
     rc <- get
-    return (lastRow rc - termRow p)
+    return $ max 0 (lastRow rc - termRow p)
 
-clearDeadText :: TermRows -> TermRows -> DrawM TermAction
-clearDeadText oldRS newRS
-    | extraRows < 0
-        || (extraRows == 0 && lookupCells oldRS r <= lookupCells newRS r)
-            = return mempty
-    | otherwise = do
-        when (extraRows /= 0) $ do
-            p <- get
-            put TermPos {termRow = termRow p + extraRows, termCol=0}
-        return $ clearToLineEnd <#> mreplicate extraRows (nl <#> clearToLineEnd)
-  where
-    extraRows = lastRow oldRS - lastRow newRS
-    r = lastRow newRS
+clearDeadText :: TermRows -> DrawM TermAction
+clearDeadText oldRS = do
+    TermPos {termRow = r, termCol = c} <- get
+    let extraRows = lastRow oldRS - r
+    if extraRows < 0
+            || (extraRows == 0 && lookupCells oldRS r <= c)
+        then return mempty
+        else do
+            modify $ setRow r c
+            when (extraRows /= 0)
+                $ put TermPos {termRow = r + extraRows, termCol=0}
+            return $ clearToLineEnd <#> mreplicate extraRows (nl <#> clearToLineEnd)
 
 clearLayoutT :: DrawM ()
 clearLayoutT = do
