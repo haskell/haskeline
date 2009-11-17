@@ -319,6 +319,9 @@ fileRunTerm = do
 wrapTerminalOps:: MonadException m => Handle -> m a -> m a
 wrapTerminalOps outH =
     bracketSet (hGetBuffering stdin) (hSetBuffering stdin) NoBuffering
+    -- TODO: block buffering?  Certain \r and \n's are causing flicker...
+    -- - moving to the right
+    -- - breaking line after offset widechar?
     . bracketSet (hGetBuffering outH) (hSetBuffering outH) LineBuffering
     . bracketSet (hGetEcho stdin) (hSetEcho stdin) False
 
