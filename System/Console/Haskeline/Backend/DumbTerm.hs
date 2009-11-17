@@ -114,13 +114,9 @@ refitLine (xs,ys) = do
   where
     -- returns the width of the returned characters.
     dropFrames w zs = case splitAtWidth w zs of
-                        (_,[],l) -> (zs,w-l)
+                        (_,[],l) -> (zs,l)
                         (_,zs',_) -> dropFrames w zs'
 
--- returns the width of the returned characters.
-takeWidth :: Int -> [Grapheme] -> ([Grapheme],Int)
-takeWidth n gs = case splitAtWidth n gs of
-                    (gs',_,l) -> (gs',n-l)
     
 clearDeadText :: Int -> String
 clearDeadText n | n > 0 = spaces n ++ backs n

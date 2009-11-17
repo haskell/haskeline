@@ -269,8 +269,8 @@ textAction prevOutput gs = do
     w <- asks width
     TermPos {termRow=r, termCol=c} <- get
     -- Now, split the line
-    let (thisLine,rest,spaceLeft) = splitAtWidth (w-c) gs
-    let lineWidth = w-spaceLeft
+    let (thisLine,rest,thisWidth) = splitAtWidth (w-c) gs
+    let lineWidth = c + thisWidth
     modify $ setRow r lineWidth
     ts <- encodeGraphemes thisLine
     -- Finally, actually print out the relevant text.
@@ -280,6 +280,7 @@ textAction prevOutput gs = do
             return (prevOutput <#> ts)
         else do -- Must wrap to the next line
             put TermPos {termRow=r+1,termCol=0}
+            let spaceLeft = w-c-lineWidth
             -- TODO: this isn't right.
             let wrap = if lineWidth == w then wrapLine else spaces spaceLeft
             textAction (prevOutput <#> ts <#> wrap) rest
