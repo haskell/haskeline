@@ -9,7 +9,7 @@ void h_iconv_close(iconv_t cd) {
     iconv_close(cd);
 }
 
-size_t h_iconv(iconv_t cd, char **inbuf, size_t *inbytesleft,
+size_t h_iconv(iconv_t cd, const char **inbuf, size_t *inbytesleft,
                 char **outbuf, size_t *outbytesleft) {
     return iconv(cd, inbuf, inbytesleft, outbuf, outbytesleft);
 }
