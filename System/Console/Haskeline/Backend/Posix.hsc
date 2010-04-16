@@ -123,7 +123,23 @@ ansiKeys = [("\ESC[D",  simpleKey LeftKey)
             ,("\ESC[C",  simpleKey RightKey)
             ,("\ESC[A",  simpleKey UpKey)
             ,("\ESC[B",  simpleKey DownKey)
-            ,("\b",      simpleKey Backspace)]
+            ,("\b",      simpleKey Backspace)
+            -- ctrl-left/right aren't a standard
+            -- part of terminfo, but enough people have complained
+            -- that I've decided to hard-code them in.
+            -- (Note they will be overridden by terminfo or .haskeline.)
+            -- These appear to be the most common bindings:
+            -- xterm:
+            ,("\ESC[1;5D", ctrlKey $ simpleKey LeftKey)
+            ,("\ESC[1;5C", ctrlKey $ simpleKey RightKey)
+            -- Terminal.app:
+            ,("\ESC[5D", ctrlKey $ simpleKey LeftKey)
+            ,("\ESC[5C", ctrlKey $ simpleKey RightKey)
+            -- rxvt: (Note: these will be superceded by e.g. xterm-color,
+            -- which uses them as regular arrow keys.)
+            ,("\ESC[OD", ctrlKey $ simpleKey LeftKey)
+            ,("\ESC[OC", ctrlKey $ simpleKey RightKey)
+            ]
 
 
 sttyKeys :: IO [(String, Key)]
