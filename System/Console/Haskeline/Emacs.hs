@@ -53,6 +53,8 @@ controlActions = choiceCmd
             , ctrlChar 'l' +> clearScreenCmd
             , metaChar 'f' +> change wordRight
             , metaChar 'b' +> change wordLeft
+            , ctrlKey (simpleKey LeftKey) +> change wordLeft
+            , ctrlKey (simpleKey RightKey) +> change wordRight
             , metaChar 'c' +> change (modifyWord capitalize)
             , metaChar 'l' +> change (modifyWord (mapBaseChars toLower))
             , metaChar 'u' +> change (modifyWord (mapBaseChars toUpper))
