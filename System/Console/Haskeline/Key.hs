@@ -7,6 +7,7 @@ module System.Console.Haskeline.Key(Key(..),
             metaChar,
             ctrlChar,
             metaKey,
+            ctrlKey,
             parseKey
             ) where
 
@@ -45,6 +46,9 @@ simpleKey = Key noModifier
 
 metaKey :: Key -> Key
 metaKey (Key m bc) = Key m {hasMeta = True} bc
+
+ctrlKey :: Key -> Key
+ctrlKey (Key m bc) = Key m {hasControl = True} bc
 
 simpleChar, metaChar, ctrlChar :: Char -> Key
 simpleChar = simpleKey . KeyChar
