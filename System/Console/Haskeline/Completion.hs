@@ -161,19 +161,13 @@ listFiles path = liftIO $ do
     alterIfDir False c = c
     alterIfDir True c = c {replacement = addTrailingPathSeparator (replacement c),
                             isFinished = False}
-    -- NOTE In order for completion to work properly, all of the alternatives
-    -- must have the exact same prefix.  As a result, </> is a little too clever;
-    -- for example, it doesn't prepend the directory if the file looks like
-    -- an absolute path (strange, but it can happen).
-    -- The FilePath docs state that (++) is an exact inverse of splitFileName, so
-    -- that's the right function to user here.
-    fullName = (dir ++)
+    fullName = replaceFileName path
 
 -- turn a user-visible path into an internal version useable by System.FilePath.
 fixPath :: String -> IO String
+-- For versions of filepath < 1.2
 fixPath "" = return "."
 fixPath ('~':c:path) | isPathSeparator c = do
     home <- getHomeDirectory
     return (home </> path)
 fixPath path = return path
-
