@@ -11,5 +11,8 @@ void h_iconv_close(iconv_t cd) {
 
 size_t h_iconv(iconv_t cd, char **inbuf, size_t *inbytesleft,
                 char **outbuf, size_t *outbytesleft) {
+    // Cast inbuf to (void*) so that it works both on Solaris, which expects
+    // a (const char**), and on other platforms (e.g. Linux), which expect
+    // a (char **).
     return iconv(cd, (void*)inbuf, inbytesleft, outbuf, outbytesleft);
 }
