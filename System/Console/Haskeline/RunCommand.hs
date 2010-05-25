@@ -30,9 +30,9 @@ runCommandLoop' tops prefix cmds getEvent = do
                     ErrorEvent e -> moveToNextLine s >> throwIO e
                     WindowResize -> drawReposition tops s
                                     >> loopKeys [] s processor
-                    KeyInput k -> do
-                        ks <- lift $ asks $ lookupKeyBinding k
-                        loopKeys ks s processor
+                    KeyInput ks -> do
+                        bound_ks <- mapM (lift . asks . lookupKeyBinding) ks
+                        loopKeys (concat bound_ks) s processor
     loopKeys (k:ks) s processor = case lookupKM processor k of
                         Nothing -> actBell >> loopKeys [] s processor
                         Just (Consumed cmd) -> loopCmd ks s cmd

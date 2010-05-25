@@ -68,7 +68,7 @@ matchInit :: Eq a => [a] -> [a] -> ([a],[a])
 matchInit (x:xs) (y:ys)  | x == y = matchInit xs ys
 matchInit xs ys = (xs,ys)
 
-data Event = WindowResize | KeyInput Key | ErrorEvent SomeException
+data Event = WindowResize | KeyInput [Key] | ErrorEvent SomeException
                 deriving Show
 
 keyEventLoop :: IO [Event] -> Chan Event -> IO Event

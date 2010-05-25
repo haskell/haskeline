@@ -233,7 +233,7 @@ getEvent enc baseMap = keyEventLoop readKeyEvents
         blockUntilInput
         bs <- B.hGetNonBlocking stdin bufferSize
         cs <- convert (localeToUnicode enc) bs
-        return $ map KeyInput $ lexKeys baseMap cs
+        return [KeyInput $ lexKeys baseMap cs]
 
 -- Different versions of ghc work better using different functions.
 blockUntilInput :: IO ()

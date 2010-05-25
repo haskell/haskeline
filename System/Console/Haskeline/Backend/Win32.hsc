@@ -63,7 +63,7 @@ getConOut = handle (\(_::IOException) -> return Nothing) $ fmap Just
 processEvent :: InputEvent -> Maybe Event
 processEvent KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc,
                     controlKeyState = cstate}
-    = fmap (KeyInput . Key modifier') $ keyFromCode vc `mplus` simpleKeyChar
+    = fmap (\e -> KeyInput [Key modifier' e]) $ keyFromCode vc `mplus` simpleKeyChar
   where
     simpleKeyChar = guard (c /= '\NUL') >> return (KeyChar c)
     testMod ck = (cstate .&. ck) /= 0
