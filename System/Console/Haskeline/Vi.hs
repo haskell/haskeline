@@ -217,6 +217,7 @@ deletionToInsertCmd = keyChoiceCmd
         -- readline does this too, so we should also.
         , simpleChar 'w' +> killAndStoreIE (SimpleMove goToWordDelEnd)
         , simpleChar 'W' +> killAndStoreIE (SimpleMove goToBigWordDelEnd)
+        , useMovementsForKill (liftM Left . change argState) killAndStoreIE
         , withoutConsuming (return . Left . argState)
         ]
 
