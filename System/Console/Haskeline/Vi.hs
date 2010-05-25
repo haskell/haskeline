@@ -205,14 +205,16 @@ repeatableCmdToIMode = simpleChar 'c' +> deletionToInsertCmd
 
 deletionCmd :: InputCmd (ArgMode CommandMode) CommandMode
 deletionCmd = keyChoiceCmd
-                    [simpleChar 'd' +> killAndStoreCmd killAll
+                    [ reinputArg >+> deletionCmd
+                    , simpleChar 'd' +> killAndStoreCmd killAll
                     , useMovementsForKill (change argState) killAndStoreCmd
                     , withoutConsuming (change argState)
                     ]
 
 deletionToInsertCmd :: InputCmd (ArgMode CommandMode) EitherMode
 deletionToInsertCmd = keyChoiceCmd
-        [simpleChar 'c' +> killAndStoreIE killAll
+        [ reinputArg >+> deletionToInsertCmd
+        , simpleChar 'c' +> killAndStoreIE killAll
         -- vim, for whatever reason, treats cw same as ce and cW same as cE.
         -- readline does this too, so we should also.
         , simpleChar 'w' +> killAndStoreIE (SimpleMove goToWordDelEnd)
@@ -224,12 +226,22 @@ deletionToInsertCmd = keyChoiceCmd
 
 yankCommand :: InputCmd (ArgMode CommandMode) CommandMode
 yankCommand = keyChoiceCmd
-                [simpleChar 'y' +> copyAndStore killAll
+                [ reinputArg >+> yankCommand
+                , simpleChar 'y' +> copyAndStore killAll
                 , useMovementsForKill (change argState) copyAndStore
                 , withoutConsuming (change argState)
                 ]
     where
         copyAndStore = storedCmdAction . copyFromArgHelper
+
+reinputArg :: LineState s => InputKeyCmd (ArgMode s) (ArgMode s)
+reinputArg = foreachDigit restartArg ['1'..'9'] >+> loop
+  where
+    restartArg n = startArg n . argState
+    loop = keyChoiceCmd
+            [ foreachDigit addNum ['0'..'9'] >+> loop
+            , withoutConsuming return
+            ]
 
 goToWordDelEnd, goToBigWordDelEnd :: InsertMode -> InsertMode
 goToWordDelEnd = goRightUntil $ atStart (not . isWordChar)
