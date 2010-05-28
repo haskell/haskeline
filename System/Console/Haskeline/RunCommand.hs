@@ -36,20 +36,16 @@ runCommandLoop' tops prefix cmds getEvent = do
 
     loopCmd :: LineChars -> CmdM m a -> t m a
     loopCmd s (GetKey next) = readMoreKeys s next
-    loopCmd s (DoEffect (LineChange f) next) = elideChanges s (f prefix) next
+    -- If there are multiple consecutive LineChanges, only render the diff
+    -- to the last one, and skip the rest. This greatly improves speed when
+    -- a large amount of text is pasted in at once.
+    loopCmd s (DoEffect (LineChange _)
+                e@(DoEffect (LineChange _) _)) = loopCmd s e
     loopCmd s (DoEffect e next) = do
                                     t <- drawEffect prefix s e
                                     loopCmd t next
     loopCmd s (CmdM next) = lift next >>= loopCmd s
     loopCmd s (Result x) = moveToNextLine s >> return x
-
-    -- If there are multiple consecutive LineChanges, only render the diff
-    -- between the first and the last.  This greatly improves speed when
-    -- a large amount of text is pasted in at once.
-    elideChanges :: LineChars -> LineChars -> CmdM m a -> t m a
-    elideChanges s _ (DoEffect (LineChange f) next)
-                                    = elideChanges s (f prefix) next
-    elideChanges s t next = drawLineDiff s t >> loopCmd t next
 
 
 drawEffect :: (MonadTrans t, Term (t m), MonadReader Prefs m)
