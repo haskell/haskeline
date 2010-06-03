@@ -24,10 +24,21 @@ extra-source-files: examples/Test.hs CHANGES
 flag base2
     Description: Use the base packages from before version 6.8
 
+-- There are three main advantages to the terminfo backend over the portable,
+-- "dumb" alternative.  First, it enables more efficient control sequences
+-- when redrawing the input.  Second, and more importantly, it enables us
+-- to draw on multiple lines, so we can wrap long input strings.  And third,
+-- the backend adds some extra key sequences such as forwards delete.
+--
+-- (The "dumb" terminal allows editing of long input strings, but is restricted
+-- to only one line and thus only shows part of the input at once.)
 flag terminfo
     Description: Use the terminfo package for POSIX consoles.
     Default: True
 
+-- Note that the Setup script checks whether -liconv is necessary.  This flag
+-- lets us override that decision.  When it is True, we use -liconv.  When it
+-- is False, we run tests to decide.
 flag libiconv
     Description: Explicitly link against the libiconv library.
     Default: False
