@@ -28,6 +28,7 @@ askIMCompletions (IMode xs ys) = do
                                             graphemesToString ys)
     return (IMode (withRev stringToGraphemes rest) ys, completions)
   where
+    withRev :: ([a] -> [b]) -> [a] -> [b]
     withRev f = reverse . f . reverse
 
 -- | Create a 'Command' for word completion.
