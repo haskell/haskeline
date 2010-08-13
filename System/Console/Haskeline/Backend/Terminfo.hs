@@ -193,6 +193,7 @@ terminfoKeys term = mapMaybe getSequence keyCapabilities
                 ,(keyEnd,        simpleKey End)
                 ,(keyPageDown,   simpleKey PageDown)
                 ,(keyPageUp,     simpleKey PageUp)
+                ,(keyEnter,      simpleKey $ KeyChar '\n')
                 ]
 
     
