@@ -1,3 +1,21 @@
+Changed in version 0.6.2.3:
+   * #110: Recognize the enter key in xterm.
+
+   * Optimization: if several key presses are input all at once (e.g. from a
+     paste), only display the last change.  This can also make Haskeline more
+     responsive when editing long lines.
+
+   * #106: Ignore input immediately following an unrecognized control sequence.
+
+   * #104: In vi-mode, allow, e.g., "d2w" as well as "2dw"
+
+   * #103: Fix vi-mode 'c' command with movements.
+
+   * Compatibility updates from the GHC folks for Solaris and for ghc-6.14.
+
+   * Hard-code some defaults for ctrl-left and ctrl-right, and provide the
+     corresponding Emacs bindings to skip words.
+
 Changed in version 0.6.2.2:
    * Raise dependency to utf8-string>=0.3.6 (fixes a bug when decoding invalid
      input)
