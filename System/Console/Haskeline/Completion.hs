@@ -100,7 +100,7 @@ escapeReplacement esc ws f = case esc of
 ---------
 -- Quoted completion
 completeQuotedWord :: Monad m => Maybe Char -- ^ An optional escape character
-                            -> String -- List of characters which set off quotes
+                            -> String -- ^ List of characters which set off quotes
                             -> (String -> m [Completion]) -- ^ Function to produce a list of possible completions
                             -> CompletionFunc m -- ^ Alternate completion to perform if the 
                                             -- cursor is not at a quoted word
