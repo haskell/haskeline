@@ -340,6 +340,7 @@ wrapTerminalOps outH =
     -- - breaking line after offset widechar?
     . bracketSet (hGetBuffering outH) (hSetBuffering outH) LineBuffering
     . bracketSet (hGetEcho stdin) (hSetEcho stdin) False
+    . hWithBinaryMode stdin
 
 bracketSet :: (Eq a, MonadException m) => IO a -> (a -> IO ()) -> a -> m b -> m b
 bracketSet getState set newState f = bracket (liftIO getState)
