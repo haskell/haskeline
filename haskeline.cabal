@@ -30,8 +30,8 @@ flag base2
 -- to draw on multiple lines, so we can wrap long input strings.  And third,
 -- the backend adds some extra key sequences such as forwards delete.
 --
--- (The "dumb" terminal allows editing of long input strings, but is restricted
--- to only one line and thus only shows part of the input at once.)
+-- (The "dumb" terminal also allows editing of long input strings, but is
+-- restricted to only one line and thus only shows part of the input at once.)
 flag terminfo
     Description: Use the terminfo package for POSIX consoles.
     Default: True
