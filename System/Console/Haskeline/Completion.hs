@@ -1,11 +1,12 @@
 module System.Console.Haskeline.Completion(
                             CompletionFunc,
                             Completion(..),
-                            completeWord,
-                            completeQuotedWord,
-                            -- * Building 'CompletionFunc's
                             noCompletion,
                             simpleCompletion,
+                            -- * Word completion
+                            completeWord,
+                            completeWordWithPrev,
+                            completeQuotedWord,
                             -- * Filename completion
                             completeFilename,
                             listFiles,
@@ -47,17 +48,33 @@ noCompletion (s,_) = return (s,[])
 --------------
 -- Word break functions
 
--- | The following function creates a custom 'CompletionFunc' for use in the 'Settings.'
+-- | A custom 'CompletionFunc' which completes the word immediately to the left of the cursor.
+--
+-- A word begins either at the start of the line or after an unescaped whitespace character.
 completeWord :: Monad m => Maybe Char 
         -- ^ An optional escape character
-        -> String -- ^ List of characters which count as whitespace
+        -> [Char]-- ^ Characters which count as whitespace
         -> (String -> m [Completion]) -- ^ Function to produce a list of possible completions
         -> CompletionFunc m
-completeWord esc ws f (line, _) = do
+completeWord esc ws = completeWordWithPrev esc ws . const
+
+-- | A custom 'CompletionFunc' which completes the word immediately to the left of the cursor,
+-- and takes into account the line contents to the left of the word.
+--
+-- A word begins either at the start of the line or after an unescaped whitespace character.
+completeWordWithPrev :: Monad m => Maybe Char
+        -- ^ An optional escape character
+        -> [Char]-- ^ Characters which count as whitespace
+        -> (String ->  String -> m [Completion])
+            -- ^ Function to produce a list of possible completions.  The first argument is the
+            -- line contents to the left of the word, reversed.  The second argument is the word
+            -- to be completed.
+        -> CompletionFunc m
+completeWordWithPrev esc ws f (line, _) = do
     let (word,rest) = case esc of
                         Nothing -> break (`elem` ws) line
                         Just e -> escapedBreak e line
-    completions <- f (reverse word)
+    completions <- f rest (reverse word)
     return (rest,map (escapeReplacement esc ws) completions)
   where
     escapedBreak e (c:d:cs) | d == e && c `elem` (e:ws)
@@ -65,7 +82,7 @@ completeWord esc ws f (line, _) = do
     escapedBreak e (c:cs) | notElem c ws
             = let (xs,ys) = escapedBreak e cs in (c:xs,ys)
     escapedBreak _ cs = ("",cs)
-    
+
 -- | Create a finished completion out of the given word.
 simpleCompletion :: String -> Completion
 simpleCompletion = completion
@@ -100,7 +117,7 @@ escapeReplacement esc ws f = case esc of
 ---------
 -- Quoted completion
 completeQuotedWord :: Monad m => Maybe Char -- ^ An optional escape character
-                            -> String -- ^ List of characters which set off quotes
+                            -> [Char] -- ^ Characters which set off quotes
                             -> (String -> m [Completion]) -- ^ Function to produce a list of possible completions
                             -> CompletionFunc m -- ^ Alternate completion to perform if the 
                                             -- cursor is not at a quoted word
