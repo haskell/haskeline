@@ -106,6 +106,15 @@ stringToGraphemes :: String -> [Grapheme]
 stringToGraphemes = mkString . dropWhile isCombiningChar
     where
         mkString [] = []
+        -- Minor hack: "\ESC...\STX" or "\SOH\ESC...\STX", where "\ESC..." is some
+        -- control sequence (e.g., ANSI colors), is represented as a grapheme
+        -- of zero length with '\ESC' as the base character.
+        -- Note that this won't round-trip correctly with graphemesToString.
+        -- In practice, however, that's fine since control characters can only occur
+        -- in the prompt.
+        mkString ('\SOH':cs) = stringToGraphemes cs
+        mkString ('\ESC':cs) | (ctrl,'\STX':rest) <- break (=='\STX') cs
+                    = Grapheme '\ESC' ctrl : stringToGraphemes rest
         mkString (c:cs) = Grapheme c (takeWhile isCombiningChar cs)
                                 : mkString (dropWhile isCombiningChar cs)
 
