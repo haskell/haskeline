@@ -20,7 +20,6 @@ import qualified Control.Exception.Extensible as E
 import Control.Exception.Extensible(Exception,SomeException)
 import Prelude hiding (catch)
 import Control.Monad.Reader
-import Control.Monad.State
 import Control.Concurrent(ThreadId)
 
 class MonadIO m => MonadException m where

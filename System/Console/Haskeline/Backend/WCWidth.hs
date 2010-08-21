@@ -10,7 +10,6 @@ module System.Console.Haskeline.Backend.WCWidth(
 
 import System.Console.Haskeline.LineState
 
-import Data.Char
 import Data.List
 import Foreign.C.Types
 
