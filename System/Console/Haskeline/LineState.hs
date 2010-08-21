@@ -126,8 +126,8 @@ graphemesToString = concatMap (\g -> (baseChar g : combiningChars g))
 class LineState s where
     beforeCursor :: String -- ^ The input prefix.
                     -> s -- ^ The current line state.
-                    -> [Grapheme] -- ^ The text to the left of the cursor, reversed.  (This 
-                                  -- includes the prefix.)
+                    -> [Grapheme] -- ^ The text to the left of the cursor
+                                  -- (including the prefix).
     afterCursor :: s -> [Grapheme] -- ^ The text under and to the right of the cursor.
 
 -- | The characters in the line (with the cursor in the middle).  NOT in a zippered format;
