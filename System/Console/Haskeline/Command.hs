@@ -34,7 +34,7 @@ import Control.Monad.Trans
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Key
 
-data Effect = LineChange (String -> LineChars)
+data Effect = LineChange (Prefix -> LineChars)
               | PrintLines [String]
               | ClearScreen
               | RingBell

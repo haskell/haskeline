@@ -11,6 +11,7 @@ module System.Console.Haskeline.LineState(
                     mapBaseChars,
                     -- * Line State class
                     LineState(..),
+                    Prefix,
                     -- ** Convenience functions for the drawing backends
                     LineChars,
                     lineChars,
@@ -124,18 +125,20 @@ graphemesToString = concatMap (\g -> (baseChar g : combiningChars g))
 -- | This class abstracts away the internal representations of the line state,
 -- for use by the drawing actions.  Line state is generally stored in a zipper format.
 class LineState s where
-    beforeCursor :: String -- ^ The input prefix.
+    beforeCursor :: Prefix -- ^ The input prefix.
                     -> s -- ^ The current line state.
                     -> [Grapheme] -- ^ The text to the left of the cursor
                                   -- (including the prefix).
     afterCursor :: s -> [Grapheme] -- ^ The text under and to the right of the cursor.
+
+type Prefix = [Grapheme]
 
 -- | The characters in the line (with the cursor in the middle).  NOT in a zippered format;
 -- both lists are in the order left->right that appears on the screen.
 type LineChars = ([Grapheme],[Grapheme])
 
 -- | Accessor function for the various backends.
-lineChars :: LineState s => String -> s -> LineChars
+lineChars :: LineState s => Prefix -> s -> LineChars
 lineChars prefix s = (beforeCursor prefix s, afterCursor s)
 
 -- | Compute the number of characters under and to the right of the cursor.
@@ -164,7 +167,7 @@ data InsertMode = IMode [Grapheme] [Grapheme]
                     deriving (Show, Eq)
 
 instance LineState InsertMode where
-    beforeCursor prefix (IMode xs _) = stringToGraphemes prefix ++ reverse xs
+    beforeCursor prefix (IMode xs _) = prefix ++ reverse xs
     afterCursor (IMode _ ys) = ys
 
 instance Result InsertMode where
@@ -241,8 +244,8 @@ data CommandMode = CMode [Grapheme] Grapheme [Grapheme] | CEmpty
                     deriving Show
 
 instance LineState CommandMode where
-    beforeCursor prefix CEmpty = stringToGraphemes prefix
-    beforeCursor prefix (CMode xs _ _) = stringToGraphemes prefix ++ reverse xs
+    beforeCursor prefix CEmpty = prefix
+    beforeCursor prefix (CMode xs _ _) = prefix ++ reverse xs
     afterCursor CEmpty = []
     afterCursor (CMode _ c ys) = c:ys
 
@@ -319,7 +322,7 @@ instance Functor ArgMode where
     fmap f am = am {argState = f (argState am)}
 
 instance LineState s => LineState (ArgMode s) where
-    beforeCursor _ am = let pre = "(arg: " ++ show (arg am) ++ ") "
+    beforeCursor _ am = let pre = map baseGrapheme $ "(arg: " ++ show (arg am) ++ ") "
                              in beforeCursor pre (argState am) 
     afterCursor = afterCursor . argState
 

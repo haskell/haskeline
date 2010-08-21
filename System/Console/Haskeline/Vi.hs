@@ -406,7 +406,7 @@ searchText :: SearchEntry -> [Grapheme]
 searchText SearchEntry {entryState = IMode xs ys} = reverse xs ++ ys
 
 instance LineState SearchEntry where
-    beforeCursor prefix se = beforeCursor (prefix ++ [searchChar se])
+    beforeCursor prefix se = beforeCursor (prefix ++ stringToGraphemes [searchChar se])
                                 (entryState se)
     afterCursor = afterCursor . entryState
 

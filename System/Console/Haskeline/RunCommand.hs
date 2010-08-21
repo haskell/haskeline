@@ -12,11 +12,12 @@ import Control.Monad
 runCommandLoop :: (MonadException m, CommandMonad m, MonadState Layout m)
     => TermOps -> String -> KeyCommand m InsertMode a -> m a
 runCommandLoop tops prefix cmds = runTerm tops $ 
-    RunTermType (withGetEvent tops $ runCommandLoop' tops prefix cmds)
+    RunTermType (withGetEvent tops
+        $ runCommandLoop' tops (stringToGraphemes prefix) cmds)
 
 runCommandLoop' :: forall t m a . (MonadTrans t, Term (t m), CommandMonad (t m),
         MonadState Layout m, MonadReader Prefs m)
-        => TermOps -> String -> KeyCommand m InsertMode a -> t m Event -> t m a
+        => TermOps -> Prefix -> KeyCommand m InsertMode a -> t m Event -> t m a
 runCommandLoop' tops prefix cmds getEvent = do
     let s = lineChars prefix emptyIM
     drawLine s
@@ -49,7 +50,7 @@ runCommandLoop' tops prefix cmds getEvent = do
 
 
 drawEffect :: (MonadTrans t, Term (t m), MonadReader Prefs m)
-    => String -> LineChars -> Effect -> t m LineChars
+    => Prefix -> LineChars -> Effect -> t m LineChars
 drawEffect prefix s (LineChange ch) = do
     let t = ch prefix
     drawLineDiff s t
