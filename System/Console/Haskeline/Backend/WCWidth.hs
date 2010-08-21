@@ -18,8 +18,8 @@ foreign import ccall unsafe mk_wcwidth :: CWchar -> Int
 
 wcwidth :: Char -> Int
 wcwidth c = case mk_wcwidth $ toEnum $ fromEnum c of
-                -1 -> 0 -- shouldn't happen, since control characters
-                        -- aren't turned into graphemes; but better to be safe.
+                -1 -> 0 -- Control characters have zero width.  (Used by the
+                        -- "\SOH...\STX" hack in LineState.stringToGraphemes.)
                 w -> w
 
 gWidth :: Grapheme -> Int
