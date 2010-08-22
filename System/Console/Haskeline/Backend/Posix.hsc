@@ -276,7 +276,7 @@ getMultiByteChar :: Handle -> (B.ByteString -> IO (String,Result))
 getMultiByteChar h decoder = hWithBinaryMode h $ do
     eof <- hIsEOF h
     if eof then return Nothing else fmap Just $ do
-    b <- getChar
+    b <- hGetChar h
     cs <- convert h decoder (Char8.pack [b])
     case cs of
         [] -> return '?' -- shouldn't happen, but doesn't hurt to be careful.
@@ -338,6 +338,7 @@ fileRunTerm h_in = do
                 decodeForTerm = decoder,
                 termOps = Right FileOps {
                             getLocaleChar = getMultiByteChar h_in decoder',
+                            maybeReadNewline = hMaybeReadNewline h_in,
                             getLocaleLine = Term.hGetLine h_in
                                                 `maybeThen` decoder 
                         }

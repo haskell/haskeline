@@ -15,10 +15,6 @@ import System.IO
 import Control.Monad(liftM,when)
 import System.IO.Error (isEOFError)
 
-#if __GLASGOW_HASKELL__ >= 611
-import System.IO (hGetEncoding, hSetEncoding, hSetBinaryMode)
-#endif
-
 class (MonadReader Layout m, MonadException m) => Term m where
     reposition :: Layout -> LineChars -> m ()
     moveToNextLine :: LineChars -> m ()
@@ -147,8 +143,8 @@ hGetLine h = do
     -- error if the Handle (e.g., stdin) is set to NoBuffering.
     buff <- hGetBuffering h
     if buff == NoBuffering
-        then hWithBinaryMode h $ fmap B.pack System.IO.getLine
-        else B.getLine
+        then hWithBinaryMode h $ fmap B.pack $ System.IO.hGetLine h
+        else B.hGetLine h
 
 -- If another character is immediately available, and it is a newline, consume it.
 --
@@ -164,9 +160,9 @@ hGetLine h = do
 -- (since stdin isn't a terminal), so it should probably be OK.
 hMaybeReadNewline :: Handle -> IO ()
 hMaybeReadNewline h = returnOnEOF () $ do
-    ready <- hReady stdin
+    ready <- hReady h
     when ready $ do
-        c <- hLookAhead stdin
+        c <- hLookAhead h
         when (c == '\n') $ getChar >> return ()
   where
     returnOnEOF x = handle $ \e -> if isEOFError e
