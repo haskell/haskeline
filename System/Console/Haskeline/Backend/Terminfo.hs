@@ -131,7 +131,7 @@ newtype Draw m a = Draw {unDraw :: (ReaderT Actions
     deriving (Monad, MonadIO, MonadException,
               MonadReader Actions, MonadReader Terminal, MonadState TermPos,
               MonadState TermRows,
-              MonadReader Handle, MonadReader Encoders)
+              MonadReader Handles, MonadReader Encoders)
 
 type DrawM a = forall m . (MonadReader Layout m, MonadIO m) => Draw m a
 
@@ -146,11 +146,11 @@ runTerminfoDraw = do
         Left (_::SetupTermError) -> return Nothing
         Right term -> case getCapability term getActions of
             Nothing -> return Nothing
-            Just actions -> fmap Just $ posixRunTerm $ \enc h ->
+            Just actions -> posixRunTerm $ \enc h ->
                 TermOps {
                     getLayout = tryGetLayouts (posixLayouts h
                                                 ++ [tinfoLayout term])
-                    , withGetEvent = wrapKeypad h term
+                    , withGetEvent = wrapKeypad (hOut h) term
                                         . withPosixGetEvent ch h enc
                                             (terminfoKeys term)
                     , runTerm = \(RunTermType f) -> 
@@ -201,7 +201,7 @@ output :: MonadIO m => TermAction -> Draw m ()
 output f = do
     toutput <- asks f
     term <- ask
-    ttyh <- ask
+    ttyh <- liftM hOut ask
     liftIO $ hRunTermOutput ttyh term toutput
 
 

@@ -16,7 +16,7 @@ import System.Console.Haskeline.MonadException(handle,IOException)
 import System.Console.Haskeline.Key
 
 {- |
-'Prefs' allow the user to customize the line-editing interface.  They are
+'Prefs' allow the user to customize the terminal-style line-editing interface.  They are
 read by default from @~/.haskeline@; to override that behavior, use
 'readPrefs' and @runInputTWithPrefs@.
 

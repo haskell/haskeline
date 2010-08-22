@@ -4,10 +4,12 @@ module System.Console.Haskeline.Backend.Posix (
                         tryGetLayouts,
                         PosixT,
                         runPosixT,
+                        Handles(..),
                         Encoders(),
                         posixEncode,
                         mapLines,
-                        posixRunTerm
+                        posixRunTerm,
+                        fileRunTerm
                  ) where
 
 import Foreign
@@ -18,7 +20,7 @@ import Control.Monad
 import Control.Concurrent hiding (throwTo)
 import Data.Maybe (catMaybes)
 import System.Posix.Signals.Exts
-import System.Posix.IO(stdInput)
+import System.Posix.Types(Fd(..))
 import Data.List
 import System.IO
 import qualified Data.ByteString as B
@@ -27,7 +29,7 @@ import System.Environment
 
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.Key
-import System.Console.Haskeline.Term
+import System.Console.Haskeline.Term as Term
 import System.Console.Haskeline.Prefs
 
 import System.Console.Haskeline.Backend.IConv
@@ -50,13 +52,17 @@ import GHC.Handle (withHandle_)
 #endif
 #include <sys/ioctl.h>
 
+-----------------------------------------------
+-- Input/output handles
+data Handles = Handles {hIn, hOut :: Handle}
+
 -------------------
 -- Window size
 
 foreign import ccall ioctl :: FD -> CULong -> Ptr a -> IO CInt
 
-posixLayouts :: Handle -> [IO (Maybe Layout)]
-posixLayouts h = [ioctlLayout h, envLayout]
+posixLayouts :: Handles -> [IO (Maybe Layout)]
+posixLayouts h = [ioctlLayout $ hOut h, envLayout]
 
 ioctlLayout :: Handle -> IO (Maybe Layout)
 ioctlLayout h = allocaBytes (#size struct winsize) $ \ws -> do
@@ -101,9 +107,9 @@ tryGetLayouts (f:fs) = do
 -- Key sequences
 
 getKeySequences :: (MonadIO m, MonadReader Prefs m)
-        => [(String,Key)] -> m (TreeMap Char Key)
-getKeySequences tinfos = do
-    sttys <- liftIO sttyKeys
+        => Handles -> [(String,Key)] -> m (TreeMap Char Key)
+getKeySequences h tinfos = do
+    sttys <- liftIO $ sttyKeys h
     customKeySeqs <- getCustomKeySeqs
     -- note ++ acts as a union; so the below favors sttys over tinfos
     return $ listToTree
@@ -142,9 +148,10 @@ ansiKeys = [("\ESC[D",  simpleKey LeftKey)
             ]
 
 
-sttyKeys :: IO [(String, Key)]
-sttyKeys = do
-    attrs <- getTerminalAttributes stdInput
+sttyKeys :: Handles -> IO [(String, Key)]
+sttyKeys h = do
+    fd <- unsafeHandleToFD $ hIn h
+    attrs <- getTerminalAttributes (Fd fd)
     let getStty (k,c) = do {str <- controlChar attrs k; return ([str],c)}
     return $ catMaybes $ map getStty [(Erase,simpleKey Backspace),(Kill,simpleKey KillLine)]
                         
@@ -199,12 +206,12 @@ lookupChars (TreeMap tm) (c:cs) = case Map.lookup c tm of
 -----------------------------
 
 withPosixGetEvent :: (MonadException m, MonadReader Prefs m) 
-        => Chan Event -> Handle -> Encoders -> [(String,Key)]
+        => Chan Event -> Handles -> Encoders -> [(String,Key)]
                 -> (m Event -> m a) -> m a
 withPosixGetEvent eventChan h enc termKeys f = wrapTerminalOps h $ do
-    baseMap <- getKeySequences termKeys
+    baseMap <- getKeySequences h termKeys
     withWindowHandler eventChan
-        $ f $ liftIO $ getEvent enc baseMap eventChan
+        $ f $ liftIO $ getEvent h enc baseMap eventChan
 
 withWindowHandler :: MonadException m => Chan Event -> m a -> m a
 withWindowHandler eventChan = withHandler windowChange $ 
@@ -222,50 +229,55 @@ withHandler signal handler f = do
     old_handler <- liftIO $ installHandler signal handler Nothing
     f `finally` liftIO (installHandler signal old_handler Nothing)
 
-getEvent :: Encoders -> TreeMap Char Key -> Chan Event -> IO Event
-getEvent enc baseMap = keyEventLoop readKeyEvents
+getEvent :: Handles -> Encoders -> TreeMap Char Key -> Chan Event -> IO Event
+getEvent Handles {hIn=h} enc baseMap = keyEventLoop readKeyEvents
   where
     bufferSize = 32
     readKeyEvents = do
         -- Read at least one character of input, and more if available.
         -- In particular, the characters making up a control sequence will all
         -- be available at once, so we can process them together with lexKeys.
-        blockUntilInput
-        bs <- B.hGetNonBlocking stdin bufferSize
-        cs <- convert (localeToUnicode enc) bs
+        blockUntilInput h
+        bs <- B.hGetNonBlocking h bufferSize
+        cs <- convert h (localeToUnicode enc) bs
         return [KeyInput $ lexKeys baseMap cs]
 
 -- Different versions of ghc work better using different functions.
-blockUntilInput :: IO ()
+blockUntilInput :: Handle -> IO ()
 #if __GLASGOW_HASKELL__ >= 611
 -- threadWaitRead doesn't work with the new ghc IO library,
 -- because it keeps a buffer even when NoBuffering is set.
-blockUntilInput = hWaitForInput stdin (-1) >> return ()
+blockUntilInput h = hWaitForInput h (-1) >> return ()
 #else
 -- hWaitForInput doesn't work with -threaded on ghc < 6.10
 -- (#2363 in ghc's trac)
-blockUntilInput = threadWaitRead stdInput
+blockUntilInput h = unsafeHandleToFd h >>= threadWaitRead
 #endif
 
 -- try to convert to the locale encoding using iconv.
 -- if the buffer has an incomplete shift sequence,
 -- read another byte of input and try again.
-convert :: (B.ByteString -> IO (String,Result)) -> B.ByteString -> IO String
-convert decoder bs = do
+convert :: Handle -> (B.ByteString -> IO (String,Result))
+            -> B.ByteString -> IO String
+convert h decoder bs = do
     (cs,result) <- decoder bs
     case result of
         Incomplete rest -> do
-                    extra <- B.hGetNonBlocking stdin 1
+                    extra <- B.hGetNonBlocking h 1
                     if B.null extra
                         then return (cs ++ "?")
-                        else fmap (cs ++) $ convert decoder (rest `B.append` extra)
-        Invalid rest -> fmap ((cs ++) . ('?':)) $ convert decoder (B.drop 1 rest)
+                        else fmap (cs ++)
+                                $ convert h decoder (rest `B.append` extra)
+        Invalid rest -> fmap ((cs ++) . ('?':)) $ convert h decoder (B.drop 1 rest)
         _ -> return cs
 
-getMultiByteChar :: (B.ByteString -> IO (String,Result)) -> IO Char
-getMultiByteChar decoder = hWithBinaryMode stdin $ do
+getMultiByteChar :: Handle -> (B.ByteString -> IO (String,Result))
+                        -> IO (Maybe Char)
+getMultiByteChar h decoder = hWithBinaryMode h $ do
+    eof <- hIsEOF h
+    if eof then return Nothing else fmap Just $ do
     b <- getChar
-    cs <- convert decoder (Char8.pack [b])
+    cs <- convert h decoder (Char8.pack [b])
     case cs of
         [] -> return '?' -- shouldn't happen, but doesn't hurt to be careful.
         (c:_) -> return c
@@ -283,21 +295,19 @@ openTTY = do
                 return (Just h)
         else return Nothing
 
-posixRunTerm :: (Encoders -> Handle -> TermOps) -> IO RunTerm
-posixRunTerm tOps = do
-    fileRT <- fileRunTerm
+posixRunTerm :: (Encoders -> Handles -> TermOps) -> IO (Maybe RunTerm)
+posixRunTerm tOps = openTTY `maybeThen` \h_out -> do
+    let h_in = stdin
     codeset <- getCodeset
-    ttyH <- openTTY
     encoders <- liftM2 Encoders (openEncoder codeset) (openPartialDecoder codeset)
-    case ttyH of
-        Nothing -> return fileRT
-        Just h -> return fileRT {
-                    closeTerm = closeTerm fileRT >> hClose h,
-                    -- NOTE: could also alloc Encoders once for each call to wrapRunTerm
-                    termOps = Just $ tOps encoders h
-                }
+    fileRT <- fileRunTerm h_in
+    return fileRT {
+                closeTerm = closeTerm fileRT >> hClose h_out,
+                -- NOTE: could also alloc Encoders once for each call to wrapRunTerm
+                termOps = Left $ tOps encoders Handles { hIn = h_in, hOut = h_out }
+            }
 
-type PosixT m = ReaderT Encoders (ReaderT Handle m)
+type PosixT m = ReaderT Encoders (ReaderT Handles m)
 
 data Encoders = Encoders {unicodeToLocale :: String -> IO B.ByteString,
                           localeToUnicode :: B.ByteString -> IO (String, Result)}
@@ -307,40 +317,45 @@ posixEncode str = do
     encoder <- asks unicodeToLocale
     liftIO $ encoder str
 
-runPosixT :: Monad m => Encoders -> Handle -> PosixT m a -> m a
+runPosixT :: Monad m => Encoders -> Handles -> PosixT m a -> m a
 runPosixT enc h = runReaderT' h . runReaderT' enc
 
-putTerm :: B.ByteString -> IO ()
-putTerm str = B.putStr str >> hFlush stdout
+putTerm :: Handle -> B.ByteString -> IO ()
+putTerm h str = B.hPutStr h str >> hFlush h
 
-fileRunTerm :: IO RunTerm
-fileRunTerm = do
+fileRunTerm :: Handle -> IO RunTerm
+fileRunTerm h_in = do
+    let h_out = stdout
     oldLocale <- setLocale (Just "")
     codeset <- getCodeset
     let encoder str = join $ fmap ($ str) $ openEncoder codeset
     let decoder str = join $ fmap ($ str) $ openDecoder codeset
     decoder' <- openPartialDecoder codeset
-    return RunTerm {putStrOut = \str -> encoder str >>= putTerm,
+    return RunTerm {putStrOut = encoder >=> putTerm h_out,
                 closeTerm = setLocale oldLocale >> return (),
                 wrapInterrupt = withSigIntHandler,
                 encodeForTerm = encoder,
                 decodeForTerm = decoder,
-                getLocaleChar = getMultiByteChar decoder',
-                termOps = Nothing
+                termOps = Right FileOps {
+                            getLocaleChar = getMultiByteChar h_in decoder',
+                            getLocaleLine = Term.hGetLine h_in
+                                                `maybeThen` decoder 
+                        }
+
                 }
 
 -- NOTE: If we set stdout to NoBuffering, there can be a flicker effect when many
 -- characters are printed at once.  We'll keep it buffered here, and let the Draw
 -- monad manually flush outputs that don't print a newline.
-wrapTerminalOps:: MonadException m => Handle -> m a -> m a
-wrapTerminalOps outH =
-    bracketSet (hGetBuffering stdin) (hSetBuffering stdin) NoBuffering
+wrapTerminalOps :: MonadException m => Handles -> m a -> m a
+wrapTerminalOps Handles {hIn = h_in, hOut = h_out} = 
+    bracketSet (hGetBuffering h_in) (hSetBuffering h_in) NoBuffering
     -- TODO: block buffering?  Certain \r and \n's are causing flicker...
     -- - moving to the right
     -- - breaking line after offset widechar?
-    . bracketSet (hGetBuffering outH) (hSetBuffering outH) LineBuffering
-    . bracketSet (hGetEcho stdin) (hSetEcho stdin) False
-    . hWithBinaryMode stdin
+    . bracketSet (hGetBuffering h_out) (hSetBuffering h_out) LineBuffering
+    . bracketSet (hGetEcho h_in) (hSetEcho h_in) False
+    . hWithBinaryMode h_in
 
 bracketSet :: (Eq a, MonadException m) => IO a -> (a -> IO ()) -> a -> m b -> m b
 bracketSet getState set newState f = bracket (liftIO getState)

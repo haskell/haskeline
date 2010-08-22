@@ -9,6 +9,7 @@ import System.Console.Haskeline.Monads as Monads
 import System.IO
 import qualified Data.ByteString as B
 import Control.Concurrent.Chan
+import Control.Monad(liftM)
 
 -- TODO: 
 ---- Put "<" and ">" at end of term if scrolls off.
@@ -23,14 +24,14 @@ initWindow = Window {pos=0}
 newtype DumbTerm m a = DumbTerm {unDumbTerm :: StateT Window (PosixT m) a}
                 deriving (Monad, MonadIO, MonadException,
                           MonadState Window,
-                          MonadReader Handle, MonadReader Encoders)
+                          MonadReader Handles, MonadReader Encoders)
 
 type DumbTermM a = forall m . (MonadIO m, MonadReader Layout m) => DumbTerm m a
 
 instance MonadTrans DumbTerm where
     lift = DumbTerm . lift . lift . lift
 
-runDumbTerm :: IO RunTerm
+runDumbTerm :: IO (Maybe RunTerm)
 runDumbTerm = do
     ch <- newChan
     posixRunTerm $ \enc h ->
@@ -55,7 +56,7 @@ instance (MonadException m, MonadReader Layout m) => Term (DumbTerm m) where
       
 printText :: MonadIO m => String -> DumbTerm m ()
 printText str = do
-    h <- ask
+    h <- liftM hOut ask
     posixEncode str >>= liftIO . B.hPutStr h
     liftIO $ hFlush h
 

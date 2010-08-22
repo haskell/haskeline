@@ -1,28 +1,44 @@
 module System.Console.Haskeline.Backend where
 
 import System.Console.Haskeline.Term
+import Control.Monad.Trans
+import System.IO (stdin, hGetEcho, Handle)
 
 #ifdef MINGW
 import System.Console.Haskeline.Backend.Win32 as Win32
 #else
+import System.Console.Haskeline.Backend.Posix as Posix
 #ifdef TERMINFO
 import System.Console.Haskeline.Backend.Terminfo as Terminfo
 #endif
 import System.Console.Haskeline.Backend.DumbTerm as DumbTerm
 #endif
 
-myRunTerm :: IO RunTerm
 
+defaultRunTerm :: IO RunTerm
+defaultRunTerm = do
+    echo <- liftIO $ hGetEcho stdin
+    if not echo then stdinAsFile else do
+    mRun <- stdinTTY
+    maybe stdinAsFile return mRun
+  where
+    stdinAsFile = fileHandleRunTerm stdin
+
+
+stdinTTY :: IO (Maybe RunTerm)
 #ifdef MINGW
-myRunTerm = win32Term
+stdinTTY = win32Term
 #else
 #ifndef TERMINFO
-myRunTerm = runDumbTerm
+stdinTTY = runDumbTerm
 #else
-myRunTerm = do
-    mRun <- runTerminfoDraw
-    case mRun of 
-        Nothing -> runDumbTerm
-        Just run -> return run
+stdinTTY = runTerminfoDraw >>= maybe runDumbTerm (return . Just)
 #endif
+#endif
+
+fileHandleRunTerm :: Handle -> IO RunTerm
+#ifdef MINGW
+fileHandleRunTerm = Win32.fileRunTerm
+#else
+fileHandleRunTerm = Posix.fileRunTerm
 #endif
