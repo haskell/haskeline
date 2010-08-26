@@ -164,8 +164,9 @@ hMaybeReadNewline h = returnOnEOF () $ do
     when ready $ do
         c <- hLookAhead h
         when (c == '\n') $ getChar >> return ()
-  where
-    returnOnEOF x = handle $ \e -> if isEOFError e
+
+returnOnEOF :: MonadException m => a -> m a -> m a
+returnOnEOF x = handle $ \e -> if isEOFError e
                                 then return x
                                 else throwIO e
 

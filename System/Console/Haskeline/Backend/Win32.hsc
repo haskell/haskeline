@@ -18,7 +18,7 @@ import Control.Monad
 import System.Console.Haskeline.Key
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.LineState
-import System.Console.Haskeline.Term
+import System.Console.Haskeline.Term as Term
 
 import Data.ByteString.Internal (createAndTrim)
 import qualified Data.ByteString as B
@@ -301,27 +301,26 @@ instance (MonadException m, MonadReader Layout m) => Term (Draw m) where
     ringBell True = liftIO messageBeep
     ringBell False = return () -- TODO
 
-win32Term :: IO RunTerm
+win32Term :: IO (Maybe RunTerm)
 win32Term = do
-    fileRT <- fileRunTerm
     inIsTerm <- hIsTerminalDevice stdin
-    if not inIsTerm
-        then return fileRT
-        else do
-            oterm <- getConOut
-            case oterm of
-                Nothing -> return fileRT
-                Just h -> do
-                        ch <- newChan
-                        return fileRT {
+    if not inIsTerm then return Nothing else do
+    oterm <- getConOut
+    case oterm of
+        Nothing -> return Nothing
+        Just h -> do
+                ch <- newChan
+                fileRT <- fileRunTerm stdin
+                return $ Just fileRT {
                             wrapInterrupt = withWindowMode . withCtrlCHandler,
-                            termOps = Just TermOps {
+                            termOps = Left TermOps {
                                 getLayout = getBufferSize h
                                 , withGetEvent = win32WithEvent ch
                                 , runTerm = \(RunTermType f) ->
                                         runReaderT' h $ runDraw f
                                 },
-                            closeTerm = closeHandle h}
+                            closeTerm = closeHandle h
+                        }
 
 win32WithEvent :: MonadException m => Chan Event -> (m Event -> m a) -> m a
 win32WithEvent eventChan f = do
@@ -329,17 +328,24 @@ win32WithEvent eventChan f = do
     f $ liftIO $ getEvent inH eventChan
 
 -- stdin is not a terminal, but we still need to check the right way to output unicode to stdout.
-fileRunTerm :: IO RunTerm
-fileRunTerm = do
+fileRunTerm :: Handle -> IO RunTerm
+fileRunTerm h_in = do
     putter <- putOut
     cp <- getCodePage
-    return RunTerm {termOps = Nothing,
+    return RunTerm {
                     closeTerm = return (),
                     putStrOut = putter,
                     encodeForTerm = unicodeToCodePage cp,
                     decodeForTerm = codePageToUnicode cp,
-                    getLocaleChar = getMultiByteChar cp,
-                    wrapInterrupt = withCtrlCHandler}
+                    wrapInterrupt = withCtrlCHandler,
+                    termOps = Right FileOps {
+                                getLocaleChar = getMultiByteChar cp h_in,
+                                maybeReadNewline = hMaybeReadNewline h_in,
+                                getLocaleLine = Term.hGetLine h_in
+                                            `maybeThen` codePageToUnicode cp
+                            }
+
+                    }
 
 -- On Windows, Unicode written to the console must be written with the WriteConsole API call.
 -- And to make the API cross-platform consistent, Unicode to a file should be UTF-8.
@@ -353,8 +359,8 @@ putOut = do
         else do
             cp <- getCodePage
             return $ \str -> unicodeToCodePage cp str >>= B.putStr >> hFlush stdout
-                
-    
+
+
 
 type Handler = DWORD -> IO BOOL
 
@@ -421,16 +427,19 @@ getCodePage = do
 foreign import stdcall "IsDBCSLeadByteEx" c_IsDBCSLeadByteEx
         :: CodePage -> BYTE -> BOOL
 
-getMultiByteChar :: CodePage -> IO Char
-getMultiByteChar cp = hWithBinaryMode stdin $ do
-    b1 <- getByte
-    bs <- if c_IsDBCSLeadByteEx cp b1
-            then getByte >>= \b2 -> return [b1,b2]
-            else return [b1]
-    cs <- codePageToUnicode cp (B.pack bs)
-    case cs of
-        [] -> getMultiByteChar cp
-        (c:_) -> return c
+getMultiByteChar :: CodePage -> Handle -> IO (Maybe Char)
+getMultiByteChar cp h = hWithBinaryMode stdin
+                            $ returnOnEOF Nothing $ fmap Just $ loop
   where
-    -- NOTE: relies on getChar returning an 8-bit Char.
-    getByte = fmap (toEnum . fromEnum) getChar
+    loop = do
+        b1 <- getByte
+        bs <- if c_IsDBCSLeadByteEx cp b1
+                then getByte >>= \b2 -> return [b1,b2]
+                else return [b1]
+        cs <- codePageToUnicode cp (B.pack bs)
+        case cs of
+            [] -> loop
+            (c:_) -> return c :: IO Char
+    -- NOTE: relies on getChar returning an 8-bit Char, so we use
+    -- hWithBinaryMode above.
+    getByte = fmap (toEnum . fromEnum) $ hGetChar h
