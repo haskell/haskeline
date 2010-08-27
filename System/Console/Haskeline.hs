@@ -104,14 +104,13 @@ The following functions enable cross-platform output of text that may contain
 Unicode characters.
 -}
 
--- | Write a string to the output (which may be 'stdout' or the user's terminal, depending on
--- the 'Mode').
+-- | Write a Unicode string to the user's standard output.
 outputStr :: MonadIO m => String -> InputT m ()
 outputStr xs = do
     putter <- asks putStrOut
     liftIO $ putter xs
 
--- | Write a string to the output, followed by a newline.
+-- | Write a string to the user's standard output, followed by a newline.
 outputStrLn :: MonadIO m => String -> InputT m ()
 outputStrLn = outputStr . (++ "\n")
 

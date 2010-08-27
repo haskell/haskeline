@@ -102,8 +102,7 @@ haveTerminalUI = asks isTerminalStyle
    to the user's terminal (which may be different than 'stdin' or 'stdout').  
  
  * \"File-style\" interaction treats the input as a simple stream of characters, for example
-    when reading from a file or pipe.  All output (e.g., the input prompt or @outputStr@)
-    is printed to 'stdout'.
+    when reading from a file or pipe.  Input functions (e.g., @getInputLine@) print the prompt to 'stdout'.
  
  A 'Mode' is a method for deciding at run-time which of those behaviors to use.  
  

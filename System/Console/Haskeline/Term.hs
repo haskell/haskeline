@@ -29,7 +29,7 @@ drawLine = drawLineDiff ([],[])
 clearLine = flip drawLineDiff ([],[])
     
 data RunTerm = RunTerm {
-            -- | Print unicode characters to the output (e.g., stdout or the terminal).
+            -- | Write unicode characters to stdout.
             putStrOut :: String -> IO (),
             encodeForTerm :: String -> IO ByteString,
             decodeForTerm :: ByteString -> IO String,
