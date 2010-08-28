@@ -31,9 +31,9 @@ type DumbTermM a = forall m . (MonadIO m, MonadReader Layout m) => DumbTerm m a
 instance MonadTrans DumbTerm where
     lift = DumbTerm . lift . lift . lift
 
-runDumbTerm :: IO (Maybe RunTerm)
+runDumbTerm :: MaybeT IO RunTerm
 runDumbTerm = do
-    ch <- newChan
+    ch <- liftIO newChan
     posixRunTerm $ \enc h ->
                 TermOps {
                         getLayout = tryGetLayouts (posixLayouts h)

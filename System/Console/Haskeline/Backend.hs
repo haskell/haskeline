@@ -1,7 +1,8 @@
 module System.Console.Haskeline.Backend where
 
 import System.Console.Haskeline.Term
-import Control.Monad.Trans
+import System.Console.Haskeline.Monads
+import Control.Monad
 import System.IO (stdin, hGetEcho, Handle)
 
 #ifdef MINGW
@@ -16,23 +17,17 @@ import System.Console.Haskeline.Backend.DumbTerm as DumbTerm
 
 
 defaultRunTerm :: IO RunTerm
-defaultRunTerm = do
-    echo <- liftIO $ hGetEcho stdin
-    if not echo then stdinAsFile else do
-    mRun <- stdinTTY
-    maybe stdinAsFile return mRun
-  where
-    stdinAsFile = fileHandleRunTerm stdin
+defaultRunTerm = (liftIO (hGetEcho stdin) >>= guard >> stdinTTY)
+                    `orElse` fileHandleRunTerm stdin
 
-
-stdinTTY :: IO (Maybe RunTerm)
+stdinTTY :: MaybeT IO RunTerm
 #ifdef MINGW
 stdinTTY = win32Term
 #else
 #ifndef TERMINFO
 stdinTTY = runDumbTerm
 #else
-stdinTTY = runTerminfoDraw >>= maybe runDumbTerm (return . Just)
+stdinTTY = runTerminfoDraw `mplus` runDumbTerm
 #endif
 #endif
 

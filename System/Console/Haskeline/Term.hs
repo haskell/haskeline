@@ -10,9 +10,10 @@ import Control.Concurrent
 import Data.Typeable
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as B
+import Data.Word
 import Control.Exception.Extensible (fromException, AsyncException(..),bracket_)
 import System.IO
-import Control.Monad(liftM,when)
+import Control.Monad(liftM,when,guard)
 import System.IO.Error (isEOFError)
 
 class (MonadReader Layout m, MonadException m) => Term m where
@@ -48,8 +49,8 @@ data TermOps = TermOps {
 
 -- | Operations needed for file-style interaction.
 data FileOps = FileOps {
-            getLocaleLine :: IO (Maybe String),
-            getLocaleChar :: IO (Maybe Char),
+            getLocaleLine :: MaybeT IO String,
+            getLocaleChar :: MaybeT IO Char,
             maybeReadNewline :: IO ()
 
         }
@@ -133,16 +134,23 @@ hWithBinaryMode h = bracket (liftIO $ hGetEncoding h)
 hWithBinaryMode _ = id
 #endif
 
+-- | Returns one 8-bit word.  Needs to be wrapped by hWithBinaryMode.
+hGetByte :: Handle -> MaybeT IO Word8
+hGetByte h = do
+    eof <- liftIO $ hIsEOF h
+    guard (not eof)
+    liftIO $ liftM (toEnum . fromEnum) $ hGetChar h
+
 
 -- | Utility function to correctly get a ByteString line of input.
-hGetLine :: Handle -> IO (Maybe ByteString)
+hGetLine :: Handle -> MaybeT IO ByteString
 hGetLine h = do
-    atEOF <- hIsEOF h
-    if atEOF then return Nothing else fmap Just $ do
+    atEOF <- liftIO $ hIsEOF h
+    guard (not atEOF)
     -- It's more efficient to use B.getLine, but that function throws an
     -- error if the Handle (e.g., stdin) is set to NoBuffering.
-    buff <- hGetBuffering h
-    if buff == NoBuffering
+    buff <- liftIO $ hGetBuffering h
+    liftIO $ if buff == NoBuffering
         then hWithBinaryMode h $ fmap B.pack $ System.IO.hGetLine h
         else B.hGetLine h
 
@@ -169,7 +177,3 @@ returnOnEOF :: MonadException m => a -> m a -> m a
 returnOnEOF x = handle $ \e -> if isEOFError e
                                 then return x
                                 else throwIO e
-
--- | A simple, MaybeT-like combinator.
-maybeThen :: Monad m => m (Maybe a) -> (a -> m b) -> m (Maybe b)
-maybeThen f g = f >>= maybe (return Nothing) (liftM Just . g)

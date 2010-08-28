@@ -55,8 +55,8 @@ eventReader h = do
             es <- readEvents h
             return $ mapMaybe processEvent es
                        
-getConOut :: IO (Maybe HANDLE)
-getConOut = handle (\(_::IOException) -> return Nothing) $ fmap Just
+getConOut :: MaybeT IO HANDLE
+getConOut = handle (\(_::IOException) -> mzero) $ liftIO
     $ createFile "CONOUT$" (gENERIC_READ .|. gENERIC_WRITE)
                         (fILE_SHARE_READ .|. fILE_SHARE_WRITE) Nothing
                     oPEN_EXISTING 0 Nothing
@@ -301,17 +301,14 @@ instance (MonadException m, MonadReader Layout m) => Term (Draw m) where
     ringBell True = liftIO messageBeep
     ringBell False = return () -- TODO
 
-win32Term :: IO (Maybe RunTerm)
+win32Term :: MaybeT IO RunTerm
 win32Term = do
-    inIsTerm <- hIsTerminalDevice stdin
-    if not inIsTerm then return Nothing else do
-    oterm <- getConOut
-    case oterm of
-        Nothing -> return Nothing
-        Just h -> do
-                ch <- newChan
-                fileRT <- fileRunTerm stdin
-                return $ Just fileRT {
+    inIsTerm <- liftIO $ hIsTerminalDevice stdin
+    guard inIsTerm
+    h <- getConOut
+    ch <- liftIO newChan
+    fileRT <- liftIO $ fileRunTerm stdin
+    return fileRT {
                             wrapInterrupt = withWindowMode . withCtrlCHandler,
                             termOps = Left TermOps {
                                 getLayout = getBufferSize h
@@ -342,7 +339,7 @@ fileRunTerm h_in = do
                                 getLocaleChar = getMultiByteChar cp h_in,
                                 maybeReadNewline = hMaybeReadNewline h_in,
                                 getLocaleLine = Term.hGetLine h_in
-                                            `maybeThen` codePageToUnicode cp
+                                            >>= liftIO . codePageToUnicode cp
                             }
 
                     }
@@ -427,19 +424,15 @@ getCodePage = do
 foreign import stdcall "IsDBCSLeadByteEx" c_IsDBCSLeadByteEx
         :: CodePage -> BYTE -> BOOL
 
-getMultiByteChar :: CodePage -> Handle -> IO (Maybe Char)
-getMultiByteChar cp h = hWithBinaryMode stdin
-                            $ returnOnEOF Nothing $ fmap Just $ loop
+getMultiByteChar :: CodePage -> Handle -> MaybeT IO Char
+getMultiByteChar cp h = hWithBinaryMode h loop
   where
     loop = do
-        b1 <- getByte
+        b1 <- hGetByte h
         bs <- if c_IsDBCSLeadByteEx cp b1
-                then getByte >>= \b2 -> return [b1,b2]
+                then hGetByte h >>= \b2 -> return [b1,b2]
                 else return [b1]
-        cs <- codePageToUnicode cp (B.pack bs)
+        cs <- liftIO $ codePageToUnicode cp (B.pack bs)
         case cs of
             [] -> loop
-            (c:_) -> return c :: IO Char
-    -- NOTE: relies on getChar returning an 8-bit Char, so we use
-    -- hWithBinaryMode above.
-    getByte = fmap (toEnum . fromEnum) $ hGetChar h
+            (c:_) -> return c

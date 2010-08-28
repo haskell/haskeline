@@ -11,7 +11,9 @@ module System.Console.Haskeline.Monads(
                 modify,
                 update,
                 MonadReader(..),
-                MonadState(..)
+                MonadState(..),
+                MaybeT(..),
+                orElse
                 ) where
 
 import Control.Monad.Trans
@@ -94,3 +96,27 @@ instance MonadException m => MonadException (StateT s m) where
     unblock m = StateT $ \s -> unblock $ getStateTFunc m s
     catch f h = StateT $ \s -> catch (getStateTFunc f s)
                             $ \e -> getStateTFunc (h e) s
+
+newtype MaybeT m a = MaybeT { unMaybeT :: m (Maybe a) }
+
+instance Monad m => Monad (MaybeT m) where
+    return x = MaybeT $ return $ Just x
+    MaybeT f >>= g = MaybeT $ f >>= maybe (return Nothing) (unMaybeT . g)
+
+instance MonadIO m => MonadIO (MaybeT m) where
+    liftIO = lift . liftIO
+
+instance MonadTrans MaybeT where
+    lift = MaybeT . liftM Just
+
+instance MonadException m => MonadException (MaybeT m) where
+    block = MaybeT . block . unMaybeT
+    unblock = MaybeT . unblock . unMaybeT
+    catch f h = MaybeT $ catch (unMaybeT f) $ unMaybeT . h
+
+orElse :: Monad m => MaybeT m a -> m a -> m a
+orElse (MaybeT f) g = f >>= maybe g return
+
+instance Monad m => MonadPlus (MaybeT m) where
+    mzero = MaybeT $ return Nothing
+    MaybeT f `mplus` MaybeT g = MaybeT $ f >>= maybe g (return . Just)

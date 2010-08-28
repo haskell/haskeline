@@ -138,15 +138,15 @@ type DrawM a = forall m . (MonadReader Layout m, MonadIO m) => Draw m a
 instance MonadTrans Draw where
     lift = Draw . lift . lift . lift . lift . lift . lift
     
-runTerminfoDraw :: IO (Maybe RunTerm)
+runTerminfoDraw :: MaybeT IO RunTerm
 runTerminfoDraw = do
-    mterm <- Exception.try setupTermFromEnv
-    ch <- newChan
+    mterm <- liftIO $ Exception.try setupTermFromEnv
+    ch <- liftIO newChan
     case mterm of
-        Left (_::SetupTermError) -> return Nothing
-        Right term -> case getCapability term getActions of
-            Nothing -> return Nothing
-            Just actions -> posixRunTerm $ \enc h ->
+        Left (_::SetupTermError) -> mzero
+        Right term -> do
+            actions <- MaybeT $ return $ getCapability term getActions
+            posixRunTerm $ \enc h ->
                 TermOps {
                     getLayout = tryGetLayouts (posixLayouts h
                                                 ++ [tinfoLayout term])

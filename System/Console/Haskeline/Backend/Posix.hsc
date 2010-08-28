@@ -24,7 +24,6 @@ import System.Posix.Types(Fd(..))
 import Data.List
 import System.IO
 import qualified Data.ByteString as B
-import Data.ByteString.Char8 as Char8 (pack)
 import System.Environment
 
 import System.Console.Haskeline.Monads
@@ -272,20 +271,18 @@ convert h decoder bs = do
         _ -> return cs
 
 getMultiByteChar :: Handle -> (B.ByteString -> IO (String,Result))
-                        -> IO (Maybe Char)
+                        -> MaybeT IO Char
 getMultiByteChar h decoder = hWithBinaryMode h $ do
-    eof <- hIsEOF h
-    if eof then return Nothing else fmap Just $ do
-    b <- hGetChar h
-    cs <- convert h decoder (Char8.pack [b])
+    b <- hGetByte h
+    cs <- liftIO $ convert h decoder (B.pack [b])
     case cs of
         [] -> return '?' -- shouldn't happen, but doesn't hurt to be careful.
         (c:_) -> return c
 
 
 -- fails if stdin is not a handle or if we couldn't access /dev/tty.
-openTTY :: IO (Maybe Handle)
-openTTY = do
+openTTY :: MaybeT IO Handle
+openTTY = MaybeT $ do
     inIsTerm <- hIsTerminalDevice stdin
     if inIsTerm
         then handle (\(_::IOException) -> return Nothing) $ do
@@ -295,8 +292,8 @@ openTTY = do
                 return (Just h)
         else return Nothing
 
-posixRunTerm :: (Encoders -> Handles -> TermOps) -> IO (Maybe RunTerm)
-posixRunTerm tOps = openTTY `maybeThen` \h_out -> do
+posixRunTerm :: (Encoders -> Handles -> TermOps) -> MaybeT IO RunTerm
+posixRunTerm tOps = openTTY >>= \h_out -> liftIO $ do
     let h_in = stdin
     codeset <- getCodeset
     encoders <- liftM2 Encoders (openEncoder codeset) (openPartialDecoder codeset)
@@ -340,7 +337,7 @@ fileRunTerm h_in = do
                             getLocaleChar = getMultiByteChar h_in decoder',
                             maybeReadNewline = hMaybeReadNewline h_in,
                             getLocaleLine = Term.hGetLine h_in
-                                                `maybeThen` decoder 
+                                                >>= liftIO . decoder
                         }
 
                 }

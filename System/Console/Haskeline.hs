@@ -142,7 +142,7 @@ getInputLine prefix = do
         Left tops -> getInputCmdLine tops prefix
         Right fops -> liftIO $ do
                         putStrOut rterm prefix
-                        getLocaleLine fops
+                        unMaybeT $ getLocaleLine fops
 
 getInputCmdLine :: MonadException m => TermOps -> String -> InputT m (Maybe String)
 getInputCmdLine tops prefix = do
@@ -192,7 +192,7 @@ getInputChar prefix = do
 
 getPrintableChar :: FileOps -> IO (Maybe Char)
 getPrintableChar fops = do
-    c <- getLocaleChar fops
+    c <- unMaybeT $ getLocaleChar fops
     case fmap isPrint c of
         Just False -> getPrintableChar fops
         _ -> return c
