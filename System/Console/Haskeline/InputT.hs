@@ -165,9 +165,9 @@ fileMode file = Mode $ do
 -- | Use terminal-style interaction whenever possible, even if 'stdin' and/or 'stdout' are not
 -- terminals.
 --
--- Otherwise, use file-style interaction, reading input from 'stdin'.
+-- If the terminal is not available, use file-style interaction, reading input from 'stdin'.
 preferTermMode :: Mode
-preferTermMode = undefined
+preferTermMode = Mode terminalRunTerm
 
 
 -- | Read 'Prefs' from @~/.haskeline.@   If there is an error reading the file,

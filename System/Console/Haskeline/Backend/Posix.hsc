@@ -8,6 +8,8 @@ module System.Console.Haskeline.Backend.Posix (
                         Encoders(),
                         posixEncode,
                         mapLines,
+                        stdinTTYHandles,
+                        ttyHandles,
                         posixRunTerm,
                         fileRunTerm
                  ) where
@@ -53,7 +55,8 @@ import GHC.Handle (withHandle_)
 
 -----------------------------------------------
 -- Input/output handles
-data Handles = Handles {hIn, hOut :: Handle}
+data Handles = Handles {hIn, hOut :: Handle,
+                        closeHandles :: IO ()}
 
 -------------------
 -- Window size
@@ -280,28 +283,37 @@ getMultiByteChar h decoder = hWithBinaryMode h $ do
         (c:_) -> return c
 
 
--- fails if stdin is not a handle or if we couldn't access /dev/tty.
-openTTY :: MaybeT IO Handle
-openTTY = MaybeT $ do
-    inIsTerm <- hIsTerminalDevice stdin
-    if inIsTerm
-        then handle (\(_::IOException) -> return Nothing) $ do
+stdinTTYHandles, ttyHandles :: MaybeT IO Handles
+stdinTTYHandles = do
+    isInTerm <- liftIO $ hIsTerminalDevice stdin
+    guard isInTerm
+    h <- openTerm WriteMode
+    -- Don't close stdin, since a different part of the program may use it later.
+    return Handles { hIn = stdin, hOut = h, closeHandles = hClose h }
+
+ttyHandles = do
+    -- Open the input and output separately, since they need different buffering.
+    h_in <- openTerm ReadMode
+    h_out <- openTerm WriteMode
+    return Handles { hIn = h_in, hOut = h_out,
+                     closeHandles = hClose h_in >> hClose h_out }
+
+openTerm :: IOMode -> MaybeT IO Handle
+openTerm mode = handle (\(_::IOException) -> mzero)
             -- NB: we open the tty as a binary file since otherwise the terminfo
             -- backend, which writes output as Chars, would double-encode on ghc-6.12.
-                h <- openBinaryFile "/dev/tty" WriteMode
-                return (Just h)
-        else return Nothing
+            $ liftIO $ openBinaryFile "/dev/tty" mode
 
-posixRunTerm :: (Encoders -> Handles -> TermOps) -> MaybeT IO RunTerm
-posixRunTerm tOps = openTTY >>= \h_out -> liftIO $ do
-    let h_in = stdin
+posixRunTerm :: MonadIO m => Handles -> (Encoders -> TermOps) -> m RunTerm
+posixRunTerm hs tOps = liftIO $ do
     codeset <- getCodeset
-    encoders <- liftM2 Encoders (openEncoder codeset) (openPartialDecoder codeset)
-    fileRT <- fileRunTerm h_in
+    encoders <- liftM2 Encoders (openEncoder codeset)
+                                         (openPartialDecoder codeset)
+    fileRT <- fileRunTerm $ hIn hs
     return fileRT {
-                closeTerm = closeTerm fileRT >> hClose h_out,
+                closeTerm = closeTerm fileRT >> closeHandles hs,
                 -- NOTE: could also alloc Encoders once for each call to wrapRunTerm
-                termOps = Left $ tOps encoders Handles { hIn = h_in, hOut = h_out }
+                termOps = Left $ tOps encoders
             }
 
 type PosixT m = ReaderT Encoders (ReaderT Handles m)

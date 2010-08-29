@@ -20,14 +20,30 @@ defaultRunTerm :: IO RunTerm
 defaultRunTerm = (liftIO (hGetEcho stdin) >>= guard >> stdinTTY)
                     `orElse` fileHandleRunTerm stdin
 
+terminalRunTerm :: IO RunTerm
+terminalRunTerm = directTTY `orElse` fileHandleRunTerm stdin
+
 stdinTTY :: MaybeT IO RunTerm
 #ifdef MINGW
 stdinTTY = win32Term
 #else
-#ifndef TERMINFO
-stdinTTY = runDumbTerm
+stdinTTY = stdinTTYHandles >>= runDraw
+#endif
+
+directTTY :: MaybeT IO RunTerm
+#ifdef MINGW
+directTTY = win32Term -- TODO
 #else
-stdinTTY = runTerminfoDraw `mplus` runDumbTerm
+directTTY = ttyHandles >>= runDraw
+#endif
+
+
+#ifndef MINGW
+runDraw :: Handles -> MaybeT IO RunTerm
+#ifndef TERMINFO
+runDraw = runDumbTerm
+#else
+runDraw h = runTerminfoDraw h `mplus` runDumbTerm h
 #endif
 #endif
 

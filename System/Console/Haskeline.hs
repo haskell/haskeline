@@ -38,6 +38,7 @@ module System.Console.Haskeline(
                     defaultMode,
                     fileHandleMode,
                     fileMode,
+                    preferTermMode,
                     -- * User interaction functions
                     -- ** Reading user input
                     -- $inputfncs
