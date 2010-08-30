@@ -1,5 +1,6 @@
 module System.Console.Haskeline.Backend.Win32(
                 win32Term,
+                win32TermStdin,
                 fileRunTerm
                 )where
 
@@ -8,7 +9,7 @@ import System.IO
 import Foreign
 import Foreign.C
 import System.Win32 hiding (multiByteToWideChar)
-import Graphics.Win32.Misc(getStdHandle, sTD_INPUT_HANDLE, sTD_OUTPUT_HANDLE)
+import Graphics.Win32.Misc(getStdHandle, sTD_OUTPUT_HANDLE)
 import Data.List(intercalate)
 import Control.Concurrent hiding (throwTo)
 import Data.Char(isPrint)
@@ -54,13 +55,19 @@ eventReader h = do
         else do
             es <- readEvents h
             return $ mapMaybe processEvent es
-                       
-getConOut :: MaybeT IO HANDLE
-getConOut = handle (\(_::IOException) -> mzero) $ liftIO
-    $ createFile "CONOUT$" (gENERIC_READ .|. gENERIC_WRITE)
-                        (fILE_SHARE_READ .|. fILE_SHARE_WRITE) Nothing
-                    oPEN_EXISTING 0 Nothing
 
+consoleHandles :: MaybeT IO Handles
+consoleHandles = do
+    h_in <- open "CONIN$"
+    h_out <- open "CONOUT$"
+    return Handles { hIn = h_in, hOut = h_out }
+  where
+   open file = handle (\(_::IOException) -> mzero) $ liftIO
+                $ createFile file (gENERIC_READ .|. gENERIC_WRITE)
+                        (fILE_SHARE_READ .|. fILE_SHARE_WRITE) Nothing
+                        oPEN_EXISTING 0 Nothing
+
+                       
 processEvent :: InputEvent -> Maybe Event
 processEvent KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc,
                     controlKeyState = cstate}
@@ -216,9 +223,9 @@ foreign import stdcall "windows.h GetConsoleMode" c_GetConsoleMode
 foreign import stdcall "windows.h SetConsoleMode" c_SetConsoleMode
     :: HANDLE -> DWORD -> IO Bool
 
-withWindowMode :: MonadException m => m a -> m a
-withWindowMode f = do
-    h <- liftIO $ getStdHandle sTD_INPUT_HANDLE
+withWindowMode :: MonadException m => Handles -> m a -> m a
+withWindowMode hs f = do
+    let h = hIn hs
     bracket (getConsoleMode h) (setConsoleMode h)
             $ \m -> setConsoleMode h (m .|. (#const ENABLE_WINDOW_INPUT)) >> f
   where
@@ -230,8 +237,13 @@ withWindowMode f = do
 ----------------------------
 -- Drawing
 
-newtype Draw m a = Draw {runDraw :: ReaderT HANDLE m a}
-    deriving (Monad,MonadIO,MonadException, MonadReader HANDLE)
+data Handles = Handles { hIn, hOut :: HANDLE }
+
+closeHandles :: Handles -> IO ()
+closeHandles hs = closeHandle (hIn hs) >> closeHandle (hOut hs)
+
+newtype Draw m a = Draw {runDraw :: ReaderT Handles m a}
+    deriving (Monad,MonadIO,MonadException, MonadReader Handles)
 
 type DrawM a = (MonadIO m, MonadReader Layout m) => Draw m ()
 
@@ -239,16 +251,16 @@ instance MonadTrans Draw where
     lift = Draw . lift
 
 getPos :: MonadIO m => Draw m Coord
-getPos = ask >>= liftIO . getPosition
+getPos = asks hOut >>= liftIO . getPosition
     
 setPos :: MonadIO m => Coord -> Draw m ()
 setPos c = do
-    h <- ask
+    h <- asks hOut
     liftIO (setPosition h c)
 
 printText :: MonadIO m => String -> Draw m ()
 printText txt = do
-    h <- ask
+    h <- asks hOut
     liftIO (writeConsole h txt)
     
 printAfter :: String -> DrawM ()
@@ -301,28 +313,30 @@ instance (MonadException m, MonadReader Layout m) => Term (Draw m) where
     ringBell True = liftIO messageBeep
     ringBell False = return () -- TODO
 
+win32TermStdin :: MaybeT IO RunTerm
+win32TermStdin = do
+    liftIO (hIsTerminalDevice stdin) >>= guard
+    win32Term
+
 win32Term :: MaybeT IO RunTerm
 win32Term = do
-    inIsTerm <- liftIO $ hIsTerminalDevice stdin
-    guard inIsTerm
-    h <- getConOut
+    hs <- consoleHandles
     ch <- liftIO newChan
     fileRT <- liftIO $ fileRunTerm stdin
     return fileRT {
-                            wrapInterrupt = withWindowMode . withCtrlCHandler,
                             termOps = Left TermOps {
-                                getLayout = getBufferSize h
-                                , withGetEvent = win32WithEvent ch
+                                getLayout = getBufferSize (hOut hs)
+                                , withGetEvent = withWindowMode hs
+                                                    . win32WithEvent hs ch
                                 , runTerm = \(RunTermType f) ->
-                                        runReaderT' h $ runDraw f
+                                        runReaderT' hs $ runDraw f
                                 },
-                            closeTerm = closeHandle h
+                            closeTerm = closeHandles hs
                         }
 
-win32WithEvent :: MonadException m => Chan Event -> (m Event -> m a) -> m a
-win32WithEvent eventChan f = do
-    inH <- liftIO $ getStdHandle sTD_INPUT_HANDLE
-    f $ liftIO $ getEvent inH eventChan
+win32WithEvent :: MonadException m => Handles -> Chan Event
+                                        -> (m Event -> m a) -> m a
+win32WithEvent h eventChan f = f $ liftIO $ getEvent (hIn h) eventChan
 
 -- stdin is not a terminal, but we still need to check the right way to output unicode to stdout.
 fileRunTerm :: Handle -> IO RunTerm

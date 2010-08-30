@@ -25,14 +25,14 @@ terminalRunTerm = directTTY `orElse` fileHandleRunTerm stdin
 
 stdinTTY :: MaybeT IO RunTerm
 #ifdef MINGW
-stdinTTY = win32Term
+stdinTTY = win32TermStdin
 #else
 stdinTTY = stdinTTYHandles >>= runDraw
 #endif
 
 directTTY :: MaybeT IO RunTerm
 #ifdef MINGW
-directTTY = win32Term -- TODO
+directTTY = win32Term
 #else
 directTTY = ttyHandles >>= runDraw
 #endif
