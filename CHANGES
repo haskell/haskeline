@@ -1,3 +1,6 @@
+Changed in version 0.6.2.4:
+   * Added back a MonadException instance for mtl's StateT.
+
 Changed in version 0.6.2.3:
    * #110: Recognize the enter key in xterm.
 
