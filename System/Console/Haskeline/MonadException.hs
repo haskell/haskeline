@@ -20,6 +20,7 @@ import qualified Control.Exception.Extensible as E
 import Control.Exception.Extensible(Exception,SomeException)
 import Prelude hiding (catch)
 import Control.Monad.Reader
+import Control.Monad.State
 import Control.Concurrent(ThreadId)
 
 class MonadIO m => MonadException m where
@@ -73,3 +74,11 @@ instance MonadException m => MonadException (ReaderT r m) where
                             (\e -> runReaderT (h e) r)
     block = mapReaderT block
     unblock = mapReaderT unblock
+
+-- Not needed anymore by our code (we have a custom StateT monad),
+-- but we should follow the PVP and not remove this in a point release.
+instance MonadException m => MonadException (StateT s m) where
+    catch f h = StateT $ \s -> catch (runStateT f s)
+                            (\e -> runStateT (h e) s)
+    block = mapStateT block
+    unblock = mapStateT unblock
