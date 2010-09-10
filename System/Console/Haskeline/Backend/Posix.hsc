@@ -346,6 +346,7 @@ fileRunTerm h_in = do
                 encodeForTerm = encoder,
                 decodeForTerm = decoder,
                 termOps = Right FileOps {
+                            inputHandle = h_in,
                             getLocaleChar = getMultiByteChar h_in decoder',
                             maybeReadNewline = hMaybeReadNewline h_in,
                             getLocaleLine = Term.hGetLine h_in
@@ -366,8 +367,3 @@ wrapTerminalOps Handles {hIn = h_in, hOut = h_out} =
     . bracketSet (hGetBuffering h_out) (hSetBuffering h_out) LineBuffering
     . bracketSet (hGetEcho h_in) (hSetEcho h_in) False
     . hWithBinaryMode h_in
-
-bracketSet :: (Eq a, MonadException m) => IO a -> (a -> IO ()) -> a -> m b -> m b
-bracketSet getState set newState f = bracket (liftIO getState)
-                            (liftIO . set)
-                            (\_ -> liftIO (set newState) >> f)

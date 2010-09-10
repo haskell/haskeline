@@ -9,19 +9,20 @@ import System.Console.Haskeline.Key
 
 import Control.Monad
 
-runCommandLoop :: (MonadException m, CommandMonad m, MonadState Layout m)
-    => TermOps -> String -> KeyCommand m InsertMode a -> m a
-runCommandLoop tops prefix cmds = runTerm tops $ 
+runCommandLoop :: (MonadException m, CommandMonad m, MonadState Layout m,
+                    LineState s)
+    => TermOps -> String -> KeyCommand m s a -> s -> m a
+runCommandLoop tops prefix cmds initState = runTerm tops $ 
     RunTermType (withGetEvent tops
-        $ runCommandLoop' tops (stringToGraphemes prefix) cmds)
+        $ runCommandLoop' tops (stringToGraphemes prefix) initState cmds)
 
-runCommandLoop' :: forall t m a . (MonadTrans t, Term (t m), CommandMonad (t m),
-        MonadState Layout m, MonadReader Prefs m)
-        => TermOps -> Prefix -> KeyCommand m InsertMode a -> t m Event -> t m a
-runCommandLoop' tops prefix cmds getEvent = do
-    let s = lineChars prefix emptyIM
+runCommandLoop' :: forall t m s a . (MonadTrans t, Term (t m), CommandMonad (t m),
+        MonadState Layout m, MonadReader Prefs m, LineState s)
+        => TermOps -> Prefix -> s -> KeyCommand m s a -> t m Event -> t m a
+runCommandLoop' tops prefix initState cmds getEvent = do
+    let s = lineChars prefix initState
     drawLine s
-    readMoreKeys s (fmap ($ emptyIM) cmds)
+    readMoreKeys s (fmap ($ initState) cmds)
   where
     readMoreKeys :: LineChars -> KeyMap (CmdM m a) -> t m a
     readMoreKeys s next = do

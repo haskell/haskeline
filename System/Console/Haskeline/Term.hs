@@ -49,10 +49,10 @@ data TermOps = TermOps {
 
 -- | Operations needed for file-style interaction.
 data FileOps = FileOps {
+            inputHandle :: Handle, -- ^ e.g. for turning off echoing.
             getLocaleLine :: MaybeT IO String,
             getLocaleChar :: MaybeT IO Char,
             maybeReadNewline :: IO ()
-
         }
 
 -- | Are we using terminal-style interaction?
@@ -133,6 +133,14 @@ hWithBinaryMode h = bracket (liftIO $ hGetEncoding h)
 #else
 hWithBinaryMode _ = id
 #endif
+
+-- | Utility function for changing a property of a terminal for the duration of
+-- a computation.
+bracketSet :: (Eq a, MonadException m) => IO a -> (a -> IO ()) -> a -> m b -> m b
+bracketSet getState set newState f = bracket (liftIO getState)
+                            (liftIO . set)
+                            (\_ -> liftIO (set newState) >> f)
+
 
 -- | Returns one 8-bit word.  Needs to be wrapped by hWithBinaryMode.
 hGetByte :: Handle -> MaybeT IO Word8

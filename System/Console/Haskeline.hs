@@ -44,6 +44,7 @@ module System.Console.Haskeline(
                     -- $inputfncs
                     getInputLine,
                     getInputChar,
+                    getPassword,
                     -- ** Outputting text
                     -- $outputfncs
                     outputStr,
@@ -149,9 +150,9 @@ getInputCmdLine :: MonadException m => TermOps -> String -> InputT m (Maybe Stri
 getInputCmdLine tops prefix = do
     emode <- asks editMode
     result <- runInputCmdT tops $ case emode of
-                Emacs -> runCommandLoop tops prefix emacsCommands
+                Emacs -> runCommandLoop tops prefix emacsCommands emptyIM
                 Vi -> evalStateT' emptyViState $
-                        runCommandLoop tops prefix viKeyCommands
+                        runCommandLoop tops prefix viKeyCommands emptyIM
     maybeAddHistory result
     return result
 
@@ -200,7 +201,7 @@ getPrintableChar fops = do
         
 getInputCmdChar :: MonadException m => TermOps -> String -> InputT m (Maybe Char)
 getInputCmdChar tops prefix = runInputCmdT tops 
-        $ runCommandLoop tops prefix acceptOneChar
+        $ runCommandLoop tops prefix acceptOneChar emptyIM
 
 acceptOneChar :: Monad m => KeyCommand m InsertMode (Maybe Char)
 acceptOneChar = choiceCmd [useChar $ \c s -> change (insertChar c) s
@@ -208,6 +209,41 @@ acceptOneChar = choiceCmd [useChar $ \c s -> change (insertChar c) s
                           , ctrlChar 'l' +> clearScreenCmd >|>
                                         keyCommand acceptOneChar
                           , ctrlChar 'd' +> failCmd]
+
+----------
+-- Passwords
+
+{- | Reads one line of input, without displaying the input while it is being typed.
+When using terminal-style interaction, the masking character (if given) will replace each typed character.
+
+When using file-style interaction, this function turns off echoing while reading
+the line of input.
+-}
+ 
+getPassword :: MonadException m => Maybe Char -- ^ masking character
+                            -> String -> InputT m (Maybe String)
+getPassword x prefix = do
+    liftIO $ hFlush stdout
+    rterm <- ask
+    case termOps rterm of
+        Left tops -> runInputCmdT tops $ runCommandLoop tops prefix loop
+                                       $ Password [] x
+        Right fops -> do
+            let h_in = inputHandle fops
+            bracketSet (hGetEcho h_in) (hSetEcho h_in) False $ liftIO $ do
+            putStrOut rterm prefix
+            unMaybeT $ getLocaleLine fops
+ where
+    loop = choiceCmd [ simpleChar '\n' +> finish
+                     , simpleKey Backspace +> change deletePasswordChar
+                                                >|> loop'
+                     , useChar $ \c -> change (addPasswordChar c) >|> loop'
+                     , ctrlChar 'd' +> \p -> if null (passwordState p)
+                                                then failCmd p
+                                                else finish p
+                     ]
+    loop' = keyCommand loop
+                        
 
 ------------
 -- Interrupt

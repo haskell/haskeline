@@ -63,6 +63,9 @@ module System.Console.Haskeline.LineState(
                     applyCmdArg,
                     -- ** Other line state types
                     Message(..),
+                    Password(..),
+                    addPasswordChar,
+                    deletePasswordChar,
                     ) where
 
 import Data.Char
@@ -359,6 +362,29 @@ data Message s = Message {messageState :: s, messageText :: String}
 instance LineState (Message s) where
     beforeCursor _ = stringToGraphemes . messageText
     afterCursor _ = []
+
+----------------
+
+data Password = Password {passwordState :: [Char], -- ^ reversed
+                          passwordChar :: Maybe Char}
+
+instance LineState Password where
+    beforeCursor prefix p
+        = prefix ++ (stringToGraphemes
+                      $ case passwordChar p of
+                        Nothing -> []
+                        Just c -> replicate (length $ passwordState p) c)
+    afterCursor _ = []
+
+instance Result Password where
+    toResult = reverse . passwordState
+
+addPasswordChar :: Char -> Password -> Password
+addPasswordChar c p = p {passwordState = c : passwordState p}
+
+deletePasswordChar :: Password -> Password
+deletePasswordChar (Password (_:cs) m) = Password cs m
+deletePasswordChar p = p
 
 -----------------
 atStart, atEnd :: (Char -> Bool) -> InsertMode -> Bool

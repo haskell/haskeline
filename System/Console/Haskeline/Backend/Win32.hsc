@@ -350,6 +350,7 @@ fileRunTerm h_in = do
                     decodeForTerm = codePageToUnicode cp,
                     wrapInterrupt = withCtrlCHandler,
                     termOps = Right FileOps {
+                                inputHandle = h_in,
                                 getLocaleChar = getMultiByteChar cp h_in,
                                 maybeReadNewline = hMaybeReadNewline h_in,
                                 getLocaleLine = Term.hGetLine h_in

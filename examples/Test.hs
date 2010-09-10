@@ -19,6 +19,8 @@ main = do
         args <- getArgs
         let inputFunc = case args of
                 ["chars"] -> fmap (fmap (\c -> [c])) . getInputChar
+                ["password"] -> getPassword Nothing
+                ["password", [c]] -> getPassword (Just c)
                 _ -> getInputLine
         runInputT mySettings $ withInterrupt $ loop inputFunc 0
     where
