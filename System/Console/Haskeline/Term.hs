@@ -8,7 +8,7 @@ import System.Console.Haskeline.Completion(Completion)
 
 import Control.Concurrent
 import Data.Typeable
-import Data.ByteString (ByteString)
+import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import Data.Word
 import Control.Exception.Extensible (fromException, AsyncException(..),bracket_)
