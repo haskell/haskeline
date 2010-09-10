@@ -9,6 +9,8 @@ Testing the line-input functions and their interaction with ctrl-c signals.
 Usage:
 ./Test          (line input)
 ./Test chars    (character input)
+./Test password (no masking characters)
+./Test password \*
 --}
 
 mySettings :: Settings IO
