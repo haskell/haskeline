@@ -135,16 +135,7 @@ spaces), it will be automatically added to the history.
 -}
 getInputLine :: forall m . MonadException m => String -- ^ The input prompt
                             -> InputT m (Maybe String)
-getInputLine prefix = do
-    -- If other parts of the program have written text, make sure that it 
-    -- appears before we interact with the user on the terminal.
-    liftIO $ hFlush stdout
-    rterm <- ask
-    case termOps rterm of
-        Left tops -> getInputCmdLine tops prefix
-        Right fops -> liftIO $ do
-                        putStrOut rterm prefix
-                        unMaybeT $ getLocaleLine fops
+getInputLine = promptedInput getInputCmdLine $ unMaybeT . getLocaleLine
 
 getInputCmdLine :: MonadException m => TermOps -> String -> InputT m (Maybe String)
 getInputCmdLine tops prefix = do
@@ -181,13 +172,7 @@ available after the input character.
 -}
 getInputChar :: MonadException m => String -- ^ The input prompt
                     -> InputT m (Maybe Char)
-getInputChar prefix = do
-    liftIO $ hFlush stdout
-    rterm <- ask
-    case termOps rterm of
-        Left tops -> getInputCmdChar tops prefix
-        Right fops -> liftIO $ do
-                        putStrOut rterm prefix
+getInputChar = promptedInput getInputCmdChar $ \fops -> do
                         c <- getPrintableChar fops
                         maybeReadNewline fops
                         return c
@@ -222,17 +207,13 @@ the line of input.
  
 getPassword :: MonadException m => Maybe Char -- ^ masking character
                             -> String -> InputT m (Maybe String)
-getPassword x prefix = do
-    liftIO $ hFlush stdout
-    rterm <- ask
-    case termOps rterm of
-        Left tops -> runInputCmdT tops $ runCommandLoop tops prefix loop
-                                       $ Password [] x
-        Right fops -> do
-            let h_in = inputHandle fops
-            bracketSet (hGetEcho h_in) (hSetEcho h_in) False $ liftIO $ do
-            putStrOut rterm prefix
-            unMaybeT $ getLocaleLine fops
+getPassword x = promptedInput
+                    (\tops prefix -> runInputCmdT tops
+                                        $ runCommandLoop tops prefix loop
+                                        $ Password [] x)
+                    (\fops -> let h_in = inputHandle fops
+                              in bracketSet (hGetEcho h_in) (hSetEcho h_in) False
+                                  $ unMaybeT $ getLocaleLine fops)
  where
     loop = choiceCmd [ simpleChar '\n' +> finish
                      , simpleKey Backspace +> change deletePasswordChar
@@ -244,6 +225,27 @@ getPassword x prefix = do
                      ]
     loop' = keyCommand loop
                         
+
+
+-------
+-- | Wrapper for input functions.
+promptedInput :: MonadIO m => (TermOps -> String -> InputT m a)
+                        -> (FileOps -> IO a)
+                        -> String -> InputT m a
+promptedInput doTerm doFile prompt = do
+    -- If other parts of the program have written text, make sure that it
+    -- appears before we interact with the user on the terminal.
+    liftIO $ hFlush stdout
+    rterm <- ask
+    case termOps rterm of
+        Right fops -> liftIO $ do
+                        putStrOut rterm prompt
+                        doFile fops
+        Left tops -> do
+            -- If the prompt contains newlines, print all but the last line.
+            let (lastLine,rest) = break (`elem` "\r\n") $ reverse prompt
+            outputStr $ reverse rest
+            doTerm tops $ reverse lastLine
 
 ------------
 -- Interrupt
