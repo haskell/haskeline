@@ -1,3 +1,16 @@
+Changed in version 0.6.3:
+   * #111: Correct width calculations when the prompt contains newlines.
+
+   * #109: Add function completeWordWithPrev.
+
+   * #101, #44: Extend the API with Modes for specifying interaction behavior.
+
+   * #78: Correct width calculations for escape sequences ("\ESC...\STX")
+
+   * Better warning message when -fterminfo doesn't work.
+
+   * Added getPassword as a new input function.
+
 Changed in version 0.6.2.4:
    * Added back a MonadException instance for mtl's StateT.
 
