@@ -205,7 +205,7 @@ When using file-style interaction, this function turns off echoing while reading
 the line of input.
 -}
  
-getPassword :: MonadException m => Maybe Char -- ^ masking character
+getPassword :: MonadException m => Maybe Char -- ^ A masking character; e.g., @Just \'*\'@
                             -> String -> InputT m (Maybe String)
 getPassword x = promptedInput
                     (\tops prefix -> runInputCmdT tops
