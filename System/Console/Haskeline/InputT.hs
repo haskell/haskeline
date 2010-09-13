@@ -74,64 +74,64 @@ instance Monad m => CommandMonad (InputCmdT m) where
         settings <- ask
         lift $ lift $ lift $ lift $ lift $ lift $ complete settings lcs
 
--- | Run a line-reading application.  Uses 'defaultMode' to determine the
+-- | Run a line-reading application.  Uses 'defaultBehavior' to determine the
 -- interaction behavior.
 runInputTWithPrefs :: MonadException m => Prefs -> Settings m -> InputT m a -> m a
-runInputTWithPrefs = runInputTForModeWithPrefs defaultMode
+runInputTWithPrefs = runInputTBehaviorWithPrefs defaultBehavior
 
 -- | Run a line-reading application.  This function should suffice for most applications.
 --
--- When using terminal-style interaction, 'Prefs' will be read from the user's @~/.haskeline@
--- file (if present).
--- When using file-style interaction, 'Prefs' are not relevant and will not be read.
---
--- This function is equivalent to @'runInputTForMode' 'defaultMode'@.  It 
+-- This function is equivalent to @'runInputTBehavior' 'defaultBehavior'@.  It 
 -- uses terminal-style interaction if 'stdin' is connected to a terminal and has
 -- echoing enabled.  Otherwise (e.g., if 'stdin' is a pipe), it uses file-style interaction.
+--
+-- If it uses terminal-style interaction, 'Prefs' will be read from the user's @~/.haskeline@ file
+-- (if present).
+-- If it uses file-style interaction, 'Prefs' are not relevant and will not be read.
 runInputT :: MonadException m => Settings m -> InputT m a -> m a
-runInputT = runInputTForMode defaultMode
+runInputT = runInputTBehavior defaultBehavior
 
--- | Returns 'True' if the current session uses terminal-style interaction.  (See 'Mode'.)
+-- | Returns 'True' if the current session uses terminal-style interaction.  (See 'Behavior'.)
 haveTerminalUI :: Monad m => InputT m Bool
 haveTerminalUI = asks isTerminalStyle
 
 
-{- | Haskeline has two types of interaction behaviors:
+{- | Haskeline has two ways of interacting with the user:
 
- * \"Terminal-style\" interaction provides an interactive user interface by connecting
+ * \"Terminal-style\" interaction provides an rich user interface by connecting
    to the user's terminal (which may be different than 'stdin' or 'stdout').  
  
  * \"File-style\" interaction treats the input as a simple stream of characters, for example
     when reading from a file or pipe.  Input functions (e.g., @getInputLine@) print the prompt to 'stdout'.
  
- A 'Mode' is a method for deciding at run-time which of those behaviors to use.  
+ A 'Behavior' is a method for deciding at run-time which type of interaction to use.  
  
- For most applications (e.g., a REPL), 'defaultMode' should have the correct behavior.
+ For most applications (e.g., a REPL), 'defaultBehavior' should have the correct effect.
 -}
-data Mode = Mode (IO RunTerm)
+data Behavior = Behavior (IO RunTerm)
 
 -- | Create and use a RunTerm, ensuring that it will be closed even if
 -- an async exception occurs during the creation or use.
-withMode :: MonadException m => Mode -> (RunTerm -> m a) -> m a
-withMode (Mode run) f = bracket (liftIO run) (liftIO . closeTerm) f
+withBehavior :: MonadException m => Behavior -> (RunTerm -> m a) -> m a
+withBehavior (Behavior run) f = bracket (liftIO run) (liftIO . closeTerm) f
 
 -- | Run a line-reading application according to the given behavior.
 --
--- When using terminal-style interaction, 'Prefs' will be read from the user's @~/.haskeline@
--- file (if present).
--- When using file-style interaction, 'Prefs' are not relevant and will not be read.
-runInputTForMode :: MonadException m => Mode -> Settings m -> InputT m a -> m a
-runInputTForMode mode settings f = withMode mode $ \run -> do
+-- If it uses terminal-style interaction, 'Prefs' will be read from the
+-- user's @~/.haskeline@ file (if present).
+-- If it uses file-style interaction, 'Prefs' are not relevant and will not be read.
+runInputTBehavior :: MonadException m => Behavior -> Settings m -> InputT m a -> m a
+runInputTBehavior behavior settings f = withBehavior behavior $ \run -> do
     prefs <- if isTerminalStyle run
                 then liftIO readPrefsFromHome
                 else return defaultPrefs
     execInputT prefs settings run f
 
 -- | Run a line-reading application.
-runInputTForModeWithPrefs :: MonadException m
-    => Mode -> Prefs -> Settings m -> InputT m a -> m a
-runInputTForModeWithPrefs mode prefs settings f
-    = withMode mode $ flip (execInputT prefs settings) f
+runInputTBehaviorWithPrefs :: MonadException m
+    => Behavior -> Prefs -> Settings m -> InputT m a -> m a
+runInputTBehaviorWithPrefs behavior prefs settings f
+    = withBehavior behavior $ flip (execInputT prefs settings) f
 
 -- | Helper function to feed the parameters into an InputT.
 execInputT :: MonadException m => Prefs -> Settings m -> RunTerm
@@ -145,19 +145,20 @@ execInputT prefs settings run (InputT f)
 
 -- | Read input from 'stdin'.  
 -- Use terminal-style interaction if 'stdin' is connected to
--- a terminal and has echoing enabled.  Otherwise (e.g., if 'stdin' is a pipe), use file-style interaction.
+-- a terminal and has echoing enabled.  Otherwise (e.g., if 'stdin' is a pipe), use
+-- file-style interaction.
 --
--- This mode should suffice for most applications.  
-defaultMode :: Mode
-defaultMode = Mode defaultRunTerm
+-- This behavior should suffice for most applications.  
+defaultBehavior :: Behavior
+defaultBehavior = Behavior defaultRunTerm
 
 -- | Use file-style interaction, reading input from the given 'Handle'.  
-fileHandleMode :: Handle -> Mode
-fileHandleMode = Mode . fileHandleRunTerm
+useFileHandle :: Handle -> Behavior
+useFileHandle = Behavior . fileHandleRunTerm
 
 -- | Use file-style interaction, reading input from the given file.
-fileMode :: FilePath -> Mode
-fileMode file = Mode $ do
+useFile :: FilePath -> Behavior
+useFile file = Behavior $ do
             h <- openBinaryFile file ReadMode
             rt <- fileHandleRunTerm h
             return rt { closeTerm = closeTerm rt >> hClose h}
@@ -166,8 +167,8 @@ fileMode file = Mode $ do
 -- terminals.
 --
 -- If the terminal is not available, use file-style interaction, reading input from 'stdin'.
-preferTermMode :: Mode
-preferTermMode = Mode terminalRunTerm
+preferTerm :: Behavior
+preferTerm = Behavior terminalRunTerm
 
 
 -- | Read 'Prefs' from @~/.haskeline.@   If there is an error reading the file,

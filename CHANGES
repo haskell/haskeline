@@ -3,7 +3,8 @@ Changed in version 0.6.3:
 
    * #109: Add function completeWordWithPrev.
 
-   * #101, #44: Extend the API with Modes for specifying interaction behavior.
+   * #101, #44: Extend the API with Behaviors, which control the choice between
+     terminal-style and file-style interaction.
 
    * #78: Correct width calculations for escape sequences ("\ESC...\STX")
 

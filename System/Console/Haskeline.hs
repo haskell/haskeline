@@ -32,13 +32,13 @@ module System.Console.Haskeline(
                     InputT,
                     runInputT,
                     haveTerminalUI,
-                    -- ** Modes and behaviors
-                    Mode,
-                    runInputTForMode,
-                    defaultMode,
-                    fileHandleMode,
-                    fileMode,
-                    preferTermMode,
+                    -- ** Behaviors
+                    Behavior,
+                    runInputTBehavior,
+                    defaultBehavior,
+                    useFileHandle,
+                    useFile,
+                    preferTerm,
                     -- * User interaction functions
                     -- ** Reading user input
                     -- $inputfncs
@@ -59,7 +59,7 @@ module System.Console.Haskeline(
                     readPrefs,
                     defaultPrefs,
                     runInputTWithPrefs,
-                    runInputTForModeWithPrefs,
+                    runInputTBehaviorWithPrefs,
                     -- * Ctrl-C handling
                     -- $ctrlc
                     Interrupt(..),
