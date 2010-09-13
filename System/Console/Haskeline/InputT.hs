@@ -166,7 +166,7 @@ useFile file = Behavior $ do
 -- | Use terminal-style interaction whenever possible, even if 'stdin' and/or 'stdout' are not
 -- terminals.
 --
--- If the terminal is not available, use file-style interaction, reading input from 'stdin'.
+-- If it cannot open the user's terminal, use file-style interaction, reading input from 'stdin'.
 preferTerm :: Behavior
 preferTerm = Behavior terminalRunTerm
 
