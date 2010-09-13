@@ -222,6 +222,7 @@ getPassword x = promptedInput
                      , ctrlChar 'd' +> \p -> if null (passwordState p)
                                                 then failCmd p
                                                 else finish p
+                     , ctrlChar 'l' +> clearScreenCmd >|> loop'
                      ]
     loop' = keyCommand loop
                         
