@@ -133,7 +133,7 @@ an @EOF@ was encountered before any characters were read.
 If @'autoAddHistory' == 'True'@ and the line input is nonblank (i.e., is not all
 spaces), it will be automatically added to the history.
 -}
-getInputLine :: forall m . MonadException m => String -- ^ The input prompt
+getInputLine :: MonadException m => String -- ^ The input prompt
                             -> InputT m (Maybe String)
 getInputLine = promptedInput getInputCmdLine $ unMaybeT . getLocaleLine
 
