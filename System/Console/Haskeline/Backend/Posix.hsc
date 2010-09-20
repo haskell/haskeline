@@ -253,7 +253,7 @@ blockUntilInput h = hWaitForInput h (-1) >> return ()
 #else
 -- hWaitForInput doesn't work with -threaded on ghc < 6.10
 -- (#2363 in ghc's trac)
-blockUntilInput h = unsafeHandleToFd h >>= threadWaitRead
+blockUntilInput h = unsafeHandleToFD h >>= threadWaitRead . Fd
 #endif
 
 -- try to convert to the locale encoding using iconv.
