@@ -20,6 +20,7 @@ import System.Console.Haskeline.Key
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Term as Term
+import System.Console.Haskeline.Backend.WCWidth
 
 import Data.ByteString.Internal (createAndTrim)
 import qualified Data.ByteString as B
@@ -265,27 +266,56 @@ printText txt = do
     
 printAfter :: String -> DrawM ()
 printAfter str = do
+    p <- getPos
     printText str
-    movePos $ negate $ length str
+    setPos p
     
 drawLineDiffWin :: LineChars -> LineChars -> DrawM ()
 drawLineDiffWin (xs1,ys1) (xs2,ys2) = case matchInit xs1 xs2 of
     ([],[])     | ys1 == ys2            -> return ()
-    (xs1',[])   | xs1' ++ ys1 == ys2    -> movePos $ negate $ length xs1'
-    ([],xs2')   | ys1 == xs2' ++ ys2    -> movePos $ length xs2'
+    (xs1',[])   | xs1' ++ ys1 == ys2    -> movePosLeft xs1'
+    ([],xs2')   | ys1 == xs2' ++ ys2    -> movePosRight xs2'
     (xs1',xs2')                         -> do
-        movePos (negate $ length xs1')
-        let m = length xs1' + length ys1 - (length xs2' + length ys2)
+        movePosLeft xs1'
+        let m = gsWidth xs1' + gsWidth ys1 - (gsWidth xs2' + gsWidth ys2)
         let deadText = replicate m ' '
         printText (graphemesToString xs2')
         printAfter (graphemesToString ys2 ++ deadText)
 
-movePos :: Int -> DrawM ()
-movePos n = do
-    Coord {coordX = x, coordY = y} <- getPos
+movePosRight, movePosLeft :: [Grapheme] -> DrawM ()
+movePosRight str = do
+    p <- getPos
     w <- asks width
-    let (h,x') = divMod (x+n) w
-    setPos Coord {coordX = x', coordY = y+h}
+    setPos $ moveCoord w p str
+  where
+    moveCoord _ p [] = p
+    moveCoord w p cs = case splitAtWidth (w - coordX p) cs of
+                        (_,[],len) | len < w -- stayed on same line
+                            -> Coord { coordY = coordY p + 1,
+                                       coordX = coordX p + len
+                                     }
+                        (_,cs',_) -- moved to next line
+                            -> moveCoord w Coord {
+                                            coordY = coordY p + 1,
+                                            coordX = 0
+                                           } cs'
+
+movePosLeft str = do
+    p <- getPos
+    w <- asks width
+    setPos $ moveCoord w p str
+  where
+    moveCoord _ p [] = p
+    moveCoord w p cs = case splitAtWidth (coordX p) cs of
+                        (_,[],len) -- stayed on same line
+                            -> Coord { coordY = coordY p,
+                                       coordX = coordX p - len
+                                     }
+                        (_,cs',_) -- moved to previous line
+                            -> moveCoord w Coord {
+                                            coordY = coordY p - 1,
+                                            coordX = w-1
+                                           } cs'
 
 crlf :: String
 crlf = "\r\n"
@@ -309,7 +339,7 @@ instance (MonadException m, MonadReader Layout m) => Term (Draw m) where
         setPos (Coord 0 0)
     
     moveToNextLine s = do
-        movePos (lengthToEnd s)
+        movePosRight (snd s)
         printText "\r\n" -- make the console take care of creating a new line
     
     ringBell True = liftIO messageBeep

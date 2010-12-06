@@ -80,6 +80,7 @@ Library
                 System.Console.Haskeline.IO
     Other-Modules:
                 System.Console.Haskeline.Backend
+                System.Console.Haskeline.Backend.WCWidth
                 System.Console.Haskeline.Command
                 System.Console.Haskeline.Command.Completion
                 System.Console.Haskeline.Command.History
@@ -96,6 +97,7 @@ Library
                 System.Console.Haskeline.Command.Undo
                 System.Console.Haskeline.Vi
     include-dirs: includes
+    c-sources: cbits/h_wcwidth.c
     if os(windows) {
         Build-depends: Win32>=2.0
         Other-modules: System.Console.Haskeline.Backend.Win32
@@ -107,11 +109,9 @@ Library
         Build-depends: unix>=2.0 && < 2.5
                         -- unix-2.3 doesn't build on ghc-6.8.1 or earlier
         c-sources: cbits/h_iconv.c
-                   cbits/h_wcwidth.c
         includes: h_iconv.h
         install-includes: h_iconv.h
         Other-modules: 
-                System.Console.Haskeline.Backend.WCWidth
                 System.Console.Haskeline.Backend.Posix
                 System.Console.Haskeline.Backend.IConv
                 System.Console.Haskeline.Backend.DumbTerm
