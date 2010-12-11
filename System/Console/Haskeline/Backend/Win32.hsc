@@ -290,8 +290,8 @@ movePosRight str = do
   where
     moveCoord _ p [] = p
     moveCoord w p cs = case splitAtWidth (w - coordX p) cs of
-                        (_,[],len) | len < w -- stayed on same line
-                            -> Coord { coordY = coordY p + 1,
+                        (_,[],len) | len < w - coordX p -- stayed on same line
+                            -> Coord { coordY = coordY p,
                                        coordX = coordX p + len
                                      }
                         (_,cs',_) -- moved to next line
@@ -311,7 +311,7 @@ movePosLeft str = do
                             -> Coord { coordY = coordY p,
                                        coordX = coordX p - len
                                      }
-                        (_,cs',_) -- moved to previous line
+                        (_,_:cs',_) -- moved to previous line
                             -> moveCoord w Coord {
                                             coordY = coordY p - 1,
                                             coordX = w-1
