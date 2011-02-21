@@ -11,6 +11,7 @@ Usage:
 ./Test chars    (character input)
 ./Test password (no masking characters)
 ./Test password \*
+./Test initial  (use initial text in the prompt)
 --}
 
 mySettings :: Settings IO
@@ -23,6 +24,7 @@ main = do
                 ["chars"] -> fmap (fmap (\c -> [c])) . getInputChar
                 ["password"] -> getPassword Nothing
                 ["password", [c]] -> getPassword (Just c)
+                ["initial"] -> flip getInputLineWithInitial ("left ", "right")
                 _ -> getInputLine
         runInputT mySettings $ withInterrupt $ loop inputFunc 0
     where

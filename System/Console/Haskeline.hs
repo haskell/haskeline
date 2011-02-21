@@ -43,6 +43,7 @@ module System.Console.Haskeline(
                     -- ** Reading user input
                     -- $inputfncs
                     getInputLine,
+                    getInputLineWithInitial,
                     getInputChar,
                     getPassword,
                     -- ** Outputting text
@@ -135,15 +136,39 @@ spaces), it will be automatically added to the history.
 -}
 getInputLine :: MonadException m => String -- ^ The input prompt
                             -> InputT m (Maybe String)
-getInputLine = promptedInput getInputCmdLine $ unMaybeT . getLocaleLine
+getInputLine = promptedInput (getInputCmdLine emptyIM) $ unMaybeT . getLocaleLine
 
-getInputCmdLine :: MonadException m => TermOps -> String -> InputT m (Maybe String)
-getInputCmdLine tops prefix = do
+{- | Reads one line of input and fills the insertion space with initial text. When using
+terminal-style interaction, this function provides a rich line-editing user interface with the
+added ability to give the user default values.
+
+This function behaves in the exact same manner as 'getInputLine', except that
+it pre-populates the input area. The text that resides in the input area is given as a 2-tuple
+with two 'String's.   The string on the left of the tuple (obtained by calling 'fst') is
+what will appear to the left of the cursor and the string on the right (obtained by
+calling 'snd') is what will appear to the right of the cursor.
+
+Some examples of calling of this function are:
+
+> getInputLineWithInitial "prompt> " ("left", "") -- The cursor starts at the end of the line.
+> getInputLineWithInitial "prompt> " ("left ", "right") -- The cursor starts before the second word.
+ -}
+getInputLineWithInitial :: MonadException m
+                            => String           -- ^ The input prompt
+                            -> (String, String) -- ^ The initial value left and right of the cursor
+                            -> InputT m (Maybe String)
+getInputLineWithInitial prompt (left,right) = promptedInput (getInputCmdLine initialIM)
+                                                (unMaybeT . getLocaleLine) prompt
+  where
+    initialIM = insertString left $ moveToStart $ insertString right $ emptyIM
+
+getInputCmdLine :: MonadException m => InsertMode -> TermOps -> String -> InputT m (Maybe String)
+getInputCmdLine initialIM tops prefix = do
     emode <- asks editMode
     result <- runInputCmdT tops $ case emode of
-                Emacs -> runCommandLoop tops prefix emacsCommands emptyIM
+                Emacs -> runCommandLoop tops prefix emacsCommands initialIM
                 Vi -> evalStateT' emptyViState $
-                        runCommandLoop tops prefix viKeyCommands emptyIM
+                        runCommandLoop tops prefix viKeyCommands initialIM
     maybeAddHistory result
     return result
 
