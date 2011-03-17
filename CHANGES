@@ -1,3 +1,6 @@
+Changed in version 0.6.4:
+   * Added new function getInputLineWithInitial.
+
 Changed in version 0.6.3.2:
    * Allow building with mtl-2.0.* .
 
