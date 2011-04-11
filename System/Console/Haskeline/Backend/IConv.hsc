@@ -65,8 +65,8 @@ openPartialDecoder codeset = do
 foreign import ccall "setlocale" c_setlocale :: CInt -> CString -> IO CString
 
 setLocale :: Maybe String -> IO (Maybe String)
-setLocale oldLocale = (maybeWith withCString) oldLocale $ \loc_p -> do
-    c_setlocale (#const LC_CTYPE) loc_p >>= maybePeek peekCString
+setLocale oldLocale = (maybeWith withCAString) oldLocale $ \loc_p -> do
+    c_setlocale (#const LC_CTYPE) loc_p >>= maybePeek peekCAString
 
 -----------------
 -- Getting the encoding
@@ -77,7 +77,7 @@ foreign import ccall nl_langinfo :: NLItem -> IO CString
 
 getCodeset :: IO String
 getCodeset = do
-    str <- nl_langinfo (#const CODESET) >>= peekCString
+    str <- nl_langinfo (#const CODESET) >>= peekCAString
     -- check for codesets which may be returned by Solaris, but not understood
     -- by GNU iconv.
     if str `elem` ["","646"]
@@ -95,8 +95,8 @@ foreign import ccall "h_iconv_open" iconv_open
     :: CString -> CString -> IO IConvTPtr
 
 iconvOpen :: String -> String -> IO IConvT
-iconvOpen destName srcName = withCString destName $ \dest ->
-                            withCString srcName $ \src -> do
+iconvOpen destName srcName = withCAString destName $ \dest ->
+                            withCAString srcName $ \src -> do
                                 res <- iconv_open dest src
                                 if res == nullPtr `plusPtr` (-1)
                                     then throwErrno $ "iconvOpen "
