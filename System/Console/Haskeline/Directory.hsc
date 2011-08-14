@@ -72,6 +72,13 @@ getHomeDirectory = allocaBytes ((#const MAX_PATH) * (#size TCHAR)) $ \pathPtr ->
         else peekCWString pathPtr
 #endif
 
+#else 
+-- POSIX
+-- On 7.2.1 and later, getDirectoryContents uses the locale encoding
+-- But previous version don't, so we need to decode manually.
+
+#if __GLASGOW_HASKELL__ >= 701
+import System.Directory
 #else
 
 import Data.ByteString.Char8 (pack, unpack)
@@ -101,4 +108,5 @@ getHomeDirectory = do
     decoder <- openDecoder codeset
     handle (\(_::IOException) -> return "")
         $ D.getHomeDirectory >>= decoder . pack
+#endif
 #endif
