@@ -144,27 +144,34 @@ repeatedCommands = choiceCmd [argumented, doBefore noArg repeatableCommands]
                             ]
 
 pureMovements :: InputKeyCmd (ArgMode CommandMode) CommandMode
-pureMovements = choiceCmd $
-            map mkCharCommand charMovements
-            ++ map mkSimpleCommand movements
+pureMovements = choiceCmd $ charMovements ++ map mkSimpleCommand movements
     where
+        charMovements = [ charMovement 'f' $ \c -> goRightUntil $ overChar (==c)
+                        , charMovement 'F' $ \c -> goLeftUntil $ overChar (==c)
+                        , charMovement 't' $ \c -> goRightUntil $ beforeChar (==c)
+                        , charMovement 'T' $ \c -> goLeftUntil $ afterChar (==c)
+                        ]
         mkSimpleCommand (k,move) = k +> change (applyCmdArg move)
-        mkCharCommand (k,move) = k +> keyChoiceCmd [
+        charMovement c move = simpleChar c +> keyChoiceCmd [
                                         useChar (change . applyCmdArg . move)
                                         , withoutConsuming (change argState)
                                         ]
 
 useMovementsForKill :: Command m s t -> (KillHelper -> Command m s t) -> KeyCommand m s t
 useMovementsForKill alternate useHelper = choiceCmd $
-            map mkCharCommand charMovements
-            ++ specialCases
+            specialCases
             ++ map (\(k,move) -> k +> useHelper (SimpleMove move)) movements
     where
         specialCases = [ simpleChar 'e' +> useHelper (SimpleMove goToWordDelEnd)
                        , simpleChar 'E' +> useHelper (SimpleMove goToBigWordDelEnd)
                        , simpleChar '%' +> useHelper (GenericKill deleteMatchingBrace)
+                       -- Note 't' and 'f' behave differently than in pureMovements.
+                       , charMovement 'f' $ \c -> goRightUntil $ afterChar (==c)
+                       , charMovement 'F' $ \c -> goLeftUntil $ overChar (==c)
+                       , charMovement 't' $ \c -> goRightUntil $ overChar (==c)
+                       , charMovement 'T' $ \c -> goLeftUntil $ afterChar (==c)
                        ]
-        mkCharCommand (k,move) = k +> keyChoiceCmd [
+        charMovement c move = simpleChar c +> keyChoiceCmd [
                                     useChar (useHelper . SimpleMove . move)
                                     , withoutConsuming alternate]
 
@@ -274,13 +281,6 @@ movements = [ (simpleChar 'h', goLeft)
                                 atEnd isWordChar .||. atEnd isOtherChar)
             , (simpleChar 'E', goRightUntil (atEnd isBigWordChar))
             ]
-
-charMovements :: [(Key, Char -> InsertMode -> InsertMode)]
-charMovements = [ (simpleChar 'f', \c -> goRightUntil $ overChar (==c))
-                       , (simpleChar 'F', \c -> goLeftUntil $ overChar (==c))
-                       , (simpleChar 't', \c -> goRightUntil $ beforeChar (==c))
-                       , (simpleChar 'T', \c -> goLeftUntil $ afterChar (==c))
-                       ]
 
 {- 
 From IEEE 1003.1:
