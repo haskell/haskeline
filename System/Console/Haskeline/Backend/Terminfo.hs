@@ -153,6 +153,7 @@ runTerminfoDraw h = do
                     , withGetEvent = wrapKeypad (hOut h) term
                                         . withPosixGetEvent ch h enc
                                             (terminfoKeys term)
+                    , saveUnusedKeys = saveKeys ch
                     , runTerm = \(RunTermType f) -> 
                              runPosixT enc h
                               $ evalStateT' initTermPos

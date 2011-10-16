@@ -360,6 +360,7 @@ win32Term = do
                                 getLayout = getBufferSize (hOut hs)
                                 , withGetEvent = withWindowMode hs
                                                     . win32WithEvent hs ch
+                                , saveUnusedKeys = saveKeys ch
                                 , runTerm = \(RunTermType f) ->
                                         runReaderT' hs $ runDraw f
                                 },

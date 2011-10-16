@@ -38,6 +38,7 @@ runDumbTerm h = do
                 TermOps {
                         getLayout = tryGetLayouts (posixLayouts h)
                         , withGetEvent = withPosixGetEvent ch h enc []
+                        , saveUnusedKeys = saveKeys ch
                         , runTerm = \(RunTermType f) -> 
                                     runPosixT enc h
                                     $ evalStateT' initWindow

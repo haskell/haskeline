@@ -22,9 +22,9 @@ runCommandLoop' :: forall t m s a . (MonadTrans t, Term (t m), CommandMonad (t m
 runCommandLoop' tops prefix initState cmds getEvent = do
     let s = lineChars prefix initState
     drawLine s
-    readMoreKeys s (fmap ($ initState) cmds)
+    readMoreKeys s (fmap (liftM (\x -> (x,[])) . ($ initState)) cmds)
   where
-    readMoreKeys :: LineChars -> KeyMap (CmdM m a) -> t m a
+    readMoreKeys :: LineChars -> KeyMap (CmdM m (a,[Key])) -> t m a
     readMoreKeys s next = do
         event <- handle (\(e::SomeException) -> moveToNextLine s
                                     >> throwIO e) getEvent
@@ -36,7 +36,7 @@ runCommandLoop' tops prefix initState cmds getEvent = do
                         bound_ks <- mapM (lift . asks . lookupKeyBinding) ks
                         loopCmd s $ applyKeysToMap (concat bound_ks) next
 
-    loopCmd :: LineChars -> CmdM m a -> t m a
+    loopCmd :: LineChars -> CmdM m (a,[Key]) -> t m a
     loopCmd s (GetKey next) = readMoreKeys s next
     -- If there are multiple consecutive LineChanges, only render the diff
     -- to the last one, and skip the rest. This greatly improves speed when
@@ -47,7 +47,10 @@ runCommandLoop' tops prefix initState cmds getEvent = do
                                     t <- drawEffect prefix s e
                                     loopCmd t next
     loopCmd s (CmdM next) = lift next >>= loopCmd s
-    loopCmd s (Result x) = moveToNextLine s >> return x
+    loopCmd s (Result (x,ks)) = do
+                                    liftIO (saveUnusedKeys tops ks)
+                                    moveToNextLine s
+                                    return x
 
 
 drawEffect :: (MonadTrans t, Term (t m), MonadReader Prefs m)
@@ -89,17 +92,18 @@ drawReposition tops s = do
 ---------------
 -- Traverse through the tree of keybindings, using the given keys.
 -- Remove as many GetKeys as possible.
-applyKeysToMap :: Monad m => [Key] -> KeyMap (CmdM m a)
-                                -> CmdM m a
+-- Returns any unused keys (so that they can be applied at the next getInputLine).
+applyKeysToMap :: Monad m => [Key] -> KeyMap (CmdM m (a,[Key]))
+                                -> CmdM m (a,[Key])
 applyKeysToMap [] next = GetKey next
 applyKeysToMap (k:ks) next = case lookupKM next k of
     Nothing -> DoEffect RingBell $ GetKey next
     Just (Consumed cmd) -> applyKeysToCmd ks cmd
     Just (NotConsumed cmd) -> applyKeysToCmd (k:ks) cmd
 
-applyKeysToCmd :: Monad m => [Key] -> CmdM m a
-                                -> CmdM m a
+applyKeysToCmd :: Monad m => [Key] -> CmdM m (a,[Key])
+                                -> CmdM m (a,[Key])
 applyKeysToCmd ks (GetKey next) = applyKeysToMap ks next
 applyKeysToCmd ks (DoEffect e next) = DoEffect e (applyKeysToCmd ks next)
 applyKeysToCmd ks (CmdM next) = CmdM $ liftM (applyKeysToCmd ks) next
-applyKeysToCmd _ (Result x) = Result x
+applyKeysToCmd ks (Result (x,ys)) = Result (x,ys++ks) -- use in the next input line

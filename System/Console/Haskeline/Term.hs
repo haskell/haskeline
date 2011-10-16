@@ -45,6 +45,7 @@ data TermOps = TermOps {
             , withGetEvent :: (MonadException m, CommandMonad m)
                                 => (m Event -> m a) -> m a
             , runTerm :: (MonadException m, CommandMonad m) => RunTermType m a -> m a
+            , saveUnusedKeys :: [Key] -> IO ()
         }
 
 -- | Operations needed for file-style interaction.
@@ -112,6 +113,8 @@ keyEventLoop readEvents eventChan = do
                                 Just ThreadKilled -> return ()
                                 _ -> writeChan eventChan (ErrorEvent e)
 
+saveKeys :: Chan Event -> [Key] -> IO ()
+saveKeys ch = writeChan ch . KeyInput
 
 data Interrupt = Interrupt
                 deriving (Show,Typeable,Eq)
