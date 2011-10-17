@@ -1,3 +1,13 @@
+Changed in version 0.6.4.4:
+   * #115: Fix the behavior of the 'f' and 't' commands when deleting text.
+   * #73: Fix regression: pasting multiple lines could drop some characters.
+
+Changed in version 0.6.4.3:
+   * Fix a bug on ghc-7.2.1 with tab-completion of Unicode filenames.
+
+Changed in version 0.6.4.2:
+   * Various updates for ghc-7.2.1.
+
 Changed in version 0.6.4:
    * Added new function getInputLineWithInitial.
 
