@@ -1,6 +1,7 @@
 Changed in version 0.6.4.4:
    * #115: Fix the behavior of the 'f' and 't' commands when deleting text.
    * #73: Fix regression: pasting multiple lines could drop some characters.
+   * Don't require NondecreasingIndentation.
 
 Changed in version 0.6.4.3:
    * Fix a bug on ghc-7.2.1 with tab-completion of Unicode filenames.
