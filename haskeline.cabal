@@ -69,8 +69,6 @@ Library
                 UndecidableInstances
                 PatternSignatures, CPP, DeriveDataTypeable,
                 PatternGuards
-    if impl(ghc >= 7.1)
-        Extensions: NondecreasingIndentation
     Exposed-Modules:
                 System.Console.Haskeline
                 System.Console.Haskeline.Completion

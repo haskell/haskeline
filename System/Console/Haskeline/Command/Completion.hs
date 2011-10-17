@@ -72,11 +72,11 @@ pagingCompletion :: MonadReader Layout m => Key -> Prefs
 pagingCompletion k prefs completions = \im -> do
         ls <- asks $ makeLines (map display completions)
         let pageAction = do
-            askFirst prefs (length completions) $ 
+                askFirst prefs (length completions) $ 
                             if completionPaging prefs
                                 then printPage ls
                                 else effect (PrintLines ls)
-            setState im
+                setState im
         if listCompletionsImmediately prefs
             then pageAction
             else effect RingBell >> try (k +> const pageAction) im
