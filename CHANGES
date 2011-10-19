@@ -1,3 +1,7 @@
+Changed in version 0.6.4.5:
+   * #116: Prevent hang on 64-bit systems when the prompt contains a control
+           character.
+
 Changed in version 0.6.4.4:
    * #115: Fix the behavior of the 'f' and 't' commands when deleting text.
    * #73: Fix regression: pasting multiple lines could drop some characters.
