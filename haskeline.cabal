@@ -50,7 +50,7 @@ Library
     }
     else {
         if impl(ghc>=6.11) {
-            Build-depends: base >=4.1 && < 4.5, containers>=0.1 && < 0.5, directory>=1.0 && < 1.2,
+            Build-depends: base >=4.1 && < 4.6, containers>=0.1 && < 0.5, directory>=1.0 && < 1.2,
                            bytestring==0.9.*
         }
         else {
@@ -58,7 +58,7 @@ Library
                            bytestring==0.9.*
         }
     }
-    Build-depends:  filepath >= 1.1 && < 1.3, mtl >= 1.1 && < 2.1,
+    Build-depends:  filepath >= 1.1 && < 1.4, mtl >= 1.1 && < 2.1,
                     utf8-string==0.3.* && >=0.3.6,
                     extensible-exceptions==0.1.* && >=0.1.1.0
     Extensions:     ForeignFunctionInterface, Rank2Types, FlexibleInstances,
