@@ -21,9 +21,6 @@ Stability:      Experimental
 Build-Type:     Custom
 extra-source-files: examples/Test.hs CHANGES
 
-flag base2
-    Description: Use the base packages from before version 6.8
-
 -- There are three main advantages to the terminfo backend over the portable,
 -- "dumb" alternative.  First, it enables more efficient control sequences
 -- when redrawing the input.  Second, and more importantly, it enables us
@@ -44,19 +41,13 @@ flag libiconv
     Default: False
 
 Library
-    if flag(base2) {
-        Build-depends: base == 2.*
-        cpp-options:    -DOLD_BASE
+    if impl(ghc>=6.11) {
+        Build-depends: base >=4.1 && < 4.6, containers>=0.1 && < 0.5, directory>=1.0 && < 1.2,
+                       bytestring==0.9.*
     }
     else {
-        if impl(ghc>=6.11) {
-            Build-depends: base >=4.1 && < 4.6, containers>=0.1 && < 0.5, directory>=1.0 && < 1.2,
-                           bytestring==0.9.*
-        }
-        else {
-            Build-depends: base>=3 && <4.1 , containers>=0.1 && < 0.3, directory==1.0.*,
-                           bytestring==0.9.*
-        }
+        Build-depends: base>=3 && <4.1 , containers>=0.1 && < 0.3, directory==1.0.*,
+                       bytestring==0.9.*
     }
     Build-depends:  filepath >= 1.1 && < 1.4, mtl >= 1.1 && < 2.1,
                     utf8-string==0.3.* && >=0.3.6

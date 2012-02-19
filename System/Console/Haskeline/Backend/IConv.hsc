@@ -11,11 +11,7 @@ import Foreign.C
 import Foreign
 import Data.ByteString (ByteString, useAsCStringLen, append)
 -- TODO: Base or Internal, depending on whether base>=3.
-#ifdef OLD_BASE
-import Data.ByteString.Base (createAndTrim')
-#else
 import Data.ByteString.Internal (createAndTrim')
-#endif
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Maybe (fromMaybe)
