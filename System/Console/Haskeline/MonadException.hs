@@ -1,4 +1,4 @@
-{- | This module redefines some of the functions in "Control.Exception.Extensible" to
+{- | This module redefines some of the functions in "Control.Exception" to
 work for more general monads than only 'IO'.
 -}
 
@@ -16,8 +16,8 @@ module System.Console.Haskeline.MonadException(
     E.IOException())
      where
 
-import qualified Control.Exception.Extensible as E
-import Control.Exception.Extensible(Exception,SomeException)
+import qualified Control.Exception as E
+import Control.Exception (Exception,SomeException)
 import Prelude hiding (catch)
 import Control.Monad.Reader
 import Control.Monad.State

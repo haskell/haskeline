@@ -30,7 +30,7 @@ import Data.Foldable (toList)
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as UTF8
-import Control.Exception.Extensible
+import Control.Exception
 
 import System.Directory(doesFileExist)
 

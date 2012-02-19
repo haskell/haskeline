@@ -11,7 +11,7 @@ import Data.Typeable
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import Data.Word
-import Control.Exception.Extensible (fromException, AsyncException(..),bracket_)
+import Control.Exception (fromException, AsyncException(..),bracket_)
 import System.IO
 import Control.Monad(liftM,when,guard)
 import System.IO.Error (isEOFError)

@@ -8,7 +8,7 @@ import System.Console.Terminfo
 import Control.Monad
 import Data.List(intersperse, foldl')
 import System.IO
-import qualified Control.Exception.Extensible as Exception
+import qualified Control.Exception as Exception
 import qualified Data.ByteString.Char8 as B
 import Data.Maybe (fromMaybe, mapMaybe)
 import Control.Concurrent.Chan

@@ -59,8 +59,7 @@ Library
         }
     }
     Build-depends:  filepath >= 1.1 && < 1.4, mtl >= 1.1 && < 2.1,
-                    utf8-string==0.3.* && >=0.3.6,
-                    extensible-exceptions==0.1.* && >=0.1.1.0
+                    utf8-string==0.3.* && >=0.3.6
     Extensions:     ForeignFunctionInterface, Rank2Types, FlexibleInstances,
                 TypeSynonymInstances
                 FlexibleContexts, ExistentialQuantification
