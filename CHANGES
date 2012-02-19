@@ -1,3 +1,6 @@
+Changed in version 0.6.4.6:
+   * Build with ghc-7.4.1.
+
 Changed in version 0.6.4.5:
    * #116: Prevent hang on 64-bit systems when the prompt contains a control
            character.
