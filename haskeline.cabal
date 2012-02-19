@@ -21,6 +21,10 @@ Stability:      Experimental
 Build-Type:     Custom
 extra-source-files: examples/Test.hs CHANGES
 
+source-repository head
+    type: darcs
+    location: http://code.haskell.org/haskeline
+
 -- There are three main advantages to the terminfo backend over the portable,
 -- "dumb" alternative.  First, it enables more efficient control sequences
 -- when redrawing the input.  Second, and more importantly, it enables us
