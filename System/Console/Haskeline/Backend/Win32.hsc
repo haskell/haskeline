@@ -381,7 +381,6 @@ fileRunTerm h_in = do
                     putStrOut = putter,
                     encodeForTerm = unicodeToCodePage cp,
                     decodeForTerm = codePageToUnicode cp,
-                    wrapInterrupt = withCtrlCHandler,
                     termOps = Right FileOps {
                                 inputHandle = h_in,
                                 getLocaleChar = getMultiByteChar cp h_in,
@@ -405,31 +404,6 @@ putOut = do
             cp <- getCodePage
             return $ \str -> unicodeToCodePage cp str >>= B.putStr >> hFlush stdout
 
-
-
-type Handler = DWORD -> IO BOOL
-
-foreign import ccall "wrapper" wrapHandler :: Handler -> IO (FunPtr Handler)
-
-foreign import stdcall "windows.h SetConsoleCtrlHandler" c_SetConsoleCtrlHandler
-    :: FunPtr Handler -> BOOL -> IO BOOL
-
--- sets the tv to True when ctrl-c is pressed.
-withCtrlCHandler :: MonadException m => m a -> m a
-withCtrlCHandler f = bracket (liftIO $ do
-                                    tid <- myThreadId
-                                    fp <- wrapHandler (handler tid)
-                                -- don't fail if we can't set the ctrl-c handler
-                                -- for example, we might not be attached to a console?
-                                    _ <- c_SetConsoleCtrlHandler fp True
-                                    return fp)
-                                (\fp -> liftIO $ c_SetConsoleCtrlHandler fp False)
-                                (const f)
-  where
-    handler tid (#const CTRL_C_EVENT) = do
-        throwTo tid Interrupt
-        return True
-    handler _ _ = return False
 
 
 ------------------------

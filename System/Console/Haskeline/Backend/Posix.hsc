@@ -17,7 +17,7 @@ module System.Console.Haskeline.Backend.Posix (
 import Foreign
 import Foreign.C.Types
 import qualified Data.Map as Map
-import System.Posix.Terminal hiding (Interrupt)
+import System.Posix.Terminal
 import Control.Monad
 import Control.Concurrent hiding (throwTo)
 import Data.Maybe (catMaybes)
@@ -219,13 +219,6 @@ withWindowHandler :: MonadException m => Chan Event -> m a -> m a
 withWindowHandler eventChan = withHandler windowChange $ 
     Catch $ writeChan eventChan WindowResize
 
-withSigIntHandler :: MonadException m => m a -> m a
-withSigIntHandler f = do
-    tid <- liftIO myThreadId 
-    withHandler keyboardSignal 
-            (Catch (throwTo tid Interrupt))
-            f
-
 withHandler :: MonadException m => Signal -> Handler -> m a -> m a
 withHandler signal handler f = do
     old_handler <- liftIO $ installHandler signal handler Nothing
@@ -342,7 +335,6 @@ fileRunTerm h_in = do
     decoder' <- openPartialDecoder codeset
     return RunTerm {putStrOut = encoder >=> putTerm h_out,
                 closeTerm = setLocale oldLocale >> return (),
-                wrapInterrupt = withSigIntHandler,
                 encodeForTerm = encoder,
                 decodeForTerm = decoder,
                 termOps = Right FileOps {

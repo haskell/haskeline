@@ -61,11 +61,6 @@ module System.Console.Haskeline(
                     defaultPrefs,
                     runInputTWithPrefs,
                     runInputTBehaviorWithPrefs,
-                    -- * Ctrl-C handling
-                    -- $ctrlc
-                    Interrupt(..),
-                    withInterrupt,
-                    handleInterrupt,
                     module System.Console.Haskeline.Completion,
                     module System.Console.Haskeline.MonadException)
                      where
@@ -272,30 +267,3 @@ promptedInput doTerm doFile prompt = do
             let (lastLine,rest) = break (`elem` "\r\n") $ reverse prompt
             outputStr $ reverse rest
             doTerm tops $ reverse lastLine
-
-------------
--- Interrupt
-
-{- $ctrlc
-The following functions provide portable handling of Ctrl-C events.  
-
-These functions are not necessary on GHC version 6.10 or later, which
-processes Ctrl-C events as exceptions by default.
--}
-
--- | If Ctrl-C is pressed during the given computation, throw an exception of type 
--- 'Interrupt'.
-withInterrupt :: MonadException m => InputT m a -> InputT m a
-withInterrupt f = do
-    rterm <- ask
-    wrapInterrupt rterm f
-
--- | Catch and handle an exception of type 'Interrupt'.
-handleInterrupt :: MonadException m => m a 
-                        -- ^ Handler to run if Ctrl-C is pressed
-                     -> m a -- ^ Computation to run
-                     -> m a
-handleInterrupt f = handleDyn $ \Interrupt -> f
-
-
-
