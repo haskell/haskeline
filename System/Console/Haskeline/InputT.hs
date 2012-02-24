@@ -14,7 +14,7 @@ import System.Console.Haskeline.Term
 import System.Directory(getHomeDirectory)
 import System.FilePath
 import Control.Applicative
-import qualified Control.Monad.State as State
+import Control.Monad (liftM, ap)
 import System.IO
 
 -- | Application-specific customizations to the user interface.
@@ -47,18 +47,26 @@ newtype InputT m a = InputT {unInputT :: ReaderT RunTerm
                                 MonadReader (Settings m), MonadReader RunTerm)
 
 instance Monad m => Functor (InputT m) where
-    fmap = State.liftM
+    fmap = liftM
 
 instance Monad m => Applicative (InputT m) where
     pure = return
-    (<*>) = State.ap
+    (<*>) = ap
 
 instance MonadTrans InputT where
     lift = InputT . lift . lift . lift . lift . lift
 
-instance Monad m => State.MonadState History (InputT m) where
-    get = get
-    put = put
+-- | Get the current line input history.
+getHistory :: Monad m => InputT m History
+getHistory = get
+
+-- | Set the line input history.
+putHistory :: Monad m => History -> InputT m ()
+putHistory = put
+
+-- | Change the current line input history.
+modifyHistory :: Monad m => (History -> History) -> InputT m ()
+modifyHistory = modify
 
 -- for internal use only
 type InputCmdT m = StateT Layout (UndoT (StateT HistLog (StateT KillRing

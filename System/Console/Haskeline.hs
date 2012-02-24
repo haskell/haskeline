@@ -61,6 +61,12 @@ module System.Console.Haskeline(
                     defaultPrefs,
                     runInputTWithPrefs,
                     runInputTBehaviorWithPrefs,
+                    -- ** History
+                    -- $history
+                    getHistory,
+                    putHistory,
+                    modifyHistory,
+                    -- * Additional submodules
                     module System.Console.Haskeline.Completion,
                     module System.Console.Haskeline.MonadException)
                      where
@@ -177,7 +183,7 @@ maybeAddHistory result = do
                         AlwaysAdd -> addHistory
                         IgnoreConsecutive -> addHistoryUnlessConsecutiveDupe
                         IgnoreAll -> addHistoryRemovingAllDupes
-               in modify (adder line)
+               in modifyHistory (adder line)
         _ -> return ()
 
 ----------
@@ -246,6 +252,13 @@ getPassword x = promptedInput
                      ]
     loop' = keyCommand loop
                         
+{- $history
+The 'InputT' monad transformer provides direct, low-level access to the user's line history state.
+
+However, for most applications, it should suffice to just use the 'autoAddHistory'
+and 'historyFile' flags.
+
+-}
 
 
 -------
