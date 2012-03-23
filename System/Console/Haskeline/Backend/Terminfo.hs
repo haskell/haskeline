@@ -6,7 +6,7 @@ module System.Console.Haskeline.Backend.Terminfo(
 
 import System.Console.Terminfo
 import Control.Monad
-import Data.List(intersperse, foldl')
+import Data.List(foldl')
 import System.IO
 import qualified Control.Exception as Exception
 import qualified Data.ByteString.Char8 as B
@@ -67,30 +67,6 @@ getWrapLine left1 = (do
     wraparoundGlitch >>= guard
     return (termText " " <#> left1)
     ) `mplus` return mempty
-
-type TermAction = Actions -> TermOutput
-    
-text :: B.ByteString -> TermAction
-text str _ = termText $ B.unpack str
-
-left,right,up :: Int -> TermAction
-left = flip leftA
-right = flip rightA
-up = flip upA
-
-clearAll :: LinesAffected -> TermAction
-clearAll = flip clearAllA
-
-mreplicate :: Monoid m => Int -> m -> m
-mreplicate n m
-    | n <= 0    = mempty
-    | otherwise = m `mappend` mreplicate (n-1) m
-
--- We don't need to bother encoding the spaces.
-spaces :: Int -> TermAction
-spaces 0 = mempty
-spaces 1 = const $ termText " " -- share when possible
-spaces n = const $ termText $ replicate n ' '
 
 ----------------------------------------------------------------
 -- The Draw monad
@@ -205,6 +181,8 @@ terminfoKeys term = mapMaybe getSequence keyCapabilities
 -- This prevents flicker, i.e., the cursor appearing briefly
 -- in an intermediate position.
 
+type TermAction = Actions -> TermOutput
+
 type ActionT = Writer.WriterT TermAction
 
 type ActionM a = forall m . (MonadReader Layout m, MonadIO m) => ActionT (Draw m) a
@@ -220,6 +198,28 @@ runActionT m = do
 
 output :: TermAction -> ActionM ()
 output = Writer.tell
+
+outputText :: String -> ActionM ()
+outputText str = posixEncode str >>= output . const . termText . B.unpack
+
+left,right,up :: Int -> TermAction
+left = flip leftA
+right = flip rightA
+up = flip upA
+
+clearAll :: LinesAffected -> TermAction
+clearAll = flip clearAllA
+
+mreplicate :: Monoid m => Int -> m -> m
+mreplicate n m
+    | n <= 0    = mempty
+    | otherwise = m `mappend` mreplicate (n-1) m
+
+-- We don't need to bother encoding the spaces.
+spaces :: Int -> TermAction
+spaces 0 = mempty
+spaces 1 = const $ termText " " -- share when possible
+spaces n = const $ termText $ replicate n ' '
 
 
 changePos :: TermPos -> TermPos -> TermAction
@@ -279,7 +279,7 @@ printText gs = do
     let (thisLine,rest,thisWidth) = splitAtWidth (w-c) gs
     let lineWidth = c + thisWidth
     -- Finally, actually print out the relevant text.
-    outputGraphemes thisLine
+    outputText (graphemesToString thisLine)
     modify $ setRow r lineWidth
     if null rest && lineWidth < w
         then  -- everything fits on one line without wrapping
@@ -288,9 +288,6 @@ printText gs = do
             put TermPos {termRow=r+1,termCol=0}
             output $ if lineWidth == w then wrapLine else spaces (w-lineWidth)
             printText rest
-  where
-    outputGraphemes thisLine = posixEncode (graphemesToString thisLine)
-                            >>= output . text
 
 ----------------------------------------------------------------
 -- High-level Term implementation
@@ -356,10 +353,9 @@ instance (MonadException m, MonadReader Layout m) => Term (Draw m) where
     drawLineDiff xs ys = runActionT $ drawLineDiffT xs ys
     reposition layout lc = runActionT $ repositionT layout lc
     
-    printLines [] = return ()
-    printLines ls = do
-        bls <- mapM posixEncode ls
-        runActionT $ output $ mconcat $ intersperse nl (map text bls) ++ [nl]
+    printLines = mapM_ $ \line -> runActionT $ do
+                                    outputText line
+                                    output nl
     clearLayout = runActionT clearLayoutT
     moveToNextLine _ = runActionT moveToNextLineT
     ringBell True = runActionT $ output bellAudible
