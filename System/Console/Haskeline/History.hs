@@ -28,11 +28,16 @@ import qualified Data.Sequence as Seq
 import Data.Sequence ( Seq, (<|), ViewL(..), ViewR(..), viewl, viewr )
 import Data.Foldable (toList)
 
-import qualified Data.ByteString as B
-import qualified Data.ByteString.UTF8 as UTF8
 import Control.Exception
 
 import System.Directory(doesFileExist)
+
+#ifdef USE_GHC_ENCODINGS
+import qualified System.IO as IO
+#else
+import qualified Data.ByteString as B
+import qualified Data.ByteString.UTF8 as UTF8
+#endif
 
 data History = History {histLines :: Seq String,
                         stifleAmt :: Maybe Int}
@@ -58,9 +63,7 @@ readHistory :: FilePath -> IO History
 readHistory file = handle (\(_::IOException) -> return emptyHistory) $ do
     exists <- doesFileExist file
     contents <- if exists
-        -- use binary file I/O to avoid Windows CRLF line endings
-        -- which cause confusion when switching between systems.
-        then fmap UTF8.toString (B.readFile file)
+        then readUTF8File file
         else return ""
     _ <- evaluate (length contents) -- force file closed
     return History {histLines = Seq.fromList $ lines contents,
@@ -70,7 +73,7 @@ readHistory file = handle (\(_::IOException) -> return emptyHistory) $ do
 -- error when writing the file, it will be ignored.
 writeHistory :: FilePath -> History -> IO ()
 writeHistory file = handle (\(_::IOException) -> return ())
-        . B.writeFile file . UTF8.fromString
+        . writeUTF8File file
         . unlines . historyLines 
 
 -- | Limit the number of lines stored in the history.
@@ -108,3 +111,38 @@ addHistoryRemovingAllDupes :: String -> History -> History
 addHistoryRemovingAllDupes h hs = addHistory h hs {histLines = filteredHS}
   where
     filteredHS = Seq.fromList $ filter (/= h) $ toList $ histLines hs
+
+---------
+-- UTF-8 file I/O, for old versions of GHC
+
+readUTF8File :: FilePath -> IO String
+#ifdef USE_GHC_ENCODINGS
+readUTF8File file = do
+    h <- IO.openFile file IO.ReadMode
+    IO.hSetEncoding h IO.utf8
+    IO.hSetNewlineMode h IO.noNewlineTranslation
+    contents <- IO.hGetContents h
+    _ <- evaluate (length contents)
+    IO.hClose h
+    return contents
+#else
+readUTF8File file = do
+    contents <- fmap UTF8.toString $ B.readFile file
+    _ <- evaluate (length contents)
+    return contents
+#endif
+
+writeUTF8File :: FilePath -> String -> IO ()
+#ifdef USE_GHC_ENCODINGS
+writeUTF8File file contents = do
+    h <- IO.openFile file IO.WriteMode
+    IO.hSetEncoding h IO.utf8
+    -- Write a file which is portable between systems.
+    IO.hSetNewlineMode h IO.noNewlineTranslation
+    IO.hPutStr h contents
+    IO.hClose h
+#else
+-- use binary file I/O to avoid Windows CRLF line endings
+-- which cause confusion when switching between systems.
+writeUTF8File file = B.writeFile file . UTF8.fromString
+#endif

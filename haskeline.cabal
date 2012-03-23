@@ -53,8 +53,7 @@ Library
         Build-depends: base>=3 && <4.1 , containers>=0.1 && < 0.3, directory==1.0.*,
                        bytestring==0.9.*
     }
-    Build-depends:  filepath >= 1.1 && < 1.4, mtl >= 1.1 && < 2.1,
-                    utf8-string==0.3.* && >=0.3.6
+    Build-depends:  filepath >= 1.1 && < 1.4, mtl >= 1.1 && < 2.1
     Extensions:     ForeignFunctionInterface, Rank2Types, FlexibleInstances,
                 TypeSynonymInstances
                 FlexibleContexts, ExistentialQuantification
@@ -90,6 +89,10 @@ Library
                 System.Console.Haskeline.Vi
     include-dirs: includes
     c-sources: cbits/h_wcwidth.c
+
+    if impl(ghc>=7.4) {
+        cpp-options: -DUSE_GHC_ENCODINGS
+    }
     if os(windows) {
         Build-depends: Win32>=2.0
         Other-modules: System.Console.Haskeline.Backend.Win32
@@ -98,8 +101,9 @@ Library
         install-includes: win_console.h
         cpp-options: -DMINGW
     } else {
-        Build-depends: unix>=2.0 && < 2.6
+        Build-depends: unix>=2.0 && < 2.6,
                         -- unix-2.3 doesn't build on ghc-6.8.1 or earlier
+                       utf8-string==0.3.* && >=0.3.6
         c-sources: cbits/h_iconv.c
         includes: h_iconv.h
         install-includes: h_iconv.h
