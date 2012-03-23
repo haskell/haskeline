@@ -335,8 +335,6 @@ fileRunTerm h_in = do
     decoder' <- openPartialDecoder codeset
     return RunTerm {putStrOut = encoder >=> putTerm h_out,
                 closeTerm = setLocale oldLocale >> return (),
-                encodeForTerm = encoder,
-                decodeForTerm = decoder,
                 termOps = Right FileOps {
                             inputHandle = h_in,
                             getLocaleChar = getMultiByteChar h_in decoder',

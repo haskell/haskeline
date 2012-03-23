@@ -31,8 +31,6 @@ clearLine = flip drawLineDiff ([],[])
 data RunTerm = RunTerm {
             -- | Write unicode characters to stdout.
             putStrOut :: String -> IO (),
-            encodeForTerm :: String -> IO ByteString,
-            decodeForTerm :: ByteString -> IO String,
             termOps :: Either TermOps FileOps,
             closeTerm :: IO ()
     }

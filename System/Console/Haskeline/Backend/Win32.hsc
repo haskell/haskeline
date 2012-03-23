@@ -379,8 +379,6 @@ fileRunTerm h_in = do
     return RunTerm {
                     closeTerm = return (),
                     putStrOut = putter,
-                    encodeForTerm = unicodeToCodePage cp,
-                    decodeForTerm = codePageToUnicode cp,
                     termOps = Right FileOps {
                                 inputHandle = h_in,
                                 getLocaleChar = getMultiByteChar cp h_in,

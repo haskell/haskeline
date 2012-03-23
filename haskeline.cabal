@@ -65,7 +65,6 @@ Library
     Exposed-Modules:
                 System.Console.Haskeline
                 System.Console.Haskeline.Completion
-                System.Console.Haskeline.Encoding
                 System.Console.Haskeline.MonadException
                 System.Console.Haskeline.History
                 System.Console.Haskeline.IO
