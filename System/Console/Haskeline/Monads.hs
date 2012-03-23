@@ -3,10 +3,12 @@ module System.Console.Haskeline.Monads(
                 module System.Console.Haskeline.MonadException,
                 ReaderT(..),
                 runReaderT',
+                mapReaderT,
                 asks,
                 StateT,
                 runStateT,
                 evalStateT',
+                mapStateT,
                 gets,
                 modify,
                 update,
@@ -74,6 +76,9 @@ instance MonadTrans (StateT s) where
 
 instance MonadIO m => MonadIO (StateT s m) where
     liftIO = lift . liftIO
+
+mapStateT :: (forall b . m b -> n b) -> StateT s m a -> StateT s n a
+mapStateT f (StateT m) = StateT (\s -> f (m s))
 
 runStateT :: Monad m => StateT s m a -> s -> m (a, s)
 runStateT f s = do

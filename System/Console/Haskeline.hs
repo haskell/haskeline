@@ -32,6 +32,7 @@ module System.Console.Haskeline(
                     InputT,
                     runInputT,
                     haveTerminalUI,
+                    mapInputT,
                     -- ** Behaviors
                     Behavior,
                     runInputTBehavior,

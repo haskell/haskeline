@@ -150,6 +150,11 @@ execInputT prefs settings run (InputT f)
             $ runHistoryFromFile (historyFile settings) (maxHistorySize prefs)
             $ runReaderT f run
 
+-- | Map a user interaction by modifying the base monad computation.
+mapInputT :: (forall b . m b -> m b) -> InputT m a -> InputT m a
+mapInputT f = InputT . mapReaderT (mapStateT (mapStateT 
+                                  (mapReaderT (mapReaderT f))))
+                    . unInputT
 
 -- | Read input from 'stdin'.  
 -- Use terminal-style interaction if 'stdin' is connected to
