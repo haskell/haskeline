@@ -30,8 +30,8 @@ emptyViState = ViState {
 
 type ViT m = StateT (ViState m) (InputCmdT m)
 
-type InputCmd s t = forall m . Monad m => Command (ViT m) s t
-type InputKeyCmd s t = forall m . Monad m => KeyCommand (ViT m) s t
+type InputCmd s t = forall m . MonadException m => Command (ViT m) s t
+type InputKeyCmd s t = forall m . MonadException m => KeyCommand (ViT m) s t
 
 viKeyCommands :: InputKeyCmd InsertMode (Maybe String)
 viKeyCommands = choiceCmd [

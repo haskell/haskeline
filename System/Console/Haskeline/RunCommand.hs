@@ -9,34 +9,37 @@ import System.Console.Haskeline.Key
 
 import Control.Monad
 
-runCommandLoop :: (MonadException m, CommandMonad m, MonadState Layout m,
-                    LineState s)
+runCommandLoop :: (CommandMonad m, MonadState Layout m, LineState s)
     => TermOps -> String -> KeyCommand m s a -> s -> m a
-runCommandLoop tops prefix cmds initState = runTerm tops $ 
-    RunTermType (withGetEvent tops
-        $ runCommandLoop' tops (stringToGraphemes prefix) initState cmds)
+runCommandLoop tops@TermOps{evalTerm = EvalTerm eval liftE} prefix cmds initState
+    = eval $ withGetEvent tops
+                $ runCommandLoop' liftE tops (stringToGraphemes prefix) initState 
+                    cmds 
+                    -- $ mapKeyCommand liftE cmds)
 
-runCommandLoop' :: forall t m s a . (MonadTrans t, Term (t m), CommandMonad (t m),
-        MonadState Layout m, MonadReader Prefs m, LineState s)
-        => TermOps -> Prefix -> s -> KeyCommand m s a -> t m Event -> t m a
-runCommandLoop' tops prefix initState cmds getEvent = do
+runCommandLoop' :: forall m n s a . (Term n, CommandMonad n,
+        MonadState Layout m, MonadReader Prefs n, LineState s)
+        => (forall b . m b -> n b) -> TermOps -> Prefix -> s -> KeyCommand m s a -> n Event
+        -> n a
+runCommandLoop' liftE tops prefix initState cmds getEvent = do
     let s = lineChars prefix initState
     drawLine s
     readMoreKeys s (fmap (liftM (\x -> (x,[])) . ($ initState)) cmds)
   where
-    readMoreKeys :: LineChars -> KeyMap (CmdM m (a,[Key])) -> t m a
+    readMoreKeys :: LineChars -> KeyMap (CmdM m (a,[Key])) -> n a
     readMoreKeys s next = do
         event <- handle (\(e::SomeException) -> moveToNextLine s
                                     >> throwIO e) getEvent
         case event of
                     ErrorEvent e -> moveToNextLine s >> throwIO e
-                    WindowResize -> drawReposition tops s
-                                        >> readMoreKeys s next
+                    WindowResize -> do
+                        drawReposition liftE tops s
+                        readMoreKeys s next
                     KeyInput ks -> do
-                        bound_ks <- mapM (lift . asks . lookupKeyBinding) ks
+                        bound_ks <- mapM (asks . lookupKeyBinding) ks
                         loopCmd s $ applyKeysToMap (concat bound_ks) next
 
-    loopCmd :: LineChars -> CmdM m (a,[Key]) -> t m a
+    loopCmd :: LineChars -> CmdM m (a,[Key]) -> n a
     loopCmd s (GetKey next) = readMoreKeys s next
     -- If there are multiple consecutive LineChanges, only render the diff
     -- to the last one, and skip the rest. This greatly improves speed when
@@ -46,15 +49,23 @@ runCommandLoop' tops prefix initState cmds getEvent = do
     loopCmd s (DoEffect e next) = do
                                     t <- drawEffect prefix s e
                                     loopCmd t next
-    loopCmd s (CmdM next) = lift next >>= loopCmd s
+    loopCmd s (CmdM next) = liftE next >>= loopCmd s
     loopCmd s (Result (x,ks)) = do
                                     liftIO (saveUnusedKeys tops ks)
                                     moveToNextLine s
                                     return x
 
 
-drawEffect :: (MonadTrans t, Term (t m), MonadReader Prefs m)
-    => Prefix -> LineChars -> Effect -> t m LineChars
+drawReposition :: (Term n, MonadState Layout m)
+    => (forall a . m a -> n a) -> TermOps -> LineChars -> n ()
+drawReposition liftE tops s = do
+    oldLayout <- liftE get
+    newLayout <- liftIO (getLayout tops)
+    liftE (put newLayout)
+    when (oldLayout /= newLayout) $ reposition oldLayout s
+
+drawEffect :: (Term m, MonadReader Prefs m)
+    => Prefix -> LineChars -> Effect -> m LineChars
 drawEffect prefix s (LineChange ch) = do
     let t = ch prefix
     drawLineDiff s t
@@ -70,23 +81,13 @@ drawEffect _ s (PrintLines ls) = do
     return s
 drawEffect _ s RingBell = actBell >> return s
 
-actBell :: (MonadTrans t, Term (t m), MonadReader Prefs m) => t m ()
+actBell :: (Term m, MonadReader Prefs m) => m ()
 actBell = do
-    style <- lift $ asks bellStyle
+    style <- asks bellStyle
     case style of
         NoBell -> return ()
         VisualBell -> ringBell False
         AudibleBell -> ringBell True
-
-drawReposition :: (MonadTrans t, Term (t m), MonadState Layout m)
-                    => TermOps -> LineChars -> t m ()
-drawReposition tops s = do
-    -- explicit lifts prevent the need for IncoherentInstances.
-    oldLayout <- lift get
-    newLayout <- liftIO $ getLayout tops
-    when (oldLayout /= newLayout) $ do
-        lift $ put newLayout
-        reposition oldLayout s
 
 
 ---------------

@@ -7,8 +7,6 @@ import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Monads as Monads
 
 import System.IO
-import qualified Data.ByteString as B
-import Control.Concurrent.Chan
 import Control.Monad(liftM)
 
 -- TODO: 
@@ -31,19 +29,11 @@ type DumbTermM a = forall m . (MonadIO m, MonadReader Layout m) => DumbTerm m a
 instance MonadTrans DumbTerm where
     lift = DumbTerm . lift . lift . lift
 
+evalDumb :: (MonadReader Layout m, CommandMonad m) => EvalTerm (PosixT m)
+evalDumb = EvalTerm (evalStateT' initWindow . unDumbTerm) (DumbTerm . lift)
+
 runDumbTerm :: Handles -> MaybeT IO RunTerm
-runDumbTerm h = do
-    ch <- liftIO newChan
-    posixRunTerm h $ \enc ->
-                TermOps {
-                        getLayout = tryGetLayouts (posixLayouts h)
-                        , withGetEvent = withPosixGetEvent ch h enc []
-                        , saveUnusedKeys = saveKeys ch
-                        , runTerm = \(RunTermType f) -> 
-                                    runPosixT enc h
-                                    $ evalStateT' initWindow
-                                    $ unDumbTerm f
-                        }
+runDumbTerm h = liftIO $ posixRunTerm h (posixLayouts h) [] id evalDumb
                                 
 instance (MonadException m, MonadReader Layout m) => Term (DumbTerm m) where
     reposition _ s = refitLine s
@@ -58,7 +48,7 @@ instance (MonadException m, MonadReader Layout m) => Term (DumbTerm m) where
 printText :: MonadIO m => String -> DumbTerm m ()
 printText str = do
     h <- liftM hOut ask
-    posixEncode str >>= liftIO . B.hPutStr h
+    DumbTerm (lift $ posixEncode str) >>= liftIO . hPutStr h
     liftIO $ hFlush h
 
 -- Things we can assume a dumb terminal knows how to do

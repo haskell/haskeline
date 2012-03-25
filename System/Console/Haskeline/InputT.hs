@@ -77,7 +77,7 @@ runInputCmdT tops f = InputT $ do
     layout <- liftIO $ getLayout tops
     lift $ runHistLog $ runUndoT $ evalStateT' layout f
 
-instance Monad m => CommandMonad (InputCmdT m) where
+instance MonadException m => CommandMonad (InputCmdT m) where
     runCompletion lcs = do
         settings <- ask
         lift $ lift $ lift $ lift $ lift $ lift $ complete settings lcs

@@ -24,7 +24,7 @@ useCompletion im c = insertString r im
 askIMCompletions :: CommandMonad m => 
             Command m InsertMode (InsertMode, [Completion])
 askIMCompletions (IMode xs ys) = do
-    (rest, completions) <- runCompletion (withRev graphemesToString xs,
+    (rest, completions) <- lift $ runCompletion (withRev graphemesToString xs,
                                             graphemesToString ys)
     return (IMode (withRev stringToGraphemes rest) ys, completions)
   where

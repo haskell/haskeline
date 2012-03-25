@@ -9,9 +9,7 @@ import Control.Monad
 import Data.List(foldl')
 import System.IO
 import qualified Control.Exception as Exception
-import qualified Data.ByteString.Char8 as B
 import Data.Maybe (fromMaybe, mapMaybe)
-import Control.Concurrent.Chan
 import qualified Data.IntMap as Map
 
 import System.Console.Haskeline.Monads as Monads
@@ -111,31 +109,29 @@ newtype Draw m a = Draw {unDraw :: (ReaderT Actions
 
 instance MonadTrans Draw where
     lift = Draw . lift . lift . lift . lift . lift . lift
-    
+
+evalDraw :: forall m . (MonadReader Layout m, CommandMonad m) => Terminal -> Actions -> EvalTerm (PosixT m)
+evalDraw term actions = EvalTerm eval liftE
+  where
+    liftE = Draw . lift . lift . lift . lift
+    eval = evalStateT' initTermPos
+                            . evalStateT' initTermRows
+                            . runReaderT' term
+                            . runReaderT' actions
+                            . unDraw 
+ 
+
 runTerminfoDraw :: Handles -> MaybeT IO RunTerm
 runTerminfoDraw h = do
     mterm <- liftIO $ Exception.try setupTermFromEnv
-    ch <- liftIO newChan
     case mterm of
         Left (_::SetupTermError) -> mzero
         Right term -> do
             actions <- MaybeT $ return $ getCapability term getActions
-            posixRunTerm h $ \enc ->
-                TermOps {
-                    getLayout = tryGetLayouts (posixLayouts h
-                                                ++ [tinfoLayout term])
-                    , withGetEvent = wrapKeypad (hOut h) term
-                                        . withPosixGetEvent ch h enc
-                                            (terminfoKeys term)
-                    , saveUnusedKeys = saveKeys ch
-                    , runTerm = \(RunTermType f) -> 
-                             runPosixT enc h
-                              $ evalStateT' initTermPos
-                              $ evalStateT' initTermRows
-                              $ runReaderT' term
-                              $ runReaderT' actions
-                              $ unDraw f
-                    }
+            liftIO $ posixRunTerm h (posixLayouts h ++ [tinfoLayout term])
+                (terminfoKeys term)
+                (wrapKeypad (hOut h) term)
+                (evalDraw term actions)
 
 -- If the keypad on/off capabilities are defined, wrap the computation with them.
 wrapKeypad :: MonadException m => Handle -> Terminal -> m a -> m a
@@ -200,7 +196,8 @@ output :: TermAction -> ActionM ()
 output = Writer.tell
 
 outputText :: String -> ActionM ()
-outputText str = posixEncode str >>= output . const . termText . B.unpack
+outputText str = (lift $ Draw $ lift $ lift $ lift $ lift $ posixEncode str)
+                    >>= output . const . termText
 
 left,right,up :: Int -> TermAction
 left = flip leftA

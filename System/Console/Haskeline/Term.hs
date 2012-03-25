@@ -38,9 +38,8 @@ data RunTerm = RunTerm {
 -- | Operations needed for terminal-style interaction.
 data TermOps = TermOps {
             getLayout :: IO Layout
-            , withGetEvent :: (MonadException m, CommandMonad m)
-                                => (m Event -> m a) -> m a
-            , runTerm :: (MonadException m, CommandMonad m) => RunTermType m a -> m a
+            , withGetEvent :: CommandMonad m => (m Event -> m a) -> m a
+            , evalTerm :: forall m . CommandMonad m => EvalTerm m
             , saveUnusedKeys :: [Key] -> IO ()
         }
 
@@ -58,17 +57,23 @@ isTerminalStyle r = case termOps r of
                     Left TermOps{} -> True
                     _ -> False
 
+-- Specific, hidden terminal action type
 -- Generic terminal actions which are independent of the Term being used.
--- Wrapped in a newtype so that we don't need RankNTypes.
-newtype RunTermType m a = RunTermType (forall t . 
-            (MonadTrans t, Term (t m), MonadException (t m), CommandMonad (t m))
-                            => t m a)
+data EvalTerm m
+    = forall n . (Term n, CommandMonad n)
+            => EvalTerm (forall a . n a -> m a) (forall a . m a -> n a)
 
-class (MonadReader Prefs m , MonadReader Layout m)
+mapEvalTerm :: (forall a . n a -> m a) -> (forall a . m a -> n a)
+        -> EvalTerm n -> EvalTerm m
+mapEvalTerm eval liftE (EvalTerm eval' liftE')
+    = EvalTerm (eval . eval') (liftE' . liftE)
+
+class (MonadReader Prefs m , MonadReader Layout m, MonadException m)
         => CommandMonad m where
     runCompletion :: (String,String) -> m (String,[Completion])
 
 instance (MonadTrans t, CommandMonad m, MonadReader Prefs (t m),
+        MonadException (t m),
         MonadReader Layout (t m))
             => CommandMonad (t m) where
     runCompletion = lift . runCompletion

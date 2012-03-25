@@ -26,6 +26,7 @@ import System.Posix.Types(Fd(..))
 import Data.List
 import System.IO
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import System.Environment
 
 import System.Console.Haskeline.Monads
@@ -297,8 +298,16 @@ openTerm mode = handle (\(_::IOException) -> mzero)
             -- backend, which writes output as Chars, would double-encode on ghc-6.12.
             $ liftIO $ openBinaryFile "/dev/tty" mode
 
-posixRunTerm :: MonadIO m => Handles -> (Encoders -> TermOps) -> m RunTerm
-posixRunTerm hs tOps = liftIO $ do
+-- To do the output, they can just call down to PosixT.  Yeah!
+posixRunTerm :: 
+    Handles
+    -> [IO (Maybe Layout)]
+    -> [(String,Key)]
+    -> (forall m b . MonadException m => m b -> m b)
+    -> (forall m . (MonadException m, CommandMonad m) => EvalTerm (PosixT m))
+    -> IO RunTerm
+posixRunTerm hs layoutGetters keys wrapGetEvent evalBackend = do
+    ch <- newChan
     codeset <- getCodeset
     encoders <- liftM2 Encoders (openEncoder codeset)
                                          (openPartialDecoder codeset)
@@ -306,18 +315,27 @@ posixRunTerm hs tOps = liftIO $ do
     return fileRT {
                 closeTerm = closeTerm fileRT >> closeHandles hs,
                 -- NOTE: could also alloc Encoders once for each call to wrapRunTerm
-                termOps = Left $ tOps encoders
-            }
+                termOps = Left TermOps {
+                            getLayout = tryGetLayouts layoutGetters,
+                            withGetEvent = wrapGetEvent 
+                                            . withPosixGetEvent ch hs encoders
+                                                keys,
+                            saveUnusedKeys = saveKeys ch,
+                            evalTerm = mapEvalTerm
+                                            (runPosixT encoders hs) (lift . lift)
+                                            evalBackend
+                        }
+                }
 
 type PosixT m = ReaderT Encoders (ReaderT Handles m)
 
 data Encoders = Encoders {unicodeToLocale :: String -> IO B.ByteString,
                           localeToUnicode :: B.ByteString -> IO (String, Result)}
 
-posixEncode :: (MonadIO m, MonadReader Encoders m) => String -> m B.ByteString
+posixEncode :: MonadIO m => String -> PosixT m String
 posixEncode str = do
     encoder <- asks unicodeToLocale
-    liftIO $ encoder str
+    liftM BC.unpack $ liftIO $ encoder str
 
 runPosixT :: Monad m => Encoders -> Handles -> PosixT m a -> m a
 runPosixT enc h = runReaderT' h . runReaderT' enc

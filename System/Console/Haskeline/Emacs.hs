@@ -12,8 +12,8 @@ import System.Console.Haskeline.InputT
 
 import Data.Char
 
-type InputCmd s t = forall m . Monad m => Command (InputCmdT m) s t
-type InputKeyCmd s t = forall m . Monad m => KeyCommand (InputCmdT m) s t
+type InputCmd s t = forall m . MonadException m => Command (InputCmdT m) s t
+type InputKeyCmd s t = forall m . MonadException m => KeyCommand (InputCmdT m) s t
 
 emacsCommands :: InputKeyCmd InsertMode (Maybe String)
 emacsCommands = choiceCmd [
