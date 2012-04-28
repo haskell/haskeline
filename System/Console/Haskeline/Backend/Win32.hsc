@@ -264,11 +264,15 @@ printText txt = do
     h <- asks hOut
     liftIO (writeConsole h txt)
     
-printAfter :: String -> DrawM ()
-printAfter str = do
-    p <- getPos
-    printText str
-    setPos p
+printAfter :: [Grapheme] -> DrawM ()
+printAfter gs = do
+    -- NOTE: you may be tempted to write
+    -- do {p <- getPos; printText (...); setPos p}
+    -- Unfortunately, that would be WRONG, because if printText wraps
+    -- a line at the bottom of the window, causing the window to scroll,
+    -- then the old value of p will be incorrect.
+    printText (graphemesToString gs)
+    movePosLeft gs
     
 drawLineDiffWin :: LineChars -> LineChars -> DrawM ()
 drawLineDiffWin (xs1,ys1) (xs2,ys2) = case matchInit xs1 xs2 of
@@ -278,9 +282,9 @@ drawLineDiffWin (xs1,ys1) (xs2,ys2) = case matchInit xs1 xs2 of
     (xs1',xs2')                         -> do
         movePosLeft xs1'
         let m = gsWidth xs1' + gsWidth ys1 - (gsWidth xs2' + gsWidth ys2)
-        let deadText = replicate m ' '
+        let deadText = stringToGraphemes $ replicate m ' '
         printText (graphemesToString xs2')
-        printAfter (graphemesToString ys2 ++ deadText)
+        printAfter (ys2 ++ deadText)
 
 movePosRight, movePosLeft :: [Grapheme] -> DrawM ()
 movePosRight str = do
