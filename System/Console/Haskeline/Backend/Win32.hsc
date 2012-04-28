@@ -361,8 +361,8 @@ win32Term = do
                                 , withGetEvent = withWindowMode hs
                                                     . win32WithEvent hs ch
                                 , saveUnusedKeys = saveKeys ch
-                                , runTerm = \(RunTermType f) ->
-                                        runReaderT' hs $ runDraw f
+                                , evalTerm = EvalTerm (runReaderT' hs . runDraw)
+                                                    (Draw . lift)
                                 },
                             closeTerm = closeHandles hs
                         }

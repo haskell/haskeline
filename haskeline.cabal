@@ -91,6 +91,8 @@ Library
 
     if impl(ghc>=7.4) {
         cpp-options: -DUSE_GHC_ENCODINGS
+    } else {
+        Build-depends: utf8-string==0.3.* && >=0.3.6
     }
     if os(windows) {
         Build-depends: Win32>=2.0
@@ -100,9 +102,8 @@ Library
         install-includes: win_console.h
         cpp-options: -DMINGW
     } else {
-        Build-depends: unix>=2.0 && < 2.6,
+        Build-depends: unix>=2.0 && < 2.6
                         -- unix-2.3 doesn't build on ghc-6.8.1 or earlier
-                       utf8-string==0.3.* && >=0.3.6
         c-sources: cbits/h_iconv.c
         includes: h_iconv.h
         install-includes: h_iconv.h
