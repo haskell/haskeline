@@ -104,6 +104,7 @@ Library
     } else {
         Build-depends: unix>=2.0 && < 2.6
                         -- unix-2.3 doesn't build on ghc-6.8.1 or earlier
+        Build-depends: utf8-string==0.3.* && >=0.3.6
         c-sources: cbits/h_iconv.c
         includes: h_iconv.h
         install-includes: h_iconv.h
