@@ -171,7 +171,7 @@ instance Storable Coord where
         (#poke COORD, Y) p (toEnum (coordY c) :: CShort)
                 
                             
-foreign import ccall "SetPosition"
+foreign import ccall "haskeline_SetPosition"
     c_SetPosition :: HANDLE -> Ptr Coord -> IO Bool
     
 setPosition :: HANDLE -> Coord -> IO ()

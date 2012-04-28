@@ -13,10 +13,10 @@ import System.Console.Haskeline.LineState
 import Data.List
 import Foreign.C.Types
 
-foreign import ccall unsafe mk_wcwidth :: CWchar -> CInt
+foreign import ccall unsafe haskeline_mk_wcwidth :: CWchar -> CInt
 
 wcwidth :: Char -> Int
-wcwidth c = case mk_wcwidth $ toEnum $ fromEnum c of
+wcwidth c = case haskeline_mk_wcwidth $ toEnum $ fromEnum c of
                 -1 -> 0 -- Control characters have zero width.  (Used by the
                         -- "\SOH...\STX" hack in LineState.stringToGraphemes.)
                 w -> fromIntegral w
