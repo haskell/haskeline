@@ -15,7 +15,6 @@ runCommandLoop tops@TermOps{evalTerm = EvalTerm eval liftE} prefix cmds initStat
     = eval $ withGetEvent tops
                 $ runCommandLoop' liftE tops (stringToGraphemes prefix) initState 
                     cmds 
-                    -- $ mapKeyCommand liftE cmds)
 
 runCommandLoop' :: forall m n s a . (Term n, CommandMonad n,
         MonadState Layout m, MonadReader Prefs n, LineState s)
