@@ -19,8 +19,10 @@ module System.Console.Haskeline.MonadException(
 import qualified Control.Exception as E
 import Control.Exception (Exception,SomeException)
 import Prelude hiding (catch)
-import Control.Monad.Reader
-import Control.Monad.State
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.State.Strict
+import Control.Monad.Trans.Maybe
 import Control.Concurrent(ThreadId)
 
 class MonadIO m => MonadException m where
@@ -76,9 +78,16 @@ instance MonadException m => MonadException (ReaderT r m) where
     unblock = mapReaderT unblock
 
 -- Not needed anymore by our code (we have a custom StateT monad),
--- but we should follow the PVP and not remove this in a point release.
+-- but might as well include it for users' convenience.
 instance MonadException m => MonadException (StateT s m) where
     catch f h = StateT $ \s -> catch (runStateT f s)
                             (\e -> runStateT (h e) s)
     block = mapStateT block
     unblock = mapStateT unblock
+
+instance MonadException m => MonadException (MaybeT m) where
+    block = MaybeT . block . runMaybeT
+    unblock = MaybeT . unblock . runMaybeT
+    catch f h = MaybeT $ catch (runMaybeT f) $ runMaybeT . h
+
+

@@ -19,7 +19,7 @@ import System.Console.Haskeline.Backend.Posix
 import System.Console.Haskeline.Backend.WCWidth
 import System.Console.Haskeline.Key
 
-import qualified Control.Monad.Writer as Writer
+import qualified Control.Monad.Trans.Writer as Writer
 
 ----------------------------------------------------------------
 -- Low-level terminal output

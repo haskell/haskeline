@@ -1,6 +1,7 @@
 module System.Console.Haskeline.Monads(
-                module Control.Monad.Trans,
                 module System.Console.Haskeline.MonadException,
+                MonadTrans(..),
+                MonadIO(..),
                 ReaderT(..),
                 runReaderT',
                 mapReaderT,
@@ -18,12 +19,15 @@ module System.Console.Haskeline.Monads(
                 orElse
                 ) where
 
-import Control.Monad.Trans
-import System.Console.Haskeline.MonadException
+import Control.Monad (liftM)
+import Control.Monad.IO.Class (MonadIO(..))
+import Control.Monad.Trans.Class (MonadTrans(..))
+import Control.Monad.Trans.Maybe (MaybeT(..))
+import Control.Monad.Trans.Reader hiding (ask,asks)
+import qualified Control.Monad.Trans.Reader as Reader
 import Prelude hiding (catch)
 
-import Control.Monad.Reader hiding (MonadReader,ask,asks,local)
-import qualified Control.Monad.Reader as Reader
+import System.Console.Haskeline.MonadException
 
 class Monad m => MonadReader r m where
     ask :: m r
@@ -102,26 +106,5 @@ instance MonadException m => MonadException (StateT s m) where
     catch f h = StateT $ \s -> catch (getStateTFunc f s)
                             $ \e -> getStateTFunc (h e) s
 
-newtype MaybeT m a = MaybeT { unMaybeT :: m (Maybe a) }
-
-instance Monad m => Monad (MaybeT m) where
-    return x = MaybeT $ return $ Just x
-    MaybeT f >>= g = MaybeT $ f >>= maybe (return Nothing) (unMaybeT . g)
-
-instance MonadIO m => MonadIO (MaybeT m) where
-    liftIO = lift . liftIO
-
-instance MonadTrans MaybeT where
-    lift = MaybeT . liftM Just
-
-instance MonadException m => MonadException (MaybeT m) where
-    block = MaybeT . block . unMaybeT
-    unblock = MaybeT . unblock . unMaybeT
-    catch f h = MaybeT $ catch (unMaybeT f) $ unMaybeT . h
-
 orElse :: Monad m => MaybeT m a -> m a -> m a
 orElse (MaybeT f) g = f >>= maybe g return
-
-instance Monad m => MonadPlus (MaybeT m) where
-    mzero = MaybeT $ return Nothing
-    MaybeT f `mplus` MaybeT g = MaybeT $ f >>= maybe g (return . Just)

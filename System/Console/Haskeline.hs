@@ -138,7 +138,7 @@ spaces), it will be automatically added to the history.
 -}
 getInputLine :: MonadException m => String -- ^ The input prompt
                             -> InputT m (Maybe String)
-getInputLine = promptedInput (getInputCmdLine emptyIM) $ unMaybeT . getLocaleLine
+getInputLine = promptedInput (getInputCmdLine emptyIM) $ runMaybeT . getLocaleLine
 
 {- | Reads one line of input and fills the insertion space with initial text. When using
 terminal-style interaction, this function provides a rich line-editing user interface with the
@@ -160,7 +160,7 @@ getInputLineWithInitial :: MonadException m
                             -> (String, String) -- ^ The initial value left and right of the cursor
                             -> InputT m (Maybe String)
 getInputLineWithInitial prompt (left,right) = promptedInput (getInputCmdLine initialIM)
-                                                (unMaybeT . getLocaleLine) prompt
+                                                (runMaybeT . getLocaleLine) prompt
   where
     initialIM = insertString left $ moveToStart $ insertString right $ emptyIM
 
@@ -206,7 +206,7 @@ getInputChar = promptedInput getInputCmdChar $ \fops -> do
 
 getPrintableChar :: FileOps -> IO (Maybe Char)
 getPrintableChar fops = do
-    c <- unMaybeT $ getLocaleChar fops
+    c <- runMaybeT $ getLocaleChar fops
     case fmap isPrint c of
         Just False -> getPrintableChar fops
         _ -> return c
@@ -240,7 +240,7 @@ getPassword x = promptedInput
                                         $ Password [] x)
                     (\fops -> let h_in = inputHandle fops
                               in bracketSet (hGetEcho h_in) (hSetEcho h_in) False
-                                  $ unMaybeT $ getLocaleLine fops)
+                                  $ runMaybeT $ getLocaleLine fops)
  where
     loop = choiceCmd [ simpleChar '\n' +> finish
                      , simpleKey Backspace +> change deletePasswordChar

@@ -42,7 +42,7 @@ module System.Console.Haskeline.IO(
 import System.Console.Haskeline hiding (completeFilename)
 import Control.Concurrent
 
-import Control.Monad.Trans
+import Control.Monad.IO.Class
 
 -- Providing a non-monadic API for haskeline
 -- A process is forked off which runs the monadic InputT API

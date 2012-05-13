@@ -30,7 +30,7 @@ module System.Console.Haskeline.Command(
 
 import Data.Char(isPrint)
 import Control.Monad(mplus, liftM)
-import Control.Monad.Trans
+import Control.Monad.Trans.Class
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Key
 
