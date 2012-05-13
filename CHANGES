@@ -1,3 +1,8 @@
+Changed in version 0.6.4.7:
+   * Bump dependencies to allow mtl-2.1, containers-0.5 and bytestring-0.10.
+   * Prefix C functions with "haskeline_" so we don't clash with other packages
+   * Prevent cursor flicker when outputting in the terminfo backend
+
 Changed in version 0.6.4.6:
    * Build with ghc-7.4.1.
 
