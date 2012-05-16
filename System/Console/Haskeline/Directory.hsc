@@ -20,14 +20,15 @@ import qualified System.Directory
 
 #include <windows.h>
 #include <Shlobj.h>
+#include "windows_cconv.h"
 
-foreign import stdcall "FindFirstFileW" c_FindFirstFile
+foreign import WINDOWS_CCONV "FindFirstFileW" c_FindFirstFile
             :: LPCTSTR -> Ptr () -> IO HANDLE
 
-foreign import stdcall "FindNextFileW" c_FindNextFile
+foreign import WINDOWS_CCONV "FindNextFileW" c_FindNextFile
             :: HANDLE -> Ptr () -> IO Bool
 
-foreign import stdcall "FindClose" c_FindClose :: HANDLE -> IO BOOL
+foreign import WINDOWS_CCONV "FindClose" c_FindClose :: HANDLE -> IO BOOL
 
 getDirectoryContents :: FilePath -> IO [FilePath]
 getDirectoryContents fp = allocaBytes (#size WIN32_FIND_DATA) $ \findP ->
@@ -45,7 +46,7 @@ getDirectoryContents fp = allocaBytes (#size WIN32_FIND_DATA) $ \findP ->
             else c_FindClose h >> return [f]
     peekFileName = peekCWString . (#ptr WIN32_FIND_DATA, cFileName)
 
-foreign import stdcall "GetFileAttributesW" c_GetFileAttributes
+foreign import WINDOWS_CCONV "GetFileAttributesW" c_GetFileAttributes
             :: LPCTSTR -> IO DWORD
 
 doesDirectoryExist :: FilePath -> IO Bool
@@ -60,7 +61,7 @@ getHomeDirectory = System.Directory.getHomeDirectory
 #else
 type HRESULT = #type HRESULT
 
-foreign import stdcall "SHGetFolderPathW" c_SHGetFolderPath
+foreign import WINDOWS_CCONV "SHGetFolderPathW" c_SHGetFolderPath
     :: Ptr () -> CInt -> HANDLE -> DWORD -> LPTSTR -> IO HRESULT
 
 getHomeDirectory :: IO FilePath

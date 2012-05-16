@@ -98,8 +98,8 @@ Library
         Build-depends: Win32>=2.0
         Other-modules: System.Console.Haskeline.Backend.Win32
         c-sources: cbits/win_console.c
-        includes: win_console.h
-        install-includes: win_console.h
+        includes: win_console.h windows_cconv.h
+        install-includes: win_console.h windows_cconv.h
         cpp-options: -DMINGW
     } else {
         Build-depends: unix>=2.0 && < 2.6

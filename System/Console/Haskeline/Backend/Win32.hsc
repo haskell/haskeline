@@ -26,14 +26,15 @@ import Data.ByteString.Internal (createAndTrim)
 import qualified Data.ByteString as B
 
 #include "win_console.h"
+#include "windows_cconv.h"
 
-foreign import stdcall "windows.h ReadConsoleInputW" c_ReadConsoleInput
+foreign import WINDOWS_CCONV "windows.h ReadConsoleInputW" c_ReadConsoleInput
     :: HANDLE -> Ptr () -> DWORD -> Ptr DWORD -> IO Bool
     
-foreign import stdcall "windows.h WaitForSingleObject" c_WaitForSingleObject
+foreign import WINDOWS_CCONV "windows.h WaitForSingleObject" c_WaitForSingleObject
     :: HANDLE -> DWORD -> IO DWORD
 
-foreign import stdcall "windows.h GetNumberOfConsoleInputEvents"
+foreign import WINDOWS_CCONV "windows.h GetNumberOfConsoleInputEvents"
     c_GetNumberOfConsoleInputEvents :: HANDLE -> Ptr DWORD -> IO Bool
 
 getNumberOfEvents :: HANDLE -> IO Int
@@ -178,7 +179,7 @@ setPosition :: HANDLE -> Coord -> IO ()
 setPosition h c = with c $ failIfFalse_ "SetConsoleCursorPosition" 
                     . c_SetPosition h
                     
-foreign import stdcall "windows.h GetConsoleScreenBufferInfo"
+foreign import WINDOWS_CCONV "windows.h GetConsoleScreenBufferInfo"
     c_GetScreenBufferInfo :: HANDLE -> Ptr () -> IO Bool
     
 getPosition :: HANDLE -> IO Coord
@@ -197,7 +198,7 @@ getBufferSize = withScreenBufferInfo $ \p -> do
     c <- (#peek CONSOLE_SCREEN_BUFFER_INFO, dwSize) p
     return Layout {width = coordX c, height = coordY c}
 
-foreign import stdcall "windows.h WriteConsoleW" c_WriteConsoleW
+foreign import WINDOWS_CCONV "windows.h WriteConsoleW" c_WriteConsoleW
     :: HANDLE -> Ptr TCHAR -> DWORD -> Ptr DWORD -> Ptr () -> IO Bool
 
 writeConsole :: HANDLE -> String -> IO ()
@@ -210,7 +211,7 @@ writeConsole h str = withArray tstr $ \t_arr -> alloca $ \numWritten -> do
   where
     tstr = map (toEnum . fromEnum) str
 
-foreign import stdcall "windows.h MessageBeep" c_messageBeep :: UINT -> IO Bool
+foreign import WINDOWS_CCONV "windows.h MessageBeep" c_messageBeep :: UINT -> IO Bool
 
 messageBeep :: IO ()
 messageBeep = c_messageBeep (-1) >> return ()-- intentionally ignore failures.
@@ -218,10 +219,10 @@ messageBeep = c_messageBeep (-1) >> return ()-- intentionally ignore failures.
 
 ----------
 -- Console mode
-foreign import stdcall "windows.h GetConsoleMode" c_GetConsoleMode
+foreign import WINDOWS_CCONV "windows.h GetConsoleMode" c_GetConsoleMode
     :: HANDLE -> Ptr DWORD -> IO Bool
 
-foreign import stdcall "windows.h SetConsoleMode" c_SetConsoleMode
+foreign import WINDOWS_CCONV "windows.h SetConsoleMode" c_SetConsoleMode
     :: HANDLE -> DWORD -> IO Bool
 
 withWindowMode :: MonadException m => Handles -> m a -> m a
@@ -411,7 +412,7 @@ putOut = do
 ------------------------
 -- Multi-byte conversion
 
-foreign import stdcall "WideCharToMultiByte" wideCharToMultiByte
+foreign import WINDOWS_CCONV "WideCharToMultiByte" wideCharToMultiByte
         :: CodePage -> DWORD -> LPCWSTR -> CInt -> LPCSTR -> CInt
                 -> LPCSTR -> LPBOOL -> IO CInt
 
@@ -425,7 +426,7 @@ unicodeToCodePage cp wideStr = withCWStringLen wideStr $ \(wideBuff, wideLen) ->
         fmap fromEnum $ wideCharToMultiByte cp 0 wideBuff (toEnum wideLen)
                     (castPtr outBuff) outSize nullPtr nullPtr
 
-foreign import stdcall "MultiByteToWideChar" multiByteToWideChar
+foreign import WINDOWS_CCONV "MultiByteToWideChar" multiByteToWideChar
         :: CodePage -> DWORD -> LPCSTR -> CInt -> LPWSTR -> CInt -> IO CInt
 
 codePageToUnicode :: CodePage -> B.ByteString -> IO String
@@ -445,7 +446,7 @@ getCodePage = do
         then return conCP
         else getACP
 
-foreign import stdcall "IsDBCSLeadByteEx" c_IsDBCSLeadByteEx
+foreign import WINDOWS_CCONV "IsDBCSLeadByteEx" c_IsDBCSLeadByteEx
         :: CodePage -> BYTE -> BOOL
 
 getMultiByteChar :: CodePage -> Handle -> MaybeT IO Char
