@@ -112,7 +112,7 @@ Unicode characters.
 -- | Write a Unicode string to the user's standard output.
 outputStr :: MonadIO m => String -> InputT m ()
 outputStr xs = do
-    putter <- asks putStrOut
+    putter <- InputT $ asks putStrOut
     liftIO $ putter xs
 
 -- | Write a string to the user's standard output, followed by a newline.
@@ -166,7 +166,7 @@ getInputLineWithInitial prompt (left,right) = promptedInput (getInputCmdLine ini
 
 getInputCmdLine :: MonadException m => InsertMode -> TermOps -> String -> InputT m (Maybe String)
 getInputCmdLine initialIM tops prefix = do
-    emode <- asks editMode
+    emode <- InputT $ asks editMode
     result <- runInputCmdT tops $ case emode of
                 Emacs -> runCommandLoop tops prefix emacsCommands initialIM
                 Vi -> evalStateT' emptyViState $
@@ -176,8 +176,8 @@ getInputCmdLine initialIM tops prefix = do
 
 maybeAddHistory :: forall m . Monad m => Maybe String -> InputT m ()
 maybeAddHistory result = do
-    settings :: Settings m <- ask
-    histDupes <- asks historyDuplicates
+    settings :: Settings m <- InputT ask
+    histDupes <- InputT $ asks historyDuplicates
     case result of
         Just line | autoAddHistory settings && not (all isSpace line) 
             -> let adder = case histDupes of
@@ -271,7 +271,7 @@ promptedInput doTerm doFile prompt = do
     -- If other parts of the program have written text, make sure that it
     -- appears before we interact with the user on the terminal.
     liftIO $ hFlush stdout
-    rterm <- ask
+    rterm <- InputT ask
     case termOps rterm of
         Right fops -> liftIO $ do
                         putStrOut rterm prompt

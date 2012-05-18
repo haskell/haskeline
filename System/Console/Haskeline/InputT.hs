@@ -42,9 +42,11 @@ newtype InputT m a = InputT {unInputT :: ReaderT RunTerm
                                 (StateT History
                                 (StateT KillRing (ReaderT Prefs
                                 (ReaderT (Settings m) m)))) a}
-                            deriving (Monad, MonadIO, MonadException,
-                                MonadState History, MonadReader Prefs,
-                                MonadReader (Settings m), MonadReader RunTerm)
+                            deriving (Monad, MonadIO, MonadException)
+                -- NOTE: we're explicitly *not* making InputT an instance of our
+                -- internal MonadState/MonadReader classes.  Otherwise haddock
+                -- displays those instances to the user, and it makes it seem like
+                -- we implement the mtl versions of those classes.
 
 instance Monad m => Functor (InputT m) where
     fmap = liftM
@@ -58,15 +60,15 @@ instance MonadTrans InputT where
 
 -- | Get the current line input history.
 getHistory :: Monad m => InputT m History
-getHistory = get
+getHistory = InputT get
 
 -- | Set the line input history.
 putHistory :: Monad m => History -> InputT m ()
-putHistory = put
+putHistory = InputT . put
 
 -- | Change the current line input history.
 modifyHistory :: Monad m => (History -> History) -> InputT m ()
-modifyHistory = modify
+modifyHistory = InputT . modify
 
 -- for internal use only
 type InputCmdT m = StateT Layout (UndoT (StateT HistLog (StateT KillRing
@@ -101,7 +103,7 @@ runInputT = runInputTBehavior defaultBehavior
 
 -- | Returns 'True' if the current session uses terminal-style interaction.  (See 'Behavior'.)
 haveTerminalUI :: Monad m => InputT m Bool
-haveTerminalUI = asks isTerminalStyle
+haveTerminalUI = InputT $ asks isTerminalStyle
 
 
 {- | Haskeline has two ways of interacting with the user:
