@@ -25,8 +25,15 @@ import System.Console.Haskeline.Backend.WCWidth
 import Data.ByteString.Internal (createAndTrim)
 import qualified Data.ByteString as B
 
+##if defined(i386_HOST_ARCH)
+## define WINDOWS_CCONV stdcall
+##elif defined(x86_64_HOST_ARCH)
+## define WINDOWS_CCONV ccall
+##else
+## error Unknown mingw32 arch
+##endif
+
 #include "win_console.h"
-#include "windows_cconv.h"
 
 foreign import WINDOWS_CCONV "windows.h ReadConsoleInputW" c_ReadConsoleInput
     :: HANDLE -> Ptr () -> DWORD -> Ptr DWORD -> IO Bool

@@ -20,7 +20,14 @@ import qualified System.Directory
 
 #include <windows.h>
 #include <Shlobj.h>
-#include "windows_cconv.h"
+
+##if defined(i386_HOST_ARCH)
+## define WINDOWS_CCONV stdcall
+##elif defined(x86_64_HOST_ARCH)
+## define WINDOWS_CCONV ccall
+##else
+## error Unknown mingw32 arch
+##endif
 
 foreign import WINDOWS_CCONV "FindFirstFileW" c_FindFirstFile
             :: LPCTSTR -> Ptr () -> IO HANDLE
