@@ -89,6 +89,11 @@ runStateT f s = do
     useXS <- getStateTFunc f s
     return $ useXS $ \x s' -> (x,s')
 
+makeStateT :: Monad m => (s -> m (a,s)) -> StateT s m a
+makeStateT f = StateT $ \s -> do
+                            (x,s') <- f s
+                            return $ \g -> g x s'
+
 instance Monad m => MonadState s (StateT s m) where
     get = StateT $ \s -> return $ \f -> f s s
     put s = s `seq` StateT $ \_ -> return $ \f -> f () s
@@ -101,10 +106,12 @@ evalStateT' :: Monad m => s -> StateT s m a -> m a
 evalStateT' s f = liftM fst $ runStateT f s
 
 instance MonadException m => MonadException (StateT s m) where
-    block m = StateT $ \s -> block $ getStateTFunc m s
-    unblock m = StateT $ \s -> unblock $ getStateTFunc m s
-    catch f h = StateT $ \s -> catch (getStateTFunc f s)
-                            $ \e -> getStateTFunc (h e) s
+    controlIO f = makeStateT $ \s -> controlIO $ \run ->
+                    fmap (flip runStateT s) $ f $ stateRunIO s run
+      where
+        stateRunIO :: s -> RunIO m -> RunIO (StateT s m)
+        stateRunIO s (RunIO run) = RunIO (\m -> fmap (makeStateT . const)
+                                        $ run (runStateT m s))
 
 orElse :: Monad m => MaybeT m a -> m a -> m a
 orElse (MaybeT f) g = f >>= maybe g return
