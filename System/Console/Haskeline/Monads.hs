@@ -25,7 +25,9 @@ import Control.Monad.Trans.Class (MonadTrans(..))
 import Control.Monad.Trans.Maybe (MaybeT(..))
 import Control.Monad.Trans.Reader hiding (ask,asks)
 import qualified Control.Monad.Trans.Reader as Reader
+#if __GLASGOW_HASKELL__ < 705
 import Prelude hiding (catch)
+#endif
 
 import System.Console.Haskeline.MonadException
 
