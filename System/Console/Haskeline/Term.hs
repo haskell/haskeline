@@ -11,6 +11,7 @@ import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import Data.Word
 import Control.Exception (fromException, AsyncException(..),bracket_)
+import Data.Typeable
 import System.IO
 import Control.Monad(liftM,when,guard)
 import System.IO.Error (isEOFError)
@@ -32,6 +33,7 @@ data RunTerm = RunTerm {
             -- | Write unicode characters to stdout.
             putStrOut :: String -> IO (),
             termOps :: Either TermOps FileOps,
+            wrapInterrupt :: forall a . IO a -> IO a,            
             closeTerm :: IO ()
     }
 
@@ -67,6 +69,13 @@ mapEvalTerm :: (forall a . n a -> m a) -> (forall a . m a -> n a)
         -> EvalTerm n -> EvalTerm m
 mapEvalTerm eval liftE (EvalTerm eval' liftE')
     = EvalTerm (eval . eval') (liftE' . liftE)
+
+data Interrupt = Interrupt
+                deriving (Show,Typeable,Eq)
+
+instance Exception Interrupt where
+
+
 
 class (MonadReader Prefs m , MonadReader Layout m, MonadException m)
         => CommandMonad m where

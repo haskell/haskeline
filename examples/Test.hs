@@ -27,10 +27,10 @@ main = do
                 ["password", [c]] -> getPassword (Just c)
                 ["initial"] -> flip getInputLineWithInitial ("left ", "right")
                 _ -> getInputLine
-        runInputT mySettings $ loop inputFunc 0
+        runInputT mySettings $ withInterrupt $ loop inputFunc 0
     where
         loop inputFunc n = do
-            minput <-  handle (\UserInterrupt -> return (Just "Caught interrupted"))
+            minput <-  handle (\Interrupt -> return (Just "Caught interrupted"))
                         $ inputFunc (show n ++ ":")
             case minput of
                 Nothing -> return ()

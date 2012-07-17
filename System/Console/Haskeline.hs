@@ -67,6 +67,10 @@ module System.Console.Haskeline(
                     getHistory,
                     putHistory,
                     modifyHistory,
+                    -- * Ctrl-C handling
+                    withInterrupt,
+                    Interrupt(..),
+                    handleInterrupt,
                     -- * Additional submodules
                     module System.Console.Haskeline.Completion,
                     module System.Console.Haskeline.MonadException)
@@ -281,3 +285,34 @@ promptedInput doTerm doFile prompt = do
             let (lastLine,rest) = break (`elem` "\r\n") $ reverse prompt
             outputStr $ reverse rest
             doTerm tops $ reverse lastLine
+
+{- | If Ctrl-C is pressed during the given action, throw an exception
+of type 'Interrupt'.  For example:
+
+> tryAction :: InputT IO ()
+> tryAction = handle (\Interrupt -> outputStrLn "Cancelled.")
+>                $ wrapInterrupt $ someLongAction
+
+The action can handle the interrupt itself; a new 'Interrupt' exception will be thrown
+every time Ctrl-C is pressed.
+
+> tryAction :: InputT IO ()
+> tryAction = wrapInterrupt loop
+>     where loop = handle (\Interrupt -> outputStrLn "Cancelled; try again." >> loop)
+>                    someLongAction
+ 
+This behavior differs from GHC's built-in Ctrl-C handling, which
+may immediately terminate the program after the second time that the user presses
+Ctrl-C.
+
+-}
+withInterrupt :: MonadException m => InputT m a -> InputT m a
+withInterrupt act = do
+    rterm <- InputT ask
+    liftIOOp_ (wrapInterrupt rterm) act
+
+-- | Catch and handle an exception of type 'Interrupt'.  
+--
+-- > handleInterrupt f = handle $ \Interrupt -> f
+handleInterrupt :: MonadException m => m a -> m a -> m a
+handleInterrupt f = handle $ \Interrupt -> f
