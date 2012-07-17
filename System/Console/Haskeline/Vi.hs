@@ -382,13 +382,13 @@ storedIAction :: Monad m => Command (ViT m) (ArgMode CommandMode) InsertMode
                         -> Command (ViT m) (ArgMode CommandMode) InsertMode
 storedIAction act = storeLastCmd (liftM Right . act) >|> act
 
-killAndStoreCmd :: Monad m => KillHelper -> Command (ViT m) (ArgMode CommandMode) CommandMode
+killAndStoreCmd :: MonadIO m => KillHelper -> Command (ViT m) (ArgMode CommandMode) CommandMode
 killAndStoreCmd = storedCmdAction . killFromArgHelper
 
-killAndStoreI :: Monad m => KillHelper -> Command (ViT m) (ArgMode CommandMode) InsertMode
+killAndStoreI :: MonadIO m => KillHelper -> Command (ViT m) (ArgMode CommandMode) InsertMode
 killAndStoreI = storedIAction . killFromArgHelper
 
-killAndStoreIE :: Monad m => KillHelper -> Command (ViT m) (ArgMode CommandMode) EitherMode
+killAndStoreIE :: MonadIO m => KillHelper -> Command (ViT m) (ArgMode CommandMode) EitherMode
 killAndStoreIE helper = storedAction (killFromArgHelper helper >|> return . Right)
 
 noArg :: Monad m => Command m s (ArgMode s)

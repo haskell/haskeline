@@ -5,6 +5,7 @@ import System.Console.Haskeline.Command
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.Command.Undo
 import Control.Monad
+import Data.IORef
 
 -- standard trick for a purely functional queue:
 data Stack a = Stack [a] [a]
@@ -28,8 +29,10 @@ push x (Stack xs ys) = Stack (x:xs) ys
 
 type KillRing = Stack [Grapheme]
 
-runKillRing :: Monad m => StateT KillRing m a -> m a
-runKillRing = evalStateT' emptyStack
+runKillRing :: MonadIO m => ReaderT (IORef KillRing) m a -> m a
+runKillRing act = do
+    ringRef <- liftIO $ newIORef emptyStack
+    runReaderT act ringRef
 
 
 pasteCommand :: (Save s, MonadState KillRing m, MonadState Undo m)

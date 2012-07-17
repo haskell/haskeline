@@ -8,6 +8,7 @@ import System.Console.Haskeline.Monads
 import Data.List
 import Data.Maybe(fromMaybe)
 import System.Console.Haskeline.History
+import Data.IORef
 
 data HistLog = HistLog {pastHistory, futureHistory :: [[Grapheme]]}
                     deriving Show
@@ -26,19 +27,21 @@ histLog :: History -> HistLog
 histLog hist = HistLog {pastHistory = map stringToGraphemes $ historyLines hist,
                         futureHistory = []}
 
-runHistoryFromFile :: MonadIO m => Maybe FilePath -> Maybe Int -> StateT History m a -> m a
-runHistoryFromFile Nothing _ f = evalStateT' emptyHistory f
+runHistoryFromFile :: MonadException m => Maybe FilePath -> Maybe Int
+                            -> ReaderT (IORef History) m a -> m a
+runHistoryFromFile Nothing _ f = do
+    historyRef <- liftIO $ newIORef emptyHistory
+    runReaderT f historyRef
 runHistoryFromFile (Just file) stifleAmt f = do
     oldHistory <- liftIO $ readHistory file
-    (x,newHistory) <- runStateT f (stifleHistory stifleAmt oldHistory)
-    liftIO $ writeHistory file newHistory
+    historyRef <- liftIO $ newIORef $ stifleHistory stifleAmt oldHistory
+    -- Run the action and then write the new history, even on an exception.
+    -- For example, if there's an unhandled ctrl-c, we don't want to lose
+    -- the user's previously-entered commands.
+    -- (Note that this requires using ReaderT (IORef History) instead of StateT.
+    x <- runReaderT f historyRef
+            `finally` (liftIO $ readIORef historyRef >>= writeHistory file)
     return x
-
-runHistLog :: Monad m => StateT HistLog m a -> StateT History m a
-runHistLog f = do
-    history <- get
-    lift (evalStateT' (histLog history) f)
-
 
 prevHistory, firstHistory :: Save s => s -> HistLog -> (s, HistLog)
 prevHistory s h = let (s',h') = fromMaybe (listSave s,h) 

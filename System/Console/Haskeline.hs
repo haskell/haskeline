@@ -174,7 +174,7 @@ getInputCmdLine initialIM tops prefix = do
     maybeAddHistory result
     return result
 
-maybeAddHistory :: forall m . Monad m => Maybe String -> InputT m ()
+maybeAddHistory :: forall m . MonadIO m => Maybe String -> InputT m ()
 maybeAddHistory result = do
     settings :: Settings m <- InputT ask
     histDupes <- InputT $ asks historyDuplicates

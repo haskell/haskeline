@@ -16,6 +16,7 @@ import System.FilePath
 import Control.Applicative
 import Control.Monad (liftM, ap)
 import System.IO
+import Data.IORef
 
 -- | Application-specific customizations to the user interface.
 data Settings m = Settings {complete :: CompletionFunc m, -- ^ Custom tab completion.
@@ -38,9 +39,13 @@ setComplete f s = s {complete = f}
 
 -- | A monad transformer which carries all of the state and settings
 -- relevant to a line-reading application.
-newtype InputT m a = InputT {unInputT :: ReaderT RunTerm
-                                (StateT History
-                                (StateT KillRing (ReaderT Prefs
+newtype InputT m a = InputT {unInputT :: 
+                                ReaderT RunTerm
+                                -- Use ReaderT (IO _) vs StateT so that exceptions (e.g., ctrl-c)
+                                -- don't cause us to lose the existing state.
+                                (ReaderT (IORef History)
+                                (ReaderT (IORef KillRing)
+                                (ReaderT Prefs
                                 (ReaderT (Settings m) m)))) a}
                             deriving (Monad, MonadIO, MonadException)
                 -- NOTE: we're explicitly *not* making InputT an instance of our
@@ -59,25 +64,28 @@ instance MonadTrans InputT where
     lift = InputT . lift . lift . lift . lift . lift
 
 -- | Get the current line input history.
-getHistory :: Monad m => InputT m History
+getHistory :: MonadIO m => InputT m History
 getHistory = InputT get
 
 -- | Set the line input history.
-putHistory :: Monad m => History -> InputT m ()
+putHistory :: MonadIO m => History -> InputT m ()
 putHistory = InputT . put
 
 -- | Change the current line input history.
-modifyHistory :: Monad m => (History -> History) -> InputT m ()
+modifyHistory :: MonadIO m => (History -> History) -> InputT m ()
 modifyHistory = InputT . modify
 
 -- for internal use only
-type InputCmdT m = StateT Layout (UndoT (StateT HistLog (StateT KillRing
+type InputCmdT m = StateT Layout (UndoT (StateT HistLog (ReaderT (IORef KillRing)
+                        -- HistLog can be just StateT, since its final state
+                        -- isn't used outside of InputCmdT.
                 (ReaderT Prefs (ReaderT (Settings m) m)))))
 
 runInputCmdT :: MonadIO m => TermOps -> InputCmdT m a -> InputT m a
 runInputCmdT tops f = InputT $ do
     layout <- liftIO $ getLayout tops
-    lift $ runHistLog $ runUndoT $ evalStateT' layout f
+    history <- get
+    lift $ lift $ evalStateT' (histLog history) $ runUndoT $ evalStateT' layout f
 
 instance MonadException m => CommandMonad (InputCmdT m) where
     runCompletion lcs = do
@@ -154,7 +162,7 @@ execInputT prefs settings run (InputT f)
 
 -- | Map a user interaction by modifying the base monad computation.
 mapInputT :: (forall b . m b -> m b) -> InputT m a -> InputT m a
-mapInputT f = InputT . mapReaderT (mapStateT (mapStateT 
+mapInputT f = InputT . mapReaderT (mapReaderT (mapReaderT
                                   (mapReaderT (mapReaderT f))))
                     . unInputT
 

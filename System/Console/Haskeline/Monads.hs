@@ -25,6 +25,7 @@ import Control.Monad.Trans.Class (MonadTrans(..))
 import Control.Monad.Trans.Maybe (MaybeT(..))
 import Control.Monad.Trans.Reader hiding (ask,asks)
 import qualified Control.Monad.Trans.Reader as Reader
+import Data.IORef
 #if __GLASGOW_HASKELL__ < 705
 import Prelude hiding (catch)
 #endif
@@ -103,6 +104,12 @@ instance Monad m => MonadState s (StateT s m) where
 instance (MonadState s m, MonadTrans t, Monad (t m)) => MonadState s (t m) where
     get = lift get
     put = lift . put
+
+-- ReaderT (IORef s) is better than StateT s for some applications,
+-- since StateT loses its state after an exception such as ctrl-c.
+instance MonadIO m => MonadState s (ReaderT (IORef s) m) where
+    get = ask >>= liftIO . readIORef
+    put s = ask >>= liftIO . flip writeIORef s
 
 evalStateT' :: Monad m => s -> StateT s m a -> m a
 evalStateT' s f = liftM fst $ runStateT f s
