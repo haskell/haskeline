@@ -254,7 +254,7 @@ closeHandles hs = closeHandle (hIn hs) >> closeHandle (hOut hs)
 newtype Draw m a = Draw {runDraw :: ReaderT Handles m a}
     deriving (Monad,MonadIO,MonadException, MonadReader Handles)
 
-type DrawM a = (MonadIO m, MonadReader Layout m) => Draw m ()
+type DrawM a = (MonadIO m, MonadReader Layout m) => Draw m a
 
 instance MonadTrans Draw where
     lift = Draw . lift
