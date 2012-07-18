@@ -262,10 +262,16 @@ instance MonadTrans Draw where
 getPos :: MonadIO m => Draw m Coord
 getPos = asks hOut >>= liftIO . getPosition
     
-setPos :: MonadIO m => Coord -> Draw m ()
+setPos :: Coord -> DrawM ()
 setPos c = do
     h <- asks hOut
-    liftIO (setPosition h c)
+    -- SetPosition will fail if you give it something out of bounds of
+    -- the window buffer (i.e., the input line doesn't fit in the window).
+    -- So we do a simple guard against that uncommon case.
+    -- However, we don't throw away the x coord since it produces sensible
+    -- results for some cases.
+    maxY <- liftM (subtract 1) $ asks height
+    liftIO $ setPosition h c { coordY = max 0 $ min maxY $ coordY c }
 
 printText :: MonadIO m => String -> Draw m ()
 printText txt = do
