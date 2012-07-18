@@ -350,11 +350,7 @@ instance (MonadException m, MonadReader Layout m) => Term (Draw m) where
     printLines [] = return ()
     printLines ls = printText $ intercalate crlf ls ++ crlf
     
-    clearLayout = do
-        lay <- ask
-        setPos (Coord 0 0)
-        printText (replicate (width lay * height lay) ' ')
-        setPos (Coord 0 0)
+    clearLayout = clearScreen
     
     moveToNextLine s = do
         movePosRight (snd s)
@@ -500,3 +496,43 @@ getMultiByteChar cp h = hWithBinaryMode h loop
         case cs of
             [] -> loop
             (c:_) -> return c
+
+----------------------------------
+-- Clearing screen
+-- WriteConsole has a limit of ~20,000-30000 characters, which is
+-- less than a 200x200 window, for example.
+-- So we'll use other Win32 functions to clear the screen.
+
+getAttribute :: HANDLE -> IO WORD
+getAttribute = withScreenBufferInfo $
+    (#peek CONSOLE_SCREEN_BUFFER_INFO, wAttributes)
+
+fillConsoleChar :: HANDLE -> Char -> Int -> Coord -> IO ()
+fillConsoleChar h c n start = with start $ \startPtr -> alloca $ \numWritten -> do
+    failIfFalse_ "FillConsoleOutputCharacter"
+        $ c_FillConsoleCharacter h (toEnum $ fromEnum c)
+            (toEnum n) startPtr numWritten
+
+foreign import ccall "haskeline_FillConsoleCharacter" c_FillConsoleCharacter 
+    :: HANDLE -> TCHAR -> DWORD -> Ptr Coord -> Ptr DWORD -> IO BOOL
+
+fillConsoleAttribute :: HANDLE -> WORD -> Int -> Coord -> IO ()
+fillConsoleAttribute h a n start = with start $ \startPtr -> alloca $ \numWritten -> do
+    failIfFalse_ "FillConsoleOutputAttribute"
+        $ c_FillConsoleAttribute h a
+            (toEnum n) startPtr numWritten
+            
+foreign import ccall "haskeline_FillConsoleAttribute" c_FillConsoleAttribute
+    :: HANDLE -> WORD -> DWORD -> Ptr Coord -> Ptr DWORD -> IO BOOL
+
+clearScreen :: DrawM ()
+clearScreen = do
+    lay <- ask
+    h <- asks hOut
+    let windowSize = width lay * height lay
+    let origin = Coord 0 0
+    attr <- liftIO $ getAttribute h
+    liftIO $ fillConsoleChar h ' ' windowSize origin
+    liftIO $ fillConsoleAttribute h attr windowSize origin
+    setPos origin
+
