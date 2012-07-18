@@ -212,12 +212,20 @@ writeConsole :: HANDLE -> String -> IO ()
 -- For some reason, Wine returns False when WriteConsoleW is called on an empty
 -- string.  Easiest fix: just don't call that function.
 writeConsole _ "" = return ()
-writeConsole h str = withArray tstr $ \t_arr -> alloca $ \numWritten -> do
-    failIfFalse_ "WriteConsole" 
-        $ c_WriteConsoleW h t_arr (toEnum $ length str) numWritten nullPtr
+writeConsole h str = writeConsole' >> writeConsole h ys
   where
-    tstr = map (toEnum . fromEnum) str
-
+    (xs,ys) = splitAt limit str
+    -- WriteConsoleW has a buffer limit which is documented as 32768 word8's,
+    -- but bug reports from online suggest that the limit may be lower (~25000).
+    -- To be safe, we pick a round number we know to be less than the limit.
+    limit = 20000 -- known to be less than WriteConsoleW's buffer limit
+    writeConsole'
+        = withArray (map (toEnum . fromEnum) xs)
+            $ \t_arr -> alloca $ \numWritten -> do
+                    failIfFalse_ "WriteConsoleW"
+                        $ c_WriteConsoleW h t_arr (toEnum $ length xs)
+                                numWritten nullPtr
+                        
 foreign import WINDOWS_CCONV "windows.h MessageBeep" c_messageBeep :: UINT -> IO Bool
 
 messageBeep :: IO ()
