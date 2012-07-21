@@ -143,8 +143,8 @@ wrapKeypad h term f = (maybeOutput keypadOn >> f)
 
 tinfoLayout :: Terminal -> IO (Maybe Layout)
 tinfoLayout term = return $ getCapability term $ do
-                        r <- termColumns
-                        c <- termLines
+                        c <- termColumns
+                        r <- termLines
                         return Layout {height=r,width=c}
 
 terminfoKeys :: Terminal -> [(String,Key)]
