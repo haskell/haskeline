@@ -12,15 +12,15 @@ module System.Console.Haskeline.MonadException(
     throwIO,
     throwTo,
     bracket,
-    -- ** Extensible Exceptions
-    Exception,
-    SomeException(..),
-    E.IOException(),
     -- * Helpers for defining \"wrapper\" functions
     liftIOOp,
     liftIOOp_,
     -- * Internal implementation
     RunIO(..),
+    -- * Extensible Exceptions
+    Exception,
+    SomeException(..),
+    E.IOException(),
     )
      where
 
@@ -52,7 +52,7 @@ import Control.Concurrent(ThreadId)
 -- and returns the ''pure'' part of @m@.
 --
 -- Note that @(RunIO return)@ is an incorrect implementation, since it does not
--- separate the pure and impure parts of the monadic action.  This module contains
+-- separate the pure and impure parts of the monadic action.  This module defines
 -- implementations for several common monad transformers.
 newtype RunIO m = RunIO (forall b . m b -> IO (m b))
 -- Uses a newtype so we don't need RankNTypes.
@@ -65,25 +65,31 @@ newtype RunIO m = RunIO (forall b . m b -> IO (m b))
 class MonadIO m => MonadException m where
     controlIO :: (RunIO m -> IO (m a)) -> m a
 
--- | Lift a control operation of type 
+-- | Lift a IO operation
 -- 
--- > (a -> IO b) -> IO b
+-- > wrap :: (a -> IO b) -> IO b
 -- 
--- to an operation of type
+-- to a more general monadic operation
 -- 
--- > MonadException m => (a -> m b) -> m b
+-- > liftIOOp wrap :: MonadException m => (a -> m b) -> m b
 --
--- For example: @alloca@, @withFile f m@, or @withForeignPtr fp@.
+-- For example: 
+--
+-- @
+--  'liftIOOp' ('System.IO.withFile' f m) :: MonadException m => (Handle -> m r) -> m r
+--  'liftIOOp' 'Foreign.Marshal.Alloc.alloca' :: (MonadException m, Storable a) => (Ptr a -> m b) -> m b
+--  'liftIOOp' (`Foreign.ForeignPtr.withForeignPtr` fp) :: MonadException m => (Ptr a -> m b) -> m b
+-- @
 liftIOOp :: MonadException m => ((a -> IO (m b)) -> IO (m c)) -> (a -> m b) -> m c
 liftIOOp f g = controlIO $ \(RunIO run) -> f (run . g)
 
--- | Lift a control operation of type 
+-- | Lift an IO operation
 -- 
--- > IO a -> IO a
+-- > wrap :: IO a -> IO a
 -- 
--- to an operation of type
+-- to a more general monadic operation
 -- 
--- > MonadException m => m a -> m a
+-- > liftIOOp_ wrap :: MonadException m => m a -> m a
 liftIOOp_ :: MonadException m => (IO (m a) -> IO (m a)) -> m a -> m a
 liftIOOp_ f act = controlIO $ \(RunIO run) -> f (run act)
 
