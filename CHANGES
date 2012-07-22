@@ -1,16 +1,24 @@
 Changed in version 0.7.0.0:
+   API changes:
+   * Remove System.Console.Haskeline.Encoding
+   * Make the MonadException class more general (similar to monad-control)
+   * Don't make InputT an instance of MonadState/MonadReader
+   * #117: Implement mapInputT
+
+   Internal changes:
    * Bump dependencies and general compatibility for ghc-7.6.1
    * Depend on the transformers package instead of mtl
    * Don't depend on the extensible-exceptions package
+   * Don't depend on the utf8-string package (except with ghc<7.4.1)
    * Bump the minimum GHC version to 6.10.1
-   * Make the MonadException class more general (similar to monad-control)
+   * Use ScopedTypeVariables instead of PatternSignatures
+
+   Internal fixes:
    * Prevent crashes on Windows when writing too many characters at once
      or ctrl-L on large window (GHC ticket #4415)
    * Remember the user's history and kill ring state after ctrl-c
-   * Don't make InputT an instance of MonadState/MonadReader
    * Use ccall on Win64
-   * #117: Implement mapInputT
-   * Use ScopedTypeVariables instead of PatternSignatures
+   * Fix terminfo's guess of the window size
 
 Changed in version 0.6.4.7:
    * Bump dependencies to allow mtl-2.1, containers-0.5 and bytestring-0.10.
