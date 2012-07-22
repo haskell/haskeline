@@ -34,6 +34,7 @@ import System.Directory(doesFileExist)
 
 #ifdef USE_GHC_ENCODINGS
 import qualified System.IO as IO
+import System.Console.Haskeline.Backend.Posix.Recover
 #else
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as UTF8
@@ -119,7 +120,7 @@ readUTF8File :: FilePath -> IO String
 #ifdef USE_GHC_ENCODINGS
 readUTF8File file = do
     h <- IO.openFile file IO.ReadMode
-    IO.hSetEncoding h IO.utf8
+    IO.hSetEncoding h $ transliterateFailure IO.utf8
     IO.hSetNewlineMode h IO.noNewlineTranslation
     contents <- IO.hGetContents h
     _ <- evaluate (length contents)

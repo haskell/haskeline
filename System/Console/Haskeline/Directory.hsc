@@ -92,7 +92,7 @@ import System.Directory
 import Data.ByteString.Char8 (pack, unpack)
 import qualified System.Directory as D
 import Control.Exception
-import System.Console.Haskeline.Backend.IConv
+import System.Console.Haskeline.Backend.Posix.IConv
 
 getDirectoryContents :: FilePath -> IO [FilePath]
 getDirectoryContents path = do

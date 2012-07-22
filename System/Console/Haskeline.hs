@@ -268,6 +268,8 @@ and 'historyFile' flags.
 
 -------
 -- | Wrapper for input functions.
+-- This is the function that calls "wrapFileInput" around file backend input
+-- functions (see Term.hs).
 promptedInput :: MonadIO m => (TermOps -> String -> InputT m a)
                         -> (FileOps -> IO a)
                         -> String -> InputT m a
@@ -279,7 +281,7 @@ promptedInput doTerm doFile prompt = do
     case termOps rterm of
         Right fops -> liftIO $ do
                         putStrOut rterm prompt
-                        doFile fops
+                        wrapFileInput fops $ doFile fops
         Left tops -> do
             -- If the prompt contains newlines, print all but the last line.
             let (lastLine,rest) = break (`elem` "\r\n") $ reverse prompt

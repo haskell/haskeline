@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 import Distribution.System
 import Distribution.Verbosity
 import Distribution.PackageDescription
@@ -35,8 +36,27 @@ myHooks
                                                     libBuildInfo = bi'}}}
             }
 
+warnIfNotTerminfo flags = when (not (hasFlagSet flags (FlagName "terminfo")))
+    $ mapM_ putStrLn
+    [ "*** Warning: running on POSIX but not building the terminfo backend. ***"
+    , "You may need to install the terminfo package manually, e.g. with"
+    , "\"cabal install terminfo\"; or, use \"-fterminfo\" when configuring or"
+    , "installing this package."
+    ,""
+    ]
+
+hasFlagSet :: ConfigFlags -> FlagName -> Bool
+hasFlagSet cflags flag = Just True == lookup flag (configConfigurationsFlags cflags)
+
+
 -- Test whether compiling a c program that links against libiconv needs -liconv.
+-- (Not needed for ghc>=7.4.1, even for the legacy POSIX backend, since
+-- the base library always links against iconv .)
 maybeSetLibiconv :: ConfigFlags -> BuildInfo -> LocalBuildInfo -> IO BuildInfo
+
+#if __GLASGOW_HASKELL__ >= 704
+maybeSetLibiconv _ bi _ = return bi
+#else
 maybeSetLibiconv flags bi lbi = do
     let biWithIconv = addIconv bi
     let verb = fromFlag (configVerbosity flags)
@@ -59,9 +79,6 @@ maybeSetLibiconv flags bi lbi = do
             putStrLn "using -liconv."
             return biWithIconv
         else error "Unable to link against the iconv library."
-
-hasFlagSet :: ConfigFlags -> FlagName -> Bool
-hasFlagSet cflags flag = Just True == lookup flag (configConfigurationsFlags cflags)
 
 tryCompile :: String -> BuildInfo -> LocalBuildInfo -> Verbosity -> IO Bool
 tryCompile program bi lbi verb = handle processExit $ handle processException $ do
@@ -105,12 +122,5 @@ iconv_prog = unlines $
     , "    return 0;"
     , "}"
     ]
-    
-warnIfNotTerminfo flags = when (not (hasFlagSet flags (FlagName "terminfo")))
-    $ mapM_ putStrLn
-    [ "*** Warning: running on POSIX but not building the terminfo backend. ***"
-    , "You may need to install the terminfo package manually, e.g. with"
-    , "\"cabal install terminfo\"; or, use \"-fterminfo\" when configuring or"
-    , "installing this package."
-    ,""
-    ]
+#endif
+

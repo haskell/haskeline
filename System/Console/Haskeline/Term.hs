@@ -7,14 +7,14 @@ import System.Console.Haskeline.Prefs(Prefs)
 import System.Console.Haskeline.Completion(Completion)
 
 import Control.Concurrent
-import Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as B
 import Data.Word
 import Control.Exception (fromException, AsyncException(..),bracket_)
 import Data.Typeable
 import System.IO
 import Control.Monad(liftM,when,guard)
 import System.IO.Error (isEOFError)
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BC
 
 class (MonadReader Layout m, MonadException m) => Term m where
     reposition :: Layout -> LineChars -> m ()
@@ -46,8 +46,12 @@ data TermOps = TermOps {
         }
 
 -- | Operations needed for file-style interaction.
+-- 
+-- Backends can assume that getLocaleLine, getLocaleChar and maybeReadNewline
+-- are "wrapped" by wrapFileInput.
 data FileOps = FileOps {
             inputHandle :: Handle, -- ^ e.g. for turning off echoing.
+            wrapFileInput :: forall a . IO a -> IO a,
             getLocaleLine :: MaybeT IO String,
             getLocaleChar :: MaybeT IO Char,
             maybeReadNewline :: IO ()
@@ -149,39 +153,27 @@ bracketSet getState set newState f = bracket (liftIO getState)
                             (liftIO . set)
                             (\_ -> liftIO (set newState) >> f)
 
-
 -- | Returns one 8-bit word.  Needs to be wrapped by hWithBinaryMode.
 hGetByte :: Handle -> MaybeT IO Word8
-hGetByte h = do
-    eof <- liftIO $ hIsEOF h
+hGetByte = guardedEOF $ liftM (toEnum . fromEnum) . hGetChar
+
+guardedEOF :: (Handle -> IO a) -> Handle -> MaybeT IO a
+guardedEOF f h = do
+    eof <- lift $ hIsEOF h
     guard (not eof)
-    liftIO $ liftM (toEnum . fromEnum) $ hGetChar h
-
-
--- | Utility function to correctly get a ByteString line of input.
-hGetLine :: Handle -> MaybeT IO ByteString
-hGetLine h = do
-    atEOF <- liftIO $ hIsEOF h
-    guard (not atEOF)
-    -- It's more efficient to use B.getLine, but that function throws an
-    -- error if the Handle (e.g., stdin) is set to NoBuffering.
-    buff <- liftIO $ hGetBuffering h
-    liftIO $ if buff == NoBuffering
-        then hWithBinaryMode h $ fmap B.pack $ System.IO.hGetLine h
-        else B.hGetLine h
+    lift $ f h
 
 -- If another character is immediately available, and it is a newline, consume it.
 --
 -- Two portability fixes:
+--
+-- 1) By itself, this (by using hReady) might crash on invalid characters.
+-- The handle should be set to binary mode or a TextEncoder that
+-- transliterates or ignores invalid input.
 -- 
 -- 1) Note that in ghc-6.8.3 and earlier, hReady returns False at an EOF,
 -- whereas in ghc-6.10.1 and later it throws an exception.  (GHC trac #1063).
 -- This code handles both of those cases.
---
--- 2) Also note that on Windows with ghc<6.10, hReady may not behave correctly (#1198)
--- The net result is that this might cause
--- But this function will generally only be used when reading buffered input
--- (since stdin isn't a terminal), so it should probably be OK.
 hMaybeReadNewline :: Handle -> IO ()
 hMaybeReadNewline h = returnOnEOF () $ do
     ready <- hReady h
@@ -193,3 +185,14 @@ returnOnEOF :: MonadException m => a -> m a -> m a
 returnOnEOF x = handle $ \e -> if isEOFError e
                                 then return x
                                 else throwIO e
+
+-- | Utility function to correctly get a line of input as an undecoded ByteString.
+hGetLocaleLine :: Handle -> MaybeT IO ByteString
+hGetLocaleLine = guardedEOF $ \h -> do
+    -- It's more efficient to use B.getLine, but that function throws an
+    -- error if the Handle (e.g., stdin) is set to NoBuffering.
+    buff <- liftIO $ hGetBuffering h
+    liftIO $ if buff == NoBuffering
+        then fmap BC.pack $ System.IO.hGetLine h
+        else BC.hGetLine h
+

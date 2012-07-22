@@ -19,7 +19,7 @@ import Control.Monad
 import System.Console.Haskeline.Key
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.LineState
-import System.Console.Haskeline.Term as Term
+import System.Console.Haskeline.Term
 import System.Console.Haskeline.Backend.WCWidth
 
 import Data.ByteString.Internal (createAndTrim)
@@ -402,13 +402,14 @@ fileRunTerm h_in = do
                     closeTerm = return (),
                     putStrOut = putter,
                     wrapInterrupt = withCtrlCHandler,
-                    termOps = Right FileOps {
-                                inputHandle = h_in,
-                                getLocaleChar = getMultiByteChar cp h_in,
-                                maybeReadNewline = hMaybeReadNewline h_in,
-                                getLocaleLine = Term.hGetLine h_in
+                    termOps = Right FileOps
+                                { inputHandle = h_in
+                                , wrapFileInput = hWithBinaryMode h_in
+                                , getLocaleChar = getMultiByteChar cp h_in
+                                , maybeReadNewline = hMaybeReadNewline h_in
+                                , getLocaleLine = hGetLocaleLine h_in
                                             >>= liftIO . codePageToUnicode cp
-                            }
+                                }
 
                     }
 
@@ -493,16 +494,14 @@ foreign import WINDOWS_CCONV "IsDBCSLeadByteEx" c_IsDBCSLeadByteEx
         :: CodePage -> BYTE -> BOOL
 
 getMultiByteChar :: CodePage -> Handle -> MaybeT IO Char
-getMultiByteChar cp h = hWithBinaryMode h loop
-  where
-    loop = do
+getMultiByteChar cp h = do
         b1 <- hGetByte h
         bs <- if c_IsDBCSLeadByteEx cp b1
                 then hGetByte h >>= \b2 -> return [b1,b2]
                 else return [b1]
         cs <- liftIO $ codePageToUnicode cp (B.pack bs)
         case cs of
-            [] -> loop
+            [] -> getMultiByteChar cp h
             (c:_) -> return c
 
 ----------------------------------

@@ -16,6 +16,7 @@ import System.Console.Haskeline.Monads as Monads
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.Backend.Posix
+import System.Console.Haskeline.Backend.Posix.Encoder (getTermText)
 import System.Console.Haskeline.Backend.WCWidth
 import System.Console.Haskeline.Key
 
@@ -105,7 +106,7 @@ newtype Draw m a = Draw {unDraw :: (ReaderT Actions
     deriving (Monad, MonadIO, MonadException,
               MonadReader Actions, MonadReader Terminal, MonadState TermPos,
               MonadState TermRows,
-              MonadReader Handles, MonadReader Encoders)
+              MonadReader Handles, MonadReader Encoder)
 
 instance MonadTrans Draw where
     lift = Draw . lift . lift . lift . lift . lift . lift
@@ -130,7 +131,7 @@ runTerminfoDraw h = do
             actions <- MaybeT $ return $ getCapability term getActions
             liftIO $ posixRunTerm h (posixLayouts h ++ [tinfoLayout term])
                 (terminfoKeys term)
-                (wrapKeypad (hOut h) term)
+                (wrapKeypad (ehOut h) term)
                 (evalDraw term actions)
 
 -- If the keypad on/off capabilities are defined, wrap the computation with them.
@@ -188,7 +189,7 @@ runActionT m = do
     (x,action) <- Writer.runWriterT m
     toutput <- asks action
     term <- ask
-    ttyh <- liftM hOut ask
+    ttyh <- liftM ehOut ask
     liftIO $ hRunTermOutput ttyh term toutput
     return x
 
@@ -196,8 +197,10 @@ output :: TermAction -> ActionM ()
 output = Writer.tell
 
 outputText :: String -> ActionM ()
-outputText str = (lift $ Draw $ lift $ lift $ lift $ lift $ posixEncode str)
-                    >>= output . const . termText
+outputText str = do
+    encode <- lift ask
+    liftIO (getTermText encode str)
+        >>= output . const
 
 left,right,up :: Int -> TermAction
 left = flip leftA

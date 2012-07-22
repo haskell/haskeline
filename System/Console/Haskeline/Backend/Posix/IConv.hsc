@@ -1,20 +1,25 @@
-module System.Console.Haskeline.Backend.IConv(
+{- | This module exports iconv-based encoding/decoding, for use on
+older versions of GHC.  
+-}
+module System.Console.Haskeline.Backend.Posix.IConv(
         setLocale,
         getCodeset,
         openEncoder,
         openDecoder,
         openPartialDecoder,
-        Result(..)
+        PartialDecoder,
+        decodeAndMore,
         ) where
 
 import Foreign.C
 import Foreign
-import Data.ByteString (ByteString, useAsCStringLen, append)
+import Data.ByteString (ByteString, useAsCStringLen, append )
 -- TODO: Base or Internal, depending on whether base>=3.
 import Data.ByteString.Internal (createAndTrim')
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Maybe (fromMaybe)
+import System.IO (Handle)
 
 #include <locale.h>
 #include <langinfo.h>
@@ -48,7 +53,9 @@ simpleIConv dropper t bs = do
     continueOnError cs rest = fmap ((cs `append`) . (replacement `B.cons`))
                                 $ simpleIConv dropper t (dropper rest)
 
-openPartialDecoder :: String -> IO (ByteString -> IO (String, Result))
+type PartialDecoder = ByteString -> IO (String,Result)
+
+openPartialDecoder :: String -> IO PartialDecoder
 openPartialDecoder codeset = do
     decodeT <- iconvOpen "UTF-8" codeset
     return $ \bs -> do
@@ -150,3 +157,21 @@ partialIconv cd outSize inBuff inBytesLeft =
                     else return Nothing
         return (0,outSize - outLeft,errno)
 
+-------------
+-- Decode the given ByteString.  If necessary, finish decoding it
+-- by reading more bytes one at a time from the given handle.
+-- (This assumes that the handle is in BinaryMode.)
+decodeAndMore:: PartialDecoder
+        -> Handle -> B.ByteString -> IO String
+decodeAndMore decoder h bs = do
+    (cs,result) <- decoder bs
+    case result of
+        Incomplete rest -> do
+            extra <- B.hGetNonBlocking h 1
+            if B.null extra
+                then return (cs ++ "?")
+                else fmap (cs++)
+                        $ decodeAndMore decoder h (rest `B.append` extra)
+        Invalid rest -> fmap ((cs ++) . ('?':))
+                            $ decodeAndMore decoder h (B.drop 1 rest)
+        Successful -> return cs
