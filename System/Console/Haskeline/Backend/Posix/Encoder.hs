@@ -206,6 +206,6 @@ blockUntilInput h = hWaitForInput h (-1) >> return ()
 blockUntilInput h = unsafeHandleToFD h >>= threadWaitRead . Fd
 #endif
 
-#endif -- USE_GHC_ENCODINGS
+#endif
 
 
