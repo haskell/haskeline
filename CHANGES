@@ -1,3 +1,6 @@
+Changed in version 0.7.0.1:
+   * Fix GHC build by removing a Haskell comment on an #endif line
+
 Changed in version 0.7.0.0:
    API changes:
    * Remove System.Console.Haskeline.Encoding
