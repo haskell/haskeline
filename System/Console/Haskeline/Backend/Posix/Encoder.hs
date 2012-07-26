@@ -33,7 +33,7 @@ import qualified System.Console.Terminfo.Base as Terminfo
 -- Way-dependent imports
 #ifdef USE_GHC_ENCODINGS
 import GHC.IO.Encoding (initLocaleEncoding)
-import System.Console.Haskeline.Backend.Posix.Recover
+import System.Console.Haskeline.Recover
 #else
 import System.Console.Haskeline.Backend.Posix.IConv
 import Data.ByteString (ByteString)

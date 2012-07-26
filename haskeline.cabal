@@ -99,6 +99,7 @@ Library
     -- due to GHC bug #5436 which wasn't fixed until 7.4.1
     if !flag(legacy-encoding) && impl(ghc>=7.4) {
         cpp-options: -DUSE_GHC_ENCODINGS
+        Other-modules: System.Console.Haskeline.Recover
     } else {
         Build-depends: utf8-string==0.3.* && >=0.3.6
     }
@@ -118,8 +119,6 @@ Library
             includes: h_iconv.h
             install-includes: h_iconv.h
             Other-modules: System.Console.Haskeline.Backend.Posix.IConv
-        } else {
-            Other-modules: System.Console.Haskeline.Backend.Posix.Recover
         }
         Other-modules: 
                 System.Console.Haskeline.Backend.Posix

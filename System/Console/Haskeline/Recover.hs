@@ -1,4 +1,4 @@
-module System.Console.Haskeline.Backend.Posix.Recover where
+module System.Console.Haskeline.Recover where
 
 import GHC.IO.Encoding
 import GHC.IO.Encoding.Failure

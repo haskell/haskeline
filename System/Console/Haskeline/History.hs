@@ -34,7 +34,7 @@ import System.Directory(doesFileExist)
 
 #ifdef USE_GHC_ENCODINGS
 import qualified System.IO as IO
-import System.Console.Haskeline.Backend.Posix.Recover
+import System.Console.Haskeline.Recover
 #else
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as UTF8
