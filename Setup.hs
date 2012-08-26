@@ -14,7 +14,7 @@ import qualified Distribution.InstalledPackageInfo as Installed
 import System.IO
 import System.Exit
 import System.Directory
-import Control.Exception.Extensible
+import Control.Exception
 import Control.Monad(when)
 
 main :: IO ()
