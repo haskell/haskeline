@@ -58,32 +58,39 @@ interactionTests i = "interaction" ~: test
 
 unicodeEncoding i = "Unicode encoding (valid)" ~:
     [ utf8Test i [utf8 "xαβγy"]
-        [prompt 0 <> utf8 "xαβγy"]
-    , utf8Test i [utf8 "xαβyψ안기q영\nquit\n"]
-        [ prompt 0 <> utf8 "xαβyψ안기q영" <> end
-            <> output 0 (utf8 "xαβyψ안기q영")
-        , prompt 1 <> utf8 "quit" <> end
+        [prompt 0, utf8 "xαβγy"]
+    , utf8Test i [utf8 "a\n", "quit\n"]
+        [ prompt 0
+        , utf8 "a" <> end
+            <> output 0 (utf8 "a") <> prompt 1
+        , utf8 "quit" <> end
+        ]
+    , utf8Test i [utf8 "xαβyψ안기q영\n", "quit\n"]
+        [ prompt 0
+        , utf8 "xαβyψ안기q영" <> end
+            <> output 0 (utf8 "xαβyψ안기q영") <> prompt 1
+        , utf8 "quit" <> end
         ]
     -- test buffering: 32 bytes is in middle of a char encoding,
     -- also test long paste
     , "multipleLines" ~: utf8Test i [l1 <> "\n" <> l1]
-        [prompt 0 <> l1 <> end <> output 0 l1
-        <> prompt 1 <> l1]
+        [ prompt 0
+        , l1 <> end <> output 0 l1 <> prompt 1 <> l1]
     ]
   where
     l1 = utf8 $ T.replicate 30 "안" -- three bytes, width 60
 
 unicodeMovement i = "Unicode movement" ~:
     [ "separate" ~: utf8Test i [utf8 "α", utf8 "\ESC[Dx"]
-        [prompt 0 <> utf8 "α", utf8 "\bxα\b"]
+        [prompt 0, utf8 "α", utf8 "\bxα\b"]
     , "coalesced" ~: utf8Test i [utf8 "α\ESC[Dx"]
-        [prompt 0 <> utf8 "xα\b"]
+        [prompt 0, utf8 "xα\b"]
     , "lineWrap" ~: utf8Test i
         [ utf8 longWideChar 
         , raw [1]
         , raw [5]
         ]
-        [prompt 0 <> utf8 lwc1 <> wrap <> utf8 lwc2 <> wrap <> utf8 lwc3
+        [prompt 0, utf8 lwc1 <> wrap <> utf8 lwc2 <> wrap <> utf8 lwc3
         , cr <> "\ESC[2A\ESC[2C"
         , cr <> nl <> nl <> "\ESC[22C"
         ]
@@ -99,8 +106,8 @@ unicodeMovement i = "Unicode movement" ~:
 
 tabCompletion i = "tab completion" ~:
     [ utf8Test i [ utf8 "dummy-μ\t\t" ]
-        [ prompt 0 <> utf8 "dummy-μασ/" 
-        , nl <> utf8 "bar   ςερτ" <> nl
+        [ prompt 0, utf8 "dummy-μασ/" 
+            <> nl <> utf8 "bar   ςερτ" <> nl
             <> prompt' 0 <> utf8 "dummy-μασ/"
         ]
     ]
@@ -109,25 +116,25 @@ incorrectInput i = "incorrect input" ~:
     [ utf8Test i [ utf8 "x" <> raw [206] ]  -- needs one more byte
         -- non-legacy encoder ignores the "206" since it's still waiting
         -- for more input.
-        [ prompt 0 <> utf8 "x" <> whenLegacy err ]
+        [ prompt 0, utf8 "x" <> whenLegacy err ]
     , utf8Test i [ raw [206] <> utf8 "x" ]  
         -- 'x' is not valid after '\206', so both the legacy and
         -- non-legacy encoders should handle the "x" correctly.
-        [ prompt 0 <> err <> utf8 "x"]
+        [ prompt 0, err <> utf8 "x"]
     , utf8Test i [ raw [236,149] <> utf8 "x" ] -- needs one more byte
-        [prompt 0 <> err <> err <> utf8 "x"]
+        [prompt 0, err <> err <> utf8 "x"]
     ]
 
 historyTests i =  "history encoding" ~:
     [ utf8TestValidHist i [ "\ESC[A" ]
-        [prompt 0 <> utf8 "abcα" ]
+        [prompt 0, utf8 "abcα" ]
     , utf8TestInvalidHist i [ "\ESC[A" ]
         -- NB: this is decoded by either utf8-string or base;
         -- either way they produce \65533 instead of '?'.
-        [prompt 0 <> utf8 "abcα\65533x\65533x\65533" ]
+        [prompt 0, utf8 "abcα\65533x\65533x\65533" ]
     -- In latin-1: read errors as utf-8 '\65533', display as '?'
     , latin1TestInvalidHist i  [ "\ESC[A" ]
-        [prompt 0 <> utf8 "abc??x?x?" ]
+        [prompt 0, utf8 "abc??x?x?" ]
     ]
 
 invalidHist =  utf8 "abcα" 
@@ -142,21 +149,28 @@ validHist = utf8 "abcα"
 
 inputChar i = "getInputChar" ~:
     [ utf8Test i [utf8 "xαβ"]
-        [ prompt 0 <> utf8 "x" <> end <> output 0 (utf8 "x")
+        [ prompt 0, utf8 "x" <> end <> output 0 (utf8 "x")
           <> prompt 1 <> utf8 "α" <> end <> output 1 (utf8 "α")
           <> prompt 2 <> utf8 "β" <> end <> output 2 (utf8 "β")
           <> prompt 3
         ]
-    , utf8Test i [utf8 "α" <> raw [149] <> utf8 "x" <> raw [206]]
-        [ prompt 0 <> utf8 "α" <> end <> output 0 (utf8 "α")
-        , prompt 1 <> err <> end <> output 1 err
-        , prompt 2 <> utf8 "x" <> end <> output 2 (utf8 "x")
-        , prompt 3 <> whenLegacy (err <> end <> output 3 err)
-        , whenLegacy (prompt 4)
+    , "bad encoding (separate)" ~: 
+        utf8Test i [utf8 "α", raw [149], utf8 "x", raw [206]]
+        [ prompt 0, utf8 "α" <> end <> output 0 (utf8 "α") <> prompt 1
+        , err <> end <> output 1 err <> prompt 2
+        , utf8 "x" <> end <> output 2 (utf8 "x") <> prompt 3
+        , whenLegacy (err <> end <> output 3 err <> prompt 4)
+        ]
+    , "bad encoding (together)" ~: 
+        utf8Test i [utf8 "α" <> raw [149] <> utf8 "x" <> raw [206]]
+        [ prompt 0, utf8 "α" <> end <> output 0 (utf8 "α")
+        <> prompt 1 <> err <> end <> output 1 err
+        <> prompt 2 <> utf8 "x" <> end <> output 2 (utf8 "x")
+        <> prompt 3 <> whenLegacy (err <> end <> output 3 err <> prompt 4)
         ]
     , utf8Test i [raw [206]] -- incomplete
-        [ prompt 0 <> whenLegacy (utf8 "?" <> end <> output 0 (utf8 "?"))
-        , whenLegacy (prompt 1)
+        [ prompt 0, whenLegacy (utf8 "?" <> end <> output 0 (utf8 "?"))
+        <> whenLegacy (prompt 1)
         ]
     ]
 
@@ -169,7 +183,8 @@ fileStyleTests i = "file style" ~:
         [ prompt' 0, output 0 (utf8 "xαβyψ안기q영") <> prompt' 1]
     , "char input" ~: utf8Test iFileChar
         [utf8 "xαβt"]
-        [prompt' 0 <> output 0 (utf8 "x")
+        [ prompt' 0
+        , output 0 (utf8 "x")
             <> prompt' 1 <> output 1 (utf8 "α")
             <> prompt' 2 <> output 2 (utf8 "β")
             <> prompt' 3 <> output 3 (utf8 "t")
@@ -182,25 +197,32 @@ fileStyleTests i = "file style" ~:
         -- Also recall GHC bug #5436 which caused a crash
         -- if the last byte started an incomplete sequence.
         [ utf8 "a" <> raw [149] <> utf8 "x" <> raw [206] ]
-        [prompt' 0 <> output 0 (utf8 "a" <> err <> utf8 "x" <> err)
-         <> prompt' 1]
-    , "invalid char input" ~: utf8Test iFileChar
+        [ prompt' 0
+        , B.empty
+        -- It only prompts after the EOF.
+        , output 0 (utf8 "a" <> err <> utf8 "x" <> err) <> prompt' 1
+        ]
+    , "invalid char input (following a newline)" ~: utf8Test iFileChar
         [ utf8 "a\n" <> raw [149] <> utf8 "x\n" <> raw [206] ]
-        [prompt' 0 <> output 0 (utf8 "a")
-            <> prompt' 1 <> output 1 err
-            <> prompt' 2 <> output 2 (utf8 "x")
-            <> prompt' 3 <> output 3 err
-            <> prompt' 4]
-    , "invalid char file input" ~: utf8Test iFileChar
+        $ [ prompt' 0
+          , output 0 (utf8 "a")
+             <> prompt' 1 <> output 1 err
+             <> prompt' 2 <> output 2 (utf8 "x")
+             <> prompt' 3
+             <> whenLegacy (output 3 err <> prompt' 4)
+          ] ++ if legacyEncoding then [] else [ output 3 err <> prompt' 4 ]
+    , "invalid char file input (no preceding newline)" ~: utf8Test iFileChar
         [ utf8 "a" <> raw [149] <> utf8 "x" <> raw [206] ]
             -- make sure it tries to read a newline
             -- and instead gets the incomplete 206.
             -- This should *not* cause it to crash or block.
-        [prompt' 0 <> output 0 (utf8 "a")
-            <> prompt' 1 <> output 1 err
-            <> prompt' 2 <> output 2 (utf8 "x")
-            <> prompt' 3 <> output 3 err
-            <> prompt' 4]
+        $ [ prompt' 0
+          , output 0 (utf8 "a")
+             <> prompt' 1 <> output 1 err
+             <> prompt' 2 <> output 2 (utf8 "x")
+             <> prompt' 3
+             <> whenLegacy (output 3 err <> prompt' 4)
+          ] ++ if legacyEncoding then [] else [ output 3 err <> prompt' 4 ]
      ]
     -- also single char and buffer break and other stuff
   where
@@ -214,16 +236,16 @@ fileStyleTests i = "file style" ~:
 dumbTests i = "dumb term" ~:
     [ "line input" ~: utf8Test i
         [ utf8 "xαβγy" ]
-        [ prompt' 0 <> utf8 "xαβγy" ]
+        [ prompt' 0, utf8 "xαβγy" ]
     , "line input wide movement" ~: utf8Test i
         [ utf8 wideChar, raw [1], raw [5] ]
-        [ prompt' 0 <> utf8 wideChar
+        [ prompt' 0, utf8 wideChar
         , utf8 (T.replicate 60 "\b")
         , utf8 wideChar
         ]
     , "line char input" ~: utf8Test (setCharInput i)
         [utf8 "xαβ"]
-        [ prompt' 0 <> utf8 "x" <> nl <> output 0 (utf8 "x")
+        [ prompt' 0, utf8 "x" <> nl <> output 0 (utf8 "x")
           <> prompt' 1 <> utf8 "α" <> nl <> output 1 (utf8 "α")
           <> prompt' 2 <> utf8 "β" <> nl <> output 2 (utf8 "β")
           <> prompt' 3

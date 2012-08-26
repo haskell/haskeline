@@ -1,7 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
--- This module provides an interface for running terminal-using programs
--- without the presence of a terminal.
--- It uses the "script" command to run a program and capture its output.
+-- This module provides an interface for testing the output
+-- of programs that expect to be run in a terminal.
 module RunTTY (Invocation(..), 
             runInvocation, 
             assertInvocation,
@@ -16,13 +15,12 @@ import Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import System.Posix.Env.ByteString hiding (setEnv)
 import System.Process
-import System.Directory
-import System.Timeout
-import Control.Concurrent.Async
 import Control.Concurrent
 import System.IO
 import Test.HUnit
-import Control.Monad (unless)
+import Control.Monad (unless, liftM2, zipWithM_)
+
+import Pty
 
 
 data Invocation = Invocation {
@@ -50,68 +48,59 @@ runInvocation :: Invocation
         -> [B.ByteString] -- Input chunks.  (We pause after each chunk to
                         -- simulate real user input and prevent Haskeline
                         -- from coalescing the changes.)
-        -> IO B.ByteString
-runInvocation Invocation {..} input = do
-    tempDir <- getTemporaryDirectory
-    (fTemp,hTemp) <- openTempFile tempDir "input.txt"
-    hClose hTemp
-    let p
-          | not runInTTY = proc prog progArgs
-          | otherwise = proc "script" $
-                        [ "-q" -- no start/stop status
-                        , "-k" -- include user input
-                        , "-t", "0" -- flush after every character I/O
-                        , fTemp
-                        , prog
-                        ] ++ progArgs
+        -> IO [B.ByteString]
+runInvocation Invocation {..} inputs
+    | runInTTY = runCommandInPty prog progArgs (Just environment) inputs
+    | otherwise = do
     (Just inH, Just outH, Nothing, ph)
-        <- createProcess p
+        <- createProcess (proc prog progArgs)
                             { env = Just environment
                             , std_in = CreatePipe
                             , std_out = CreatePipe
                             , std_err = Inherit
                             }
-    readOut <- async $ B.hGetContents outH
-    mapM_ (\i -> B.hPutStr inH i >> hFlush inH >> threadDelay 20000) input
+    hSetBuffering inH NoBuffering
+    firstOutput <- getOutput outH
+    outputs <- mapM (inputOutput inH outH) inputs
     hClose inH
-    -- if the process is paused, wait 1/5 of a second before forcing it
-    -- to close.
-    race (waitForProcess ph)
-        (threadDelay 100000
-            >> terminateProcess ph >> waitForProcess ph)
-    output <- wait readOut
-    tempContents <- B.readFile fTemp
-    removeFile fTemp
-    return $ if runInTTY then tempContents else output
-    
+    lastOutput <- getOutput outH -- output triggered by EOF, if any
+    terminateProcess ph
+    waitForProcess ph
+    return $ firstOutput : outputs
+                ++ if B.null lastOutput then [] else [lastOutput]
+
+inputOutput :: Handle -> Handle -> B.ByteString -> IO B.ByteString
+inputOutput inH outH input = do
+    B.hPut inH input
+    getOutput outH
+
+
+getOutput :: Handle -> IO B.ByteString
+getOutput h = do
+    threadDelay 20000
+    B.hGetNonBlocking h 4096
 
 
 assertInvocation :: Invocation -> [B.ByteString] -> [B.ByteString]
                     -> Assertion
-assertInvocation i input output = do
-    let expectedOutput = if runInTTY i
-                            then interleave input output
-                            else B.concat output
+assertInvocation i input expectedOutput = do
     actualOutput <- runInvocation i input
-    assertSame ((if runInTTY i then fixInput else id) expectedOutput)
-        (fixOutput actualOutput)
+    assertSameList expectedOutput $ fmap fixOutput actualOutput
 
-interleave (x:xs) (y:ys) = x `B.append` y `B.append` interleave xs ys
-interleave xs [] = B.concat xs
-interleave [] ys = B.concat ys
-
--- script expands LF -> CRLF (like a normal terminal would)
--- so we'll do the same for our inputs/outputs
-fixInput = B.concatMap 
-            $ \c -> if c == 10 then B.pack  [13,10] else B.singleton c
-
--- script turns "\ESC" from input into "^["
--- so we'll normalize any "^[" into "\ESC"
+-- Remove CRLFs from output, since tty translates all LFs into CRLF.
+-- (TODO: I'd like to just unset ONLCR in the slave tty, but
+-- System.Posix.Terminal doesn't support that flag.)
 fixOutput = BC.pack . loop . BC.unpack
   where
-    loop ('^':'[':rest) = '\ESC':loop rest
+    loop ('\r':'\n':rest) = '\n' : loop rest
     loop (c:cs) = c : loop cs
     loop [] = []
+
+assertSameList :: (Show a, Eq a) => [a] -> [a] -> Assertion
+assertSameList [] [] = return ()
+assertSameList (x:xs) (y:ys)
+    | x == y = assertSameList xs ys
+assertSameList xs ys = xs @=? ys -- cause error to be thrown
 
 assertSame :: B.ByteString -> B.ByteString -> Assertion
 assertSame expected actual = do
