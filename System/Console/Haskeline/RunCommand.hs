@@ -11,8 +11,11 @@ import Control.Monad
 
 runCommandLoop :: (CommandMonad m, MonadState Layout m, LineState s)
     => TermOps -> String -> KeyCommand m s a -> s -> m a
-runCommandLoop tops@TermOps{evalTerm = EvalTerm eval liftE} prefix cmds initState
-    = eval $ withGetEvent tops
+runCommandLoop tops@TermOps{evalTerm = e} prefix cmds initState
+    = case e of -- NB: Need to separate this case out from the above pattern
+                -- in order to build on ghc-6.12.3
+        EvalTerm eval liftE
+            -> eval $ withGetEvent tops
                 $ runCommandLoop' liftE tops (stringToGraphemes prefix) initState 
                     cmds 
 
