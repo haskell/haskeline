@@ -431,7 +431,7 @@ type Handler = DWORD -> IO BOOL
 
 foreign import ccall "wrapper" wrapHandler :: Handler -> IO (FunPtr Handler)
 
-foreign import stdcall "windows.h SetConsoleCtrlHandler" c_SetConsoleCtrlHandler
+foreign import WINDOWS_CCONV "windows.h SetConsoleCtrlHandler" c_SetConsoleCtrlHandler
     :: FunPtr Handler -> BOOL -> IO BOOL
 
 -- sets the tv to True when ctrl-c is pressed.
