@@ -48,7 +48,7 @@ import GHC.IOBase(haFD,FD)
 import GHC.Handle (withHandle_)
 #endif
 
-#ifdef USE_TERMIOS_H
+#if defined(USE_TERMIOS_H) || defined(__ANDROID__)
 #include <termios.h>
 #endif
 #include <sys/ioctl.h>
