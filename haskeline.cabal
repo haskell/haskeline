@@ -111,7 +111,7 @@ Library
         install-includes: win_console.h
         cpp-options: -DMINGW
     } else {
-        Build-depends: unix>=2.0 && < 2.7
+        Build-depends: unix>=2.0 && < 2.8
                         -- unix-2.3 doesn't build on ghc-6.8.1 or earlier
         -- Use manual encoding/decoding on ghc<7.4
         if flag (legacy-encoding) || impl(ghc<7.4) {
