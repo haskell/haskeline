@@ -8,6 +8,8 @@ module System.Console.Haskeline.MonadException(
     -- * Generalizations of Control.Exception
     catch,
     handle,
+    catches,
+    Handler(..),
     finally,
     throwIO,
     throwTo,
@@ -101,6 +103,18 @@ catch act handler = controlIO $ \(RunIO run) -> E.catch
 
 handle :: (MonadException m, Exception e) => (e -> m a) -> m a -> m a
 handle = flip catch
+ 
+catches :: (MonadException m) => m a -> [Handler m a] -> m a
+catches act handlers = controlIO $ \(RunIO run) ->
+                           let catchesHandler handlers e = foldr tryHandler (E.throw e) handlers
+                                   where tryHandler (Handler handler) res =
+                                             case E.fromException e of
+                                               Just e' -> run $ handler e'
+                                               Nothing -> res
+                           in E.catch (run act) (catchesHandler handlers)
+
+data Handler m a = forall e . Exception e => Handler (e -> m a)
+
 
 bracket :: MonadException m => m a -> (a -> m b) -> (a -> m c) -> m c
 bracket before after thing 

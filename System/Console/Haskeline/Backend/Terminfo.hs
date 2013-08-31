@@ -194,7 +194,9 @@ runActionT m = do
     return x
 
 output :: TermAction -> ActionM ()
-output = Writer.tell
+output t = Writer.tell t  -- NB: explicit argument enables build with ghc-6.12.3
+                          -- (Probably related to the monomorphism restriction;
+                          -- see GHC ticket #1749).
 
 outputText :: String -> ActionM ()
 outputText str = do

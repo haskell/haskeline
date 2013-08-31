@@ -28,7 +28,7 @@ import Data.List
 import System.IO
 import System.Environment
 
-import System.Console.Haskeline.Monads
+import System.Console.Haskeline.Monads hiding (Handler)
 import System.Console.Haskeline.Key
 import System.Console.Haskeline.Term as Term
 import System.Console.Haskeline.Prefs
@@ -48,7 +48,7 @@ import GHC.IOBase(haFD,FD)
 import GHC.Handle (withHandle_)
 #endif
 
-#ifdef USE_TERMIOS_H
+#if defined(USE_TERMIOS_H) || defined(__ANDROID__)
 #include <termios.h>
 #endif
 #include <sys/ioctl.h>
