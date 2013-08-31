@@ -106,12 +106,12 @@ handle = flip catch
  
 catches :: (MonadException m) => m a -> [Handler m a] -> m a
 catches act handlers = controlIO $ \(RunIO run) ->
-                           let catchesHandler handlers e = foldr tryHandler (E.throw e) handlers
+                           let catchesHandler e = foldr tryHandler (E.throw e) handlers
                                    where tryHandler (Handler handler) res =
                                              case E.fromException e of
                                                Just e' -> run $ handler e'
                                                Nothing -> res
-                           in E.catch (run act) (catchesHandler handlers)
+                           in E.catch (run act) catchesHandler
 
 data Handler m a = forall e . Exception e => Handler (e -> m a)
 
