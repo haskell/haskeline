@@ -17,7 +17,7 @@ import Data.Maybe(mapMaybe)
 import Control.Monad
 
 import System.Console.Haskeline.Key
-import System.Console.Haskeline.Monads
+import System.Console.Haskeline.Monads hiding (Handler)
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.Backend.WCWidth
