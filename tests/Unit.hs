@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- Usage:
 --   ghc ../examples/Test.hs
---   runghc Unit.hs ../examples/Test
+--   ghc Unit.hs
+--   ./Unit ../examples/Test
 -- Requirements:
 -- - Empty ~/.haskeline (or set to defaults)
 -- - Assumes the dummy folder is in the current folder
