@@ -1,3 +1,10 @@
+Changed in version 0.7.1.0:
+   * Fix build with ghc-7.8.
+   * Fix build with ghc-6.12.3.
+   * Fix build on Android.
+   * Fix build on Win64.
+   * Add 'catches' to System.Console.Haskeline.MonadException.
+
 Changed in version 0.7.0.3:
    * Fix build with ghc>=7.6.1.
 
