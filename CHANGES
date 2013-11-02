@@ -1,3 +1,6 @@
+Changed in version 0.7.0.3:
+   * Fix build with ghc>=7.6.1.
+
 Changed in version 0.7.0.2:
    * Fix build on Windows with ghc>=7.4.1.
 
