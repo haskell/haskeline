@@ -29,7 +29,8 @@ module System.Console.Haskeline.Command(
                         ) where
 
 import Data.Char(isPrint)
-import Control.Monad(mplus, liftM)
+import Control.Applicative(Applicative(..))
+import Control.Monad(ap, mplus, liftM)
 import Control.Monad.Trans.Class
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Key
@@ -60,6 +61,13 @@ data CmdM m a   = GetKey (KeyMap (CmdM m a))
                 | Result a
 
 type Command m s t = s -> CmdM m t
+
+instance Monad m => Functor (CmdM m) where
+    fmap = liftM
+
+instance Monad m => Applicative (CmdM m) where
+    pure  = return
+    (<*>) = ap
 
 instance Monad m => Monad (CmdM m) where
     return = Result

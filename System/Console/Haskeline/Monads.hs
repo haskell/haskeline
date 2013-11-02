@@ -19,7 +19,8 @@ module System.Console.Haskeline.Monads(
                 orElse
                 ) where
 
-import Control.Monad (liftM)
+import Control.Applicative (Applicative(..))
+import Control.Monad (ap, liftM)
 import Control.Monad.IO.Class (MonadIO(..))
 import Control.Monad.Trans.Class (MonadTrans(..))
 import Control.Monad.Trans.Maybe (MaybeT(..))
@@ -69,6 +70,13 @@ runReaderT' = flip runReaderT
 
 newtype StateT s m a = StateT { getStateTFunc 
                                     :: forall r . s -> m ((a -> s -> r) -> r)}
+
+instance Monad m => Functor (StateT s m) where
+    fmap  = liftM
+
+instance Monad m => Applicative (StateT s m) where
+    pure  = return
+    (<*>) = ap
 
 instance Monad m => Monad (StateT s m) where
     return x = StateT $ \s -> return $ \f -> f x s

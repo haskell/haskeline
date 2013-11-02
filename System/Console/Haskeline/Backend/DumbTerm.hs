@@ -8,6 +8,7 @@ import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Monads as Monads
 
 import System.IO
+import Control.Applicative(Applicative)
 import Control.Monad(liftM)
 
 -- TODO: 
@@ -21,7 +22,7 @@ initWindow :: Window
 initWindow = Window {pos=0}
 
 newtype DumbTerm m a = DumbTerm {unDumbTerm :: StateT Window (PosixT m) a}
-                deriving (Monad, MonadIO, MonadException,
+                deriving (Functor, Applicative, Monad, MonadIO, MonadException,
                           MonadState Window,
                           MonadReader Handles, MonadReader Encoder)
 
