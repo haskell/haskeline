@@ -19,7 +19,7 @@ Description:
 Homepage:       http://trac.haskell.org/haskeline
 Stability:      Experimental
 Build-Type:     Custom
-extra-source-files: examples/Test.hs CHANGES
+extra-source-files: examples/Test.hs Changelog
 
 source-repository head
     type: darcs
