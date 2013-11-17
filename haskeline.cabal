@@ -1,6 +1,6 @@
 Name:           haskeline
 Cabal-Version:  >=1.6
-Version:        0.7.1.0
+Version:        0.7.1.1
 Category:       User Interfaces
 License:        BSD3
 License-File:   LICENSE
@@ -22,8 +22,8 @@ Build-Type:     Custom
 extra-source-files: examples/Test.hs Changelog
 
 source-repository head
-    type: darcs
-    location: http://code.haskell.org/haskeline
+    type: git
+    location: git://github.com/judah/haskeline.git
 
 -- There are three main advantages to the terminfo backend over the portable,
 -- "dumb" alternative.  First, it enables more efficient control sequences
