@@ -1,5 +1,5 @@
 Name:           haskeline
-Cabal-Version:  >=1.6
+Cabal-Version:  >=1.16
 Version:        0.7.1.1
 Category:       User Interfaces
 License:        BSD3
@@ -59,7 +59,9 @@ Library
                        bytestring==0.9.*
     }
     Build-depends:  filepath >= 1.1 && < 1.4, transformers >= 0.2 && < 0.4
-    Extensions:     ForeignFunctionInterface, Rank2Types, FlexibleInstances,
+    Default-Language: Haskell98
+    Default-Extensions: 
+                ForeignFunctionInterface, Rank2Types, FlexibleInstances,
                 TypeSynonymInstances
                 FlexibleContexts, ExistentialQuantification
                 ScopedTypeVariables, GeneralizedNewtypeDeriving
