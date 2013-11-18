@@ -25,7 +25,6 @@ install:
 
 script:
  - cabal-1.18 configure -v2
- - echo Starting the build
  - cabal-1.18 build -v2
  - cabal-1.18 check
  - cabal-1.18 sdist
