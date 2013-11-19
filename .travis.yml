@@ -21,7 +21,7 @@ before_install:
 install:
  - cabal-$CABALVER update
  - cabal-$CABALVER install --only-dependencies
- - cabal-$CABALVER install Cabal-$CABALVER
+ - cabal-$CABALVER install "Cabal >= $CABALVER"
  - ghc --version
 
 script:
