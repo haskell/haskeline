@@ -40,7 +40,7 @@ data RunTerm = RunTerm {
 -- | Operations needed for terminal-style interaction.
 data TermOps = TermOps {
             getLayout :: IO Layout
-            , withGetEvent :: CommandMonad m => (m Event -> m a) -> m a
+            , withGetEvent :: forall m a . CommandMonad m => (m Event -> m a) -> m a
             , evalTerm :: forall m . CommandMonad m => EvalTerm m
             , saveUnusedKeys :: [Key] -> IO ()
         }
