@@ -2,7 +2,8 @@ module System.Console.Haskeline.Monads(
                 module System.Console.Haskeline.MonadException,
                 MonadTrans(..),
                 MonadIO(..),
-                ReaderT(..),
+                ReaderT,
+                runReaderT,
                 runReaderT',
                 mapReaderT,
                 asks,
@@ -15,7 +16,8 @@ module System.Console.Haskeline.Monads(
                 update,
                 MonadReader(..),
                 MonadState(..),
-                MaybeT(..),
+                MaybeT(MaybeT),
+                runMaybeT,
                 orElse
                 ) where
 
@@ -23,7 +25,7 @@ import Control.Applicative (Applicative(..))
 import Control.Monad (ap, liftM)
 import Control.Monad.IO.Class (MonadIO(..))
 import Control.Monad.Trans.Class (MonadTrans(..))
-import Control.Monad.Trans.Maybe (MaybeT(..))
+import Control.Monad.Trans.Maybe (MaybeT(MaybeT),runMaybeT)
 import Control.Monad.Trans.Reader hiding (ask,asks)
 import qualified Control.Monad.Trans.Reader as Reader
 import Data.IORef
