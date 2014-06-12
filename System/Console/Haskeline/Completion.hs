@@ -39,7 +39,7 @@ data Completion = Completion {replacement  :: String, -- ^ Text to insert in lin
                             -- ^ Whether this word should be followed by a
                             -- space, end quote, etc.
                             }
-                    deriving Show
+                    deriving (Eq, Ord, Show)
 
 -- | Disable completion altogether.
 noCompletion :: Monad m => CompletionFunc m
@@ -51,7 +51,7 @@ noCompletion (s,_) = return (s,[])
 -- | A custom 'CompletionFunc' which completes the word immediately to the left of the cursor.
 --
 -- A word begins either at the start of the line or after an unescaped whitespace character.
-completeWord :: Monad m => Maybe Char 
+completeWord :: Monad m => Maybe Char
         -- ^ An optional escape character
         -> [Char]-- ^ Characters which count as whitespace
         -> (String -> m [Completion]) -- ^ Function to produce a list of possible completions
@@ -119,7 +119,7 @@ escapeReplacement esc ws f = case esc of
 completeQuotedWord :: Monad m => Maybe Char -- ^ An optional escape character
                             -> [Char] -- ^ Characters which set off quotes
                             -> (String -> m [Completion]) -- ^ Function to produce a list of possible completions
-                            -> CompletionFunc m -- ^ Alternate completion to perform if the 
+                            -> CompletionFunc m -- ^ Alternate completion to perform if the
                                             -- cursor is not at a quoted word
                             -> CompletionFunc m
 completeQuotedWord esc qs completer alterative line@(left,_)
@@ -136,7 +136,7 @@ addQuotes c = if isFinished c
 
 splitAtQuote :: Maybe Char -> String -> String -> Maybe (String,String)
 splitAtQuote esc qs line = case line of
-    c:e:cs | isEscape e && isEscapable c  
+    c:e:cs | isEscape e && isEscapable c
                         -> do
                             (w,rest) <- splitAtQuote esc qs cs
                             return (c:w,rest)
@@ -164,9 +164,9 @@ listFiles path = liftIO $ do
     -- get all of the files in that directory, as basenames
     allFiles <- if not dirExists
                     then return []
-                    else fmap (map completion . filterPrefix) 
+                    else fmap (map completion . filterPrefix)
                             $ getDirectoryContents fixedDir
-    -- The replacement text should include the directory part, and also 
+    -- The replacement text should include the directory part, and also
     -- have a trailing slash if it's itself a directory.
     forM allFiles $ \c -> do
             isDir <- doesDirectoryExist (fixedDir </> replacement c)
