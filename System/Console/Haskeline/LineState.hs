@@ -356,10 +356,9 @@ applyCmdArg :: (InsertMode -> InsertMode) -> ArgMode CommandMode -> CommandMode
 applyCmdArg f am = withCommandMode (repeatN (arg am) f) (argState am)
 
 ---------------
--- TODO: messageState param not needed anymore.
-data Message s = Message {messageState :: s, messageText :: String}
+newtype Message = Message {messageText :: String}
 
-instance LineState (Message s) where
+instance LineState Message where
     beforeCursor _ = stringToGraphemes . messageText
     afterCursor _ = []
 

@@ -85,7 +85,7 @@ askFirst :: Monad m => Prefs -> Int -> CmdM m ()
             -> CmdM m ()
 askFirst prefs n cmd
     | maybe False (< n) (completionPromptLimit prefs) = do
-        _ <- setState (Message () $ "Display all " ++ show n
+        _ <- setState (Message $ "Display all " ++ show n
                                  ++ " possibilities? (y or n)")
         keyChoiceCmdM [
             simpleChar 'y' +> cmd
@@ -96,7 +96,7 @@ askFirst prefs n cmd
 pageCompletions :: MonadReader Layout m => [String] -> CmdM m ()
 pageCompletions [] = return ()
 pageCompletions wws@(w:ws) = do
-    _ <- setState $ Message () "----More----"
+    _ <- setState $ Message "----More----"
     keyChoiceCmdM [
         simpleChar '\n' +> oneLine
         , simpleKey DownKey +> oneLine
