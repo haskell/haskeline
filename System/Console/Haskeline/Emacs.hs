@@ -40,8 +40,8 @@ simpleActions = choiceCmd
             , simpleKey Delete +> change deleteNext 
             , changeFromChar insertChar
             , completionCmd (simpleChar '\t')
-            , simpleKey UpKey +> historyBack
-            , simpleKey DownKey +> historyForward
+            , simpleKey UpKey +> searchForPrefix Reverse
+            , simpleKey DownKey +> searchForPrefix Forward
             , searchHistory
             ] 
             
