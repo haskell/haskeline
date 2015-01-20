@@ -1,39 +1,37 @@
 env:
- - GHCVER=7.0.1 CABALVER=1.10
- - GHCVER=7.0.1 CABALVER=1.16
- - GHCVER=7.0.2 CABALVER=1.16
- - GHCVER=7.0.3 CABALVER=1.16
- - GHCVER=7.0.4 CABALVER=1.16
- - GHCVER=7.2.1 CABALVER=1.18
- - GHCVER=7.2.2 CABALVER=1.18
- - GHCVER=7.4.1 CABALVER=1.18
- - GHCVER=7.4.2 CABALVER=1.18
- - GHCVER=7.6.1 CABALVER=1.18
- - GHCVER=7.6.2 CABALVER=1.18
- - GHCVER=7.6.3 CABALVER=1.18
+ - GHCVER=7.0.1 CABALINSTALLVER=1.16
+ - GHCVER=7.0.2 CABALINSTALLVER=1.16
+ - GHCVER=7.0.3 CABALINSTALLVER=1.16
+ - GHCVER=7.0.4 CABALINSTALLVER=1.16
+ - GHCVER=7.2.1 CABALINSTALLVER=1.18
+ - GHCVER=7.2.2 CABALINSTALLVER=1.18
+ - GHCVER=7.4.1 CABALINSTALLVER=1.18
+ - GHCVER=7.4.2 CABALINSTALLVER=1.18
+ - GHCVER=7.6.1 CABALINSTALLVER=1.18
+ - GHCVER=7.6.2 CABALINSTALLVER=1.18
+ - GHCVER=7.6.3 CABALINSTALLVER=1.18
 
 before_install:
  - sudo add-apt-repository -y ppa:hvr/ghc
  - sudo apt-get update
- - sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER
+ - sudo apt-get install cabal-install-$CABALINSTALLVER ghc-$GHCVER
  - export PATH=/opt/ghc/$GHCVER/bin:$PATH
 
 install:
- - cabal-$CABALVER update
- - cabal-$CABALVER install --only-dependencies
- - cabal-$CABALVER install "Cabal >= $CABALVER"
+ - cabal-$CABALINSTALLVER update
+ - cabal-$CABALINSTALLVER install --only-dependencies
  - ghc --version
 
 script:
- - cabal-$CABALVER configure -v2
- - cabal-$CABALVER build -v2
- - cabal-$CABALVER check
- - cabal-$CABALVER sdist
+ - cabal-$CABALINSTALLVER configure -v2
+ - cabal-$CABALINSTALLVER build -v2
+ - cabal-$CABALINSTALLVER check
+ - cabal-$CABALINSTALLVER sdist
 # The following scriptlet checks that the resulting source distribution can be built & installed
- - export SRC_TGZ=$(cabal-$CABALVER info . | awk '{print $2 ".tar.gz";exit}') ;
+ - export SRC_TGZ=$(cabal-$CABALINSTALLVER info . | awk '{print $2 ".tar.gz";exit}') ;
    cd dist/;
    if [ -f "$SRC_TGZ" ]; then
-      cabal-$CABALVER install "$SRC_TGZ";
+      cabal-$CABALINSTALLVER install "$SRC_TGZ";
    else
       echo "expected '$SRC_TGZ' not found";
       exit 1;
