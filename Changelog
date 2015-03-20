@@ -1,5 +1,5 @@
 Changed in version 0.7.2.0:
-   * Bump upper-bound on base library to accomodate GHC HEAD (7.10)
+   * Bump upper-bound on base and filepath libraries to accomodate GHC HEAD (7.10)
    * Drop Cabal dependency to 1.10
    * Use explicit forall syntax to avoid warning
    * Support Applicative/Monad proposal in Win32/Draw backend
