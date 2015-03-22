@@ -2,8 +2,21 @@
 #
 # NB: don't set `language: haskell` here
 env:
+ - CABALVER=1.16 GHCVER=7.0.1
+ - CABALVER=1.16 GHCVER=7.0.2
+ - CABALVER=1.16 GHCVER=7.0.3
+ - CABALVER=1.16 GHCVER=7.0.4
  - CABALVER=1.16 GHCVER=7.2.1
  - CABALVER=1.16 GHCVER=7.2.2
+ - CABALVER=1.16 GHCVER=7.4.1
+ - CABALVER=1.16 GHCVER=7.4.2
+ - CABALVER=1.16 GHCVER=7.6.1
+ - CABALVER=1.16 GHCVER=7.6.2
+ - CABALVER=1.18 GHCVER=7.6.3
+ - CABALVER=1.18 GHCVER=7.8.1
+ - CABALVER=1.18 GHCVER=7.8.2
+ - CABALVER=1.18 GHCVER=7.8.3
+ - CABALVER=1.22 GHCVER=7.10.1
 
 # Note: the distinction between `before_install` and `install` is not important.
 before_install:
