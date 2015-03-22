@@ -14,6 +14,7 @@ import Data.List(intercalate)
 import Control.Concurrent hiding (throwTo)
 import Data.Char(isPrint)
 import Data.Maybe(mapMaybe)
+import Control.Applicative
 import Control.Monad
 
 import System.Console.Haskeline.Key
