@@ -71,17 +71,33 @@ completeWordWithPrev :: Monad m => Maybe Char
             -- to be completed.
         -> CompletionFunc m
 completeWordWithPrev esc ws f (line, _) = do
-    let (word,rest) = case esc of
-                        Nothing -> break (`elem` ws) line
-                        Just e -> escapedBreak e line
-    completions <- f rest (reverse word)
-    return (rest,map (escapeReplacement esc ws) completions)
+    let (word, rest)   = breakSequence line
+        (word', rest') =
+          if word /= ""
+            then (word, rest)
+            -- if `word` is an empty string it is likely we have to deal with
+            -- operator, so let's try to take an operator symbols sequence
+            else breakOperator rest
+    completions <- f rest' (reverse word')
+    return (rest', map (escapeReplacement esc ws) completions)
   where
-    escapedBreak e (c:d:cs) | d == e && c `elem` (e:ws)
-            = let (xs,ys) = escapedBreak e cs in (c:xs,ys)
-    escapedBreak e (c:cs) | notElem c ws
-            = let (xs,ys) = escapedBreak e cs in (c:xs,ys)
+    breakSequence =
+      case esc of
+        Nothing -> break (`elem` ws)
+        Just e  -> escapedBreak e
+    escapedBreak e (c:d:cs) | d == e && c `elem` (e:ws) =
+      let (xs,ys) = escapedBreak e cs
+      in (c:xs,ys)
+    escapedBreak e (c:cs) | notElem c ws =
+      let (xs,ys) = escapedBreak e cs
+      in (c:xs,ys)
     escapedBreak _ cs = ("",cs)
+    breakOperator s =
+      let (w1, r1) = span (`elem` operatorSymbols) s
+          (w2, r2) = breakSequence r1
+      in (w1 ++ w2, r2)
+    operatorSymbols = "!#$%&*+./<=>?@\\^|-~:"
+
 
 -- | Create a finished completion out of the given word.
 simpleCompletion :: String -> Completion
