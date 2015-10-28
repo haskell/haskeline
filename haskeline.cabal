@@ -50,7 +50,7 @@ flag legacy-encoding
     Default: False
 
 Library
-    Build-depends: base >=4.3 && < 4.9, containers>=0.4 && < 0.6,
+    Build-depends: base >=4.3 && < 4.10, containers>=0.4 && < 0.6,
                    directory>=1.1 && < 1.3, bytestring>=0.9 && < 0.11,
                    filepath >= 1.2 && < 1.5, transformers >= 0.2 && < 0.5
     Default-Language: Haskell98
