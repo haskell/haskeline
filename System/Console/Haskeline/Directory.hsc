@@ -19,7 +19,7 @@ import qualified System.Directory
 #endif
 
 #include <windows.h>
-#include <Shlobj.h>
+#include <shlobj.h>
 
 ##if defined(i386_HOST_ARCH)
 ## define WINDOWS_CCONV stdcall
