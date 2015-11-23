@@ -66,11 +66,11 @@ instance Monad m => Functor (CmdM m) where
     fmap = liftM
 
 instance Monad m => Applicative (CmdM m) where
-    pure  = return
+    pure  = Result
     (<*>) = ap
 
 instance Monad m => Monad (CmdM m) where
-    return = Result
+    return = pure
 
     GetKey km >>= g = GetKey $ fmap (>>= g) km
     DoEffect e f >>= g = DoEffect e (f >>= g)

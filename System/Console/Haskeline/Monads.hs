@@ -77,11 +77,11 @@ instance Monad m => Functor (StateT s m) where
     fmap  = liftM
 
 instance Monad m => Applicative (StateT s m) where
-    pure  = return
+    pure x = StateT $ \s -> return $ \f -> f x s
     (<*>) = ap
 
 instance Monad m => Monad (StateT s m) where
-    return x = StateT $ \s -> return $ \f -> f x s
+    return = pure
     StateT f >>= g = StateT $ \s -> do
         useX <- f s
         useX $ \x s' -> getStateTFunc (g x) s'
