@@ -47,18 +47,11 @@ newtype InputT m a = InputT {unInputT ::
                                 (ReaderT (IORef KillRing)
                                 (ReaderT Prefs
                                 (ReaderT (Settings m) m)))) a}
-                            deriving (Monad, MonadIO, MonadException)
+                            deriving (Functor, Applicative, Monad, MonadIO, MonadException)
                 -- NOTE: we're explicitly *not* making InputT an instance of our
                 -- internal MonadState/MonadReader classes.  Otherwise haddock
                 -- displays those instances to the user, and it makes it seem like
                 -- we implement the mtl versions of those classes.
-
-instance Monad m => Functor (InputT m) where
-    fmap = liftM
-
-instance Monad m => Applicative (InputT m) where
-    pure = return
-    (<*>) = ap
 
 instance MonadTrans InputT where
     lift = InputT . lift . lift . lift . lift . lift
