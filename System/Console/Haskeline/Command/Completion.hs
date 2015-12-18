@@ -21,7 +21,7 @@ useCompletion im c = insertString r im
     where r | isFinished c = replacement c ++ " "
             | otherwise = replacement c
 
-askIMCompletions :: CommandMonad m => 
+askIMCompletions :: CommandMonad m =>
             Command m InsertMode (InsertMode, [Completion])
 askIMCompletions (IMode xs ys) = do
     (rest, completions) <- lift $ runCompletion (withRev graphemesToString xs,
@@ -72,7 +72,7 @@ pagingCompletion :: MonadReader Layout m => Key -> Prefs
 pagingCompletion k prefs completions = \im -> do
         ls <- asks $ makeLines (map display completions)
         let pageAction = do
-                askFirst prefs (length completions) $ 
+                askFirst prefs (length completions) $
                             if completionPaging prefs
                                 then printPage ls
                                 else effect (PrintLines ls)
@@ -134,7 +134,7 @@ padWords :: Int -> [String] -> String
 padWords _ [x] = x
 padWords _ [] = ""
 padWords len (x:xs) = x ++ replicate (len - glength x) ' '
-			++ padWords len xs
+                        ++ padWords len xs
     where
         -- kludge: compute the length in graphemes, not chars.
         -- but don't use graphemes for the max length, since I'm not convinced
@@ -159,5 +159,3 @@ splitIntoGroups n xs = transpose $ unfoldr f xs
 ceilDiv :: Integral a => a -> a -> a
 ceilDiv m n | m `rem` n == 0    =  m `div` n
             | otherwise         =  m `div` n + 1
-
-
