@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 import Distribution.System
 import Distribution.PackageDescription
 import Distribution.Simple
