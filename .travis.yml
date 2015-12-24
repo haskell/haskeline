@@ -28,8 +28,9 @@ before_install:
 install:
  - cabal --version
  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
- - if [ "$GHCVER" = "7.2.1" ]; then
-     sudo ghc-pkg trust base; # To avoid a SafeHaskell bug on GHC 7.2.1
+ - |
+   if [ "$GHCVER" = "7.2.1" ]; then
+     sudo ghc-pkg trust base # To avoid a SafeHaskell bug on GHC 7.2.1
    fi
  - travis_retry cabal update
  - cabal install --only-dependencies
