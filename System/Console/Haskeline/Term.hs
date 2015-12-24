@@ -138,13 +138,9 @@ data Layout = Layout {width, height :: Int}
 
 -- | Utility function since we're not using the new IO library yet.
 hWithBinaryMode :: MonadException m => Handle -> m a -> m a
-#if __GLASGOW_HASKELL__ >= 611
 hWithBinaryMode h = bracket (liftIO $ hGetEncoding h)
                         (maybe (return ()) (liftIO . hSetEncoding h))
                         . const . (liftIO (hSetBinaryMode h True) >>)
-#else
-hWithBinaryMode _ = id
-#endif
 
 -- | Utility function for changing a property of a terminal for the duration of
 -- a computation.

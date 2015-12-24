@@ -35,7 +35,6 @@ import System.Console.Haskeline.Prefs
 
 import System.Console.Haskeline.Backend.Posix.Encoder
 
-#if __GLASGOW_HASKELL__ >= 611
 import GHC.IO.FD (fdFD)
 import Data.Dynamic (cast)
 import System.IO.Error
@@ -43,10 +42,6 @@ import GHC.IO.Exception
 import GHC.IO.Handle.Types hiding (getState)
 import GHC.IO.Handle.Internals
 import System.Posix.Internals (FD)
-#else
-import GHC.IOBase(haFD,FD)
-import GHC.Handle (withHandle_)
-#endif
 
 #if defined(USE_TERMIOS_H) || defined(__ANDROID__)
 #include <termios.h>
@@ -81,7 +76,6 @@ ioctlLayout h = allocaBytes (#size struct winsize) $ \ws -> do
                     else return Nothing
 
 unsafeHandleToFD :: Handle -> IO FD
-#if __GLASGOW_HASKELL__ >= 611
 unsafeHandleToFD h =
   withHandle_ "unsafeHandleToFd" h $ \Handle__{haDevice=dev} -> do
   case cast dev of
@@ -89,9 +83,6 @@ unsafeHandleToFD h =
                                            "unsafeHandleToFd" (Just h) Nothing)
                         "handle is not a file descriptor")
     Just fd -> return (fdFD fd)
-#else
-unsafeHandleToFD h = withHandle_ "unsafeHandleToFd" h (return . haFD)
-#endif
 
 envLayout :: IO (Maybe Layout)
 envLayout = handle (\(_::IOException) -> return Nothing) $ do

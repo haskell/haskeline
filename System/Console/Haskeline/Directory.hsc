@@ -14,9 +14,7 @@ module System.Console.Haskeline.Directory(
 import Foreign
 import Foreign.C
 import System.Win32.Types
-#if __GLASGOW_HASKELL__ >= 611
 import qualified System.Directory
-#endif
 
 #include <windows.h>
 #include <shlobj.h>
@@ -62,59 +60,11 @@ doesDirectoryExist file = do
     return $ attrs /= (#const INVALID_FILE_ATTRIBUTES)
             && (attrs .&. (#const FILE_ATTRIBUTE_DIRECTORY)) /= 0
 
-#if __GLASGOW_HASKELL__ >= 611
 getHomeDirectory :: IO FilePath
 getHomeDirectory = System.Directory.getHomeDirectory
-#else
-type HRESULT = #type HRESULT
-
-foreign import WINDOWS_CCONV "SHGetFolderPathW" c_SHGetFolderPath
-    :: Ptr () -> CInt -> HANDLE -> DWORD -> LPTSTR -> IO HRESULT
-
-getHomeDirectory :: IO FilePath
-getHomeDirectory = allocaBytes ((#const MAX_PATH) * (#size TCHAR)) $ \pathPtr -> do
-    result <- c_SHGetFolderPath nullPtr (#const CSIDL_PROFILE) nullPtr 0 pathPtr
-
-    if result /= (#const S_OK)
-        then return ""
-        else peekCWString pathPtr
-#endif
 
 #else 
--- POSIX
--- On 7.2.1 and later, getDirectoryContents uses the locale encoding
--- But previous version don't, so we need to decode manually.
 
-#if __GLASGOW_HASKELL__ >= 701
 import System.Directory
-#else
 
-import Data.ByteString.Char8 (pack, unpack)
-import qualified System.Directory as D
-import Control.Exception
-import System.Console.Haskeline.Backend.Posix.IConv
-
-getDirectoryContents :: FilePath -> IO [FilePath]
-getDirectoryContents path = do
-    codeset <- getCodeset
-    encoder <- openEncoder codeset
-    decoder <- openDecoder codeset
-    dirEnc <- fmap unpack (encoder path)
-    filesEnc <- handle (\(_::IOException) -> return [])
-                    $ D.getDirectoryContents dirEnc
-    mapM (decoder . pack) filesEnc
-
-doesDirectoryExist :: FilePath -> IO Bool
-doesDirectoryExist file = do
-    codeset <- getCodeset
-    encoder <- openEncoder codeset
-    encoder file >>= D.doesDirectoryExist . unpack
-
-getHomeDirectory :: IO FilePath
-getHomeDirectory = do
-    codeset <- getCodeset
-    decoder <- openDecoder codeset
-    handle (\(_::IOException) -> return "")
-        $ D.getHomeDirectory >>= decoder . pack
-#endif
 #endif
