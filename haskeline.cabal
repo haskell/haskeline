@@ -17,7 +17,7 @@ Description:
                 .
                 Haskeline runs both on POSIX-compatible systems and on Windows.
 Homepage:       http://trac.haskell.org/haskeline
-Stability:      Experimental
+Stability:      Stable
 Build-Type:     Custom
 extra-source-files: examples/Test.hs Changelog
 
@@ -37,20 +37,11 @@ flag terminfo
     Description: Use the terminfo package for POSIX consoles.
     Default: True
 
--- Note that the Setup script checks whether -liconv is necessary.  This flag
--- lets us override that decision.  When it is True, we use -liconv.  When it
--- is False, we run tests to decide.
-flag libiconv
-    Description: Explicitly link against the libiconv library.
-    Default: False
-
-flag legacy-encoding
-    Description: Use the legacy iconv encoding for POSIX, even on ghc>=7.4.1.
-                 (Intended for testing only.)
-    Default: False
-
 Library
-    Build-depends: base >=4.3 && < 4.10, containers>=0.4 && < 0.6,
+    -- We require ghc>=7.4.1 (base>=4.5) to use the base library encodings, even
+    -- though it was implemented in earlier releases, due to GHC bug #5436 which
+    -- wasn't fixed until 7.4.1
+    Build-depends: base >=4.5 && < 4.10, containers>=0.4 && < 0.6,
                    directory>=1.1 && < 1.3, bytestring>=0.9 && < 0.11,
                    filepath >= 1.2 && < 1.5, transformers >= 0.2 && < 0.6
     Default-Language: Haskell98
@@ -83,6 +74,7 @@ Library
                 System.Console.Haskeline.LineState
                 System.Console.Haskeline.Monads
                 System.Console.Haskeline.Prefs
+                System.Console.Haskeline.Recover
                 System.Console.Haskeline.RunCommand
                 System.Console.Haskeline.Term
                 System.Console.Haskeline.Command.Undo
@@ -90,15 +82,6 @@ Library
     include-dirs: includes
     c-sources: cbits/h_wcwidth.c
 
-    -- We require ghc>=7.4.1 to use the base library encodings,
-    -- even though it was implemented in earlier releases,
-    -- due to GHC bug #5436 which wasn't fixed until 7.4.1
-    if !flag(legacy-encoding) && impl(ghc>=7.4) {
-        cpp-options: -DUSE_GHC_ENCODINGS
-        Other-modules: System.Console.Haskeline.Recover
-    } else {
-        Build-depends: utf8-string==0.3.* && >=0.3.6
-    }
     if os(windows) {
         Build-depends: Win32>=2.0
         Other-modules: System.Console.Haskeline.Backend.Win32
@@ -108,14 +91,6 @@ Library
         cpp-options: -DMINGW
     } else {
         Build-depends: unix>=2.0 && < 2.8
-                        -- unix-2.3 doesn't build on ghc-6.8.1 or earlier
-        -- Use manual encoding/decoding on ghc<7.4
-        if flag (legacy-encoding) || impl(ghc<7.4) {
-            c-sources: cbits/h_iconv.c
-            includes: h_iconv.h
-            install-includes: h_iconv.h
-            Other-modules: System.Console.Haskeline.Backend.Posix.IConv
-        }
         Other-modules: 
                 System.Console.Haskeline.Backend.Posix
                 System.Console.Haskeline.Backend.Posix.Encoder

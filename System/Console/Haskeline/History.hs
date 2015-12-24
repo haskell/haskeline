@@ -32,13 +32,8 @@ import Control.Exception
 
 import System.Directory(doesFileExist)
 
-#ifdef USE_GHC_ENCODINGS
 import qualified System.IO as IO
 import System.Console.Haskeline.Recover
-#else
-import qualified Data.ByteString as B
-import qualified Data.ByteString.UTF8 as UTF8
-#endif
 
 data History = History {histLines :: Seq String,
                         stifleAmt :: Maybe Int}
@@ -117,7 +112,6 @@ addHistoryRemovingAllDupes h hs = addHistory h hs {histLines = filteredHS}
 -- UTF-8 file I/O, for old versions of GHC
 
 readUTF8File :: FilePath -> IO String
-#ifdef USE_GHC_ENCODINGS
 readUTF8File file = do
     h <- IO.openFile file IO.ReadMode
     IO.hSetEncoding h $ transliterateFailure IO.utf8
@@ -126,15 +120,8 @@ readUTF8File file = do
     _ <- evaluate (length contents)
     IO.hClose h
     return contents
-#else
-readUTF8File file = do
-    contents <- fmap UTF8.toString $ B.readFile file
-    _ <- evaluate (length contents)
-    return contents
-#endif
 
 writeUTF8File :: FilePath -> String -> IO ()
-#ifdef USE_GHC_ENCODINGS
 writeUTF8File file contents = do
     h <- IO.openFile file IO.WriteMode
     IO.hSetEncoding h IO.utf8
@@ -142,8 +129,3 @@ writeUTF8File file contents = do
     IO.hSetNewlineMode h IO.noNewlineTranslation
     IO.hPutStr h contents
     IO.hClose h
-#else
--- use binary file I/O to avoid Windows CRLF line endings
--- which cause confusion when switching between systems.
-writeUTF8File file = B.writeFile file . UTF8.fromString
-#endif

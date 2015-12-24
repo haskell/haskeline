@@ -30,39 +30,15 @@ import System.Console.Haskeline.Term
 import qualified System.Console.Terminfo.Base as Terminfo
 #endif
 
--- Way-dependent imports
-#ifdef USE_GHC_ENCODINGS
 import GHC.IO.Encoding (initLocaleEncoding)
 import System.Console.Haskeline.Recover
-#else
-import System.Console.Haskeline.Backend.Posix.IConv
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
-#ifdef TERMINFO
-import qualified Data.ByteString.Char8 as BC
-#endif
-import Control.Monad (liftM2)
-#endif
 
 
-
-#ifdef USE_GHC_ENCODINGS
 data Encoder = Encoder
 data Decoder = Decoder
-#else
-type Decoder = PartialDecoder
-type Encoder = String -> IO ByteString
-#endif
 
 newEncoders :: IO (Encoder,Decoder)
-#ifdef USE_GHC_ENCODINGS
 newEncoders = return (Encoder,Decoder)
-#else
-newEncoders = do
-    codeset <- bracket (setLocale (Just "")) setLocale $ const $ getCodeset
-    liftM2 (,) (openEncoder codeset)
-                (openPartialDecoder codeset)
-#endif
 
 -- | An 'ExternalHandle' is a handle which may or may not be in the correct
 -- mode for Unicode input/output.  When the POSIX backend opens a file
@@ -89,7 +65,6 @@ externalHandle = ExternalHandle OtherMode
 -- for the duration of the given action.
 withCodingMode :: ExternalHandle -> IO a -> IO a
 withCodingMode ExternalHandle {externalMode=CodingMode} act = act
-#ifdef USE_GHC_ENCODINGS
 withCodingMode (ExternalHandle OtherMode h) act = do
     bracket (liftIO $ hGetEncoding h)
             (liftIO . hSetBinOrEncoding h)
@@ -100,45 +75,26 @@ withCodingMode (ExternalHandle OtherMode h) act = do
 hSetBinOrEncoding :: Handle -> Maybe TextEncoding -> IO ()
 hSetBinOrEncoding h Nothing = hSetBinaryMode h True
 hSetBinOrEncoding h (Just enc) = hSetEncoding h enc
-#else
-withCodingMode (ExternalHandle OtherMode h) act = hWithBinaryMode h act
-#endif
 
-#ifdef USE_GHC_ENCODINGS
 haskelineEncoding :: TextEncoding
 haskelineEncoding = transliterateFailure initLocaleEncoding
-#endif
 
 -- Open a file and permanently set it to the correct mode.
 openInCodingMode :: FilePath -> IOMode -> IO ExternalHandle
-#ifdef USE_GHC_ENCODINGS
 openInCodingMode path iomode = do
     h <- openFile path iomode
     hSetEncoding h haskelineEncoding
     return $ ExternalHandle CodingMode h
-#else
-openInCodingMode path iomode
-    = fmap (ExternalHandle CodingMode) $ openBinaryFile path iomode
-#endif
-
 
 
 -----------------------
 -- Output
 putEncodedStr :: Encoder -> Handle -> String -> IO ()
-#ifdef USE_GHC_ENCODINGS
 putEncodedStr _ h = hPutStr h
-#else
-putEncodedStr enc h s = enc s >>= B.hPutStr h
-#endif
 
 #ifdef TERMINFO
 getTermText :: Encoder -> String -> IO Terminfo.TermOutput
-#ifdef USE_GHC_ENCODINGS
 getTermText _ = return . Terminfo.termText
-#else
-getTermText enc s = enc s >>= return . Terminfo.termText . BC.unpack
-#endif
 #endif
 
 
@@ -148,7 +104,6 @@ getTermText enc s = enc s >>= return . Terminfo.termText . BC.unpack
 -- will all be available at once, so they can be processed together
 -- (with Posix.lexKeys).
 getBlockOfChars :: Handle -> Decoder -> IO String
-#ifdef USE_GHC_ENCODINGS
 getBlockOfChars h _ = do
     c <- hGetChar h
     loop [c]
@@ -160,52 +115,12 @@ getBlockOfChars h _ = do
             else do
                     c <- hGetChar h
                     loop (c:cs)
-#else
-getBlockOfChars h decode = do
-    let bufferSize = 32
-    blockUntilInput h
-    bs <- B.hGetNonBlocking h bufferSize
-    decodeAndMore decode h bs
-
-#endif
 
 -- Read in a single character, or Nothing if eof.
 -- Assumes the handle is "prepared".
 getDecodedChar :: Handle -> Decoder -> MaybeT IO Char
-#ifdef USE_GHC_ENCODINGS
 getDecodedChar h _ = guardedEOF hGetChar h
-#else
-getDecodedChar h decode = do
-    b <- hGetByte h
-    cs <- liftIO $ decodeAndMore decode h (B.pack [b])
-    case cs of
-        [] -> return '?' -- shouldn't happen, but doesn't hurt to be careful.
-        (c:_) -> return c
-#endif
 
 -- Read in a single line, or Nothing if eof.
 getDecodedLine :: Handle -> Decoder -> MaybeT IO String
-#ifdef USE_GHC_ENCODINGS
 getDecodedLine h _ = guardedEOF hGetLine h
-#else
-getDecodedLine h decode
-    = hGetLocaleLine h >>= liftIO . decodeAndMore decode h
-
-#endif
-
--- Helper functions for iconv encoding
-#ifndef USE_GHC_ENCODINGS
-blockUntilInput :: Handle -> IO ()
-#if __GLASGOW_HASKELL__ >= 611
--- threadWaitRead doesn't work with the new (ghc-6.12) IO library,
--- because it keeps a buffer even when NoBuffering is set.
-blockUntilInput h = hWaitForInput h (-1) >> return ()
-#else
--- hWaitForInput doesn't work with -threaded on ghc < 6.10
--- (#2363 in ghc's trac)
-blockUntilInput h = unsafeHandleToFD h >>= threadWaitRead . Fd
-#endif
-
-#endif
-
-
