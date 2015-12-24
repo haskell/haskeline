@@ -17,7 +17,6 @@ import System.Console.Haskeline.Monads as Monads
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.Backend.Posix
-import System.Console.Haskeline.Backend.Posix.Encoder (getTermText)
 import System.Console.Haskeline.Backend.WCWidth
 import System.Console.Haskeline.Key
 
@@ -106,11 +105,10 @@ newtype Draw m a = Draw {unDraw :: (ReaderT Actions
                                     (PosixT m))))) a}
     deriving (Functor, Applicative, Monad, MonadIO, MonadException,
               MonadReader Actions, MonadReader Terminal, MonadState TermPos,
-              MonadState TermRows,
-              MonadReader Handles, MonadReader Encoder)
+              MonadState TermRows, MonadReader Handles)
 
 instance MonadTrans Draw where
-    lift = Draw . lift . lift . lift . lift . lift . lift
+    lift = Draw . lift . lift . lift . lift . lift
 
 evalDraw :: forall m . (MonadReader Layout m, CommandMonad m) => Terminal -> Actions -> EvalTerm (PosixT m)
 evalDraw term actions = EvalTerm eval liftE
@@ -200,10 +198,7 @@ output t = Writer.tell t  -- NB: explicit argument enables build with ghc-6.12.3
                           -- see GHC ticket #1749).
 
 outputText :: String -> ActionM ()
-outputText str = do
-    encode <- lift ask
-    liftIO (getTermText encode str)
-        >>= output . const
+outputText = output . const . termText
 
 left,right,up :: Int -> TermAction
 left = flip leftA

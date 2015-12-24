@@ -1,7 +1,6 @@
 module System.Console.Haskeline.Backend.DumbTerm where
 
 import System.Console.Haskeline.Backend.Posix
-import System.Console.Haskeline.Backend.Posix.Encoder (putEncodedStr)
 import System.Console.Haskeline.Backend.WCWidth
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.LineState
@@ -23,13 +22,12 @@ initWindow = Window {pos=0}
 
 newtype DumbTerm m a = DumbTerm {unDumbTerm :: StateT Window (PosixT m) a}
                 deriving (Functor, Applicative, Monad, MonadIO, MonadException,
-                          MonadState Window,
-                          MonadReader Handles, MonadReader Encoder)
+                          MonadState Window, MonadReader Handles)
 
 type DumbTermM a = forall m . (MonadIO m, MonadReader Layout m) => DumbTerm m a
 
 instance MonadTrans DumbTerm where
-    lift = DumbTerm . lift . lift . lift
+    lift = DumbTerm . lift . lift
 
 evalDumb :: (MonadReader Layout m, CommandMonad m) => EvalTerm (PosixT m)
 evalDumb = EvalTerm (evalStateT' initWindow . unDumbTerm) (DumbTerm . lift)
@@ -50,8 +48,7 @@ instance (MonadException m, MonadReader Layout m) => Term (DumbTerm m) where
 printText :: MonadIO m => String -> DumbTerm m ()
 printText str = do
     h <- liftM ehOut ask
-    encode <- ask
-    liftIO $ putEncodedStr encode h str
+    liftIO $ hPutStr h str
     liftIO $ hFlush h
 
 -- Things we can assume a dumb terminal knows how to do

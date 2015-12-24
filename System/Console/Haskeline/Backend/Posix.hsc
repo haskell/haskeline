@@ -6,8 +6,6 @@ module System.Console.Haskeline.Backend.Posix (
                         Handles(),
                         ehIn,
                         ehOut,
-                        Encoder,
-                        Decoder,
                         mapLines,
                         stdinTTYHandles,
                         ttyHandles,
@@ -203,12 +201,12 @@ lookupChars (TreeMap tm) (c:cs) = case Map.lookup c tm of
 -----------------------------
 
 withPosixGetEvent :: (MonadException m, MonadReader Prefs m) 
-        => Chan Event -> Handles -> Decoder -> [(String,Key)]
+        => Chan Event -> Handles -> [(String,Key)]
                 -> (m Event -> m a) -> m a
-withPosixGetEvent eventChan h enc termKeys f = wrapTerminalOps h $ do
+withPosixGetEvent eventChan h termKeys f = wrapTerminalOps h $ do
     baseMap <- getKeySequences (ehIn h) termKeys
     withWindowHandler eventChan
-        $ f $ liftIO $ getEvent (ehIn h) enc baseMap eventChan
+        $ f $ liftIO $ getEvent (ehIn h) baseMap eventChan
 
 withWindowHandler :: MonadException m => Chan Event -> m a -> m a
 withWindowHandler eventChan = withHandler windowChange $ 
@@ -226,11 +224,27 @@ withHandler signal handler f = do
     old_handler <- liftIO $ installHandler signal handler Nothing
     f `finally` liftIO (installHandler signal old_handler Nothing)
 
-getEvent :: Handle -> Decoder -> TreeMap Char Key -> Chan Event -> IO Event
-getEvent h dec baseMap = keyEventLoop $ do
-        cs <- getBlockOfChars h dec
+getEvent :: Handle -> TreeMap Char Key -> Chan Event -> IO Event
+getEvent h baseMap = keyEventLoop $ do
+        cs <- getBlockOfChars h
         return [KeyInput $ lexKeys baseMap cs]
 
+-- Read at least one character of input, and more if immediately
+-- available.  In particular the characters making up a control sequence
+-- will all be available at once, so they can be processed together
+-- (with Posix.lexKeys).
+getBlockOfChars :: Handle -> IO String
+getBlockOfChars h = do
+    c <- hGetChar h
+    loop [c]
+  where
+    loop cs = do
+        isReady <- hReady h
+        if not isReady
+            then return $ reverse cs
+            else do
+                    c <- hGetChar h
+                    loop (c:cs)
 
 stdinTTYHandles, ttyHandles :: MaybeT IO Handles
 stdinTTYHandles = do
@@ -270,26 +284,23 @@ posixRunTerm ::
 posixRunTerm hs layoutGetters keys wrapGetEvent evalBackend = do
     ch <- newChan
     fileRT <- posixFileRunTerm hs
-    (enc,dec) <- newEncoders
     return fileRT
                 { closeTerm = closeTerm fileRT
                 , termOps = Left TermOps
                             { getLayout = tryGetLayouts layoutGetters
                             , withGetEvent = wrapGetEvent 
-                                            . withPosixGetEvent ch hs dec
+                                            . withPosixGetEvent ch hs
                                                 keys
                             , saveUnusedKeys = saveKeys ch
-                            , evalTerm = mapEvalTerm
-                                            (runPosixT enc hs)
-                                                (lift . lift)
-                                            evalBackend
+                            , evalTerm =
+                                    mapEvalTerm (runPosixT hs) lift evalBackend
                             }
                 }
 
-type PosixT m = ReaderT Encoder (ReaderT Handles m)
+type PosixT m = ReaderT Handles m
 
-runPosixT :: Monad m => Encoder -> Handles -> PosixT m a -> m a
-runPosixT enc h = runReaderT' h . runReaderT' enc
+runPosixT :: Monad m => Handles -> PosixT m a -> m a
+runPosixT h = runReaderT' h
 
 fileRunTerm :: Handle -> IO RunTerm
 fileRunTerm h_in = posixFileRunTerm Handles
@@ -300,19 +311,18 @@ fileRunTerm h_in = posixFileRunTerm Handles
 
 posixFileRunTerm :: Handles -> IO RunTerm
 posixFileRunTerm hs = do
-    (enc,dec) <- newEncoders
     return RunTerm
                 { putStrOut = \str -> withCodingMode (hOut hs) $ do
-                                        putEncodedStr enc (ehOut hs) str
+                                        hPutStr (ehOut hs) str
                                         hFlush (ehOut hs)
                 , closeTerm = closeHandles hs
                 , wrapInterrupt = withSigIntHandler
                 , termOps = Right FileOps
                           { inputHandle = ehIn hs
                           , wrapFileInput = withCodingMode (hIn hs)
-                          , getLocaleChar = getDecodedChar (ehIn hs) dec
+                          , getLocaleChar = guardedEOF hGetChar (ehIn hs)
                           , maybeReadNewline = hMaybeReadNewline (ehIn hs)
-                          , getLocaleLine = getDecodedLine (ehIn hs) dec
+                          , getLocaleLine = guardedEOF hGetLine (ehIn hs)
                           }
                 }
 
