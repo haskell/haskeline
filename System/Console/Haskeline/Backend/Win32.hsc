@@ -38,7 +38,7 @@ import qualified Data.ByteString as B
 
 foreign import WINDOWS_CCONV "windows.h ReadConsoleInputW" c_ReadConsoleInput
     :: HANDLE -> Ptr () -> DWORD -> Ptr DWORD -> IO Bool
-    
+
 foreign import WINDOWS_CCONV "windows.h WaitForSingleObject" c_WaitForSingleObject
     :: HANDLE -> DWORD -> IO DWORD
 
@@ -58,7 +58,7 @@ eventReader :: HANDLE -> IO [Event]
 eventReader h = do
     let waitTime = 500 -- milliseconds
     ret <- c_WaitForSingleObject h waitTime
-    yield -- otherwise, the above foreign call causes the loop to never 
+    yield -- otherwise, the above foreign call causes the loop to never
           -- respond to the killThread
     if ret /= (#const WAIT_OBJECT_0)
         then eventReader h
@@ -77,7 +77,7 @@ consoleHandles = do
                         (fILE_SHARE_READ .|. fILE_SHARE_WRITE) Nothing
                         oPEN_EXISTING 0 Nothing
 
-                       
+
 processEvent :: InputEvent -> Maybe Event
 processEvent KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc,
                     controlKeyState = cstate}
@@ -88,9 +88,9 @@ processEvent KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc,
     modifier' = if hasMeta modifier && hasControl modifier
                     then noModifier {hasShift = hasShift modifier}
                     else modifier
-    modifier = Modifier {hasMeta = testMod ((#const RIGHT_ALT_PRESSED) 
+    modifier = Modifier {hasMeta = testMod ((#const RIGHT_ALT_PRESSED)
                                         .|. (#const LEFT_ALT_PRESSED))
-                        ,hasControl = testMod ((#const RIGHT_CTRL_PRESSED) 
+                        ,hasControl = testMod ((#const RIGHT_CTRL_PRESSED)
                                         .|. (#const LEFT_CTRL_PRESSED))
                                     && not (c > '\NUL' && c <= '\031')
                         ,hasShift = testMod (#const SHIFT_PRESSED)
@@ -116,7 +116,7 @@ keyFromCode (#const VK_RETURN) = Just (KeyChar '\n')
 -- TODO: KillLine?
 -- TODO: function keys.
 keyFromCode _ = Nothing
-    
+
 data InputEvent = KeyEvent {keyDown :: BOOL,
                           repeatCount :: WORD,
                           virtualKeyCode :: WORD,
@@ -141,9 +141,9 @@ peekEvent pRecord = do
 readEvents :: HANDLE -> IO [InputEvent]
 readEvents h = do
     n <- getNumberOfEvents h
-    alloca $ \numEventsPtr -> 
+    alloca $ \numEventsPtr ->
         allocaBytes (n * #size INPUT_RECORD) $ \pRecord -> do
-            failIfFalse_ "ReadConsoleInput" 
+            failIfFalse_ "ReadConsoleInput"
                 $ c_ReadConsoleInput h pRecord (toEnum n) numEventsPtr
             numRead <- fmap fromEnum $ peek numEventsPtr
             forM [0..toEnum numRead-1] $ \i -> peekEvent
@@ -166,8 +166,10 @@ getKeyEvent p = do
 
 data Coord = Coord {coordX, coordY :: Int}
                 deriving Show
-                
+
+#if __GLASGOW_HASKELL__ < 711
 #let alignment t = "%lu", (unsigned long)offsetof(struct {char x__; t (y__); }, y__)
+#endif
 instance Storable Coord where
     sizeOf _ = (#size COORD)
     alignment _ = (#alignment COORD)
@@ -178,20 +180,20 @@ instance Storable Coord where
     poke p c = do
         (#poke COORD, X) p (toEnum (coordX c) :: CShort)
         (#poke COORD, Y) p (toEnum (coordY c) :: CShort)
-                
-                            
+
+
 foreign import ccall "haskeline_SetPosition"
     c_SetPosition :: HANDLE -> Ptr Coord -> IO Bool
-    
+
 setPosition :: HANDLE -> Coord -> IO ()
-setPosition h c = with c $ failIfFalse_ "SetConsoleCursorPosition" 
+setPosition h c = with c $ failIfFalse_ "SetConsoleCursorPosition"
                     . c_SetPosition h
-                    
+
 foreign import WINDOWS_CCONV "windows.h GetConsoleScreenBufferInfo"
     c_GetScreenBufferInfo :: HANDLE -> Ptr () -> IO Bool
-    
+
 getPosition :: HANDLE -> IO Coord
-getPosition = withScreenBufferInfo $ 
+getPosition = withScreenBufferInfo $
     (#peek CONSOLE_SCREEN_BUFFER_INFO, dwCursorPosition)
 
 withScreenBufferInfo :: (Ptr () -> IO a) -> HANDLE -> IO a
@@ -226,7 +228,7 @@ writeConsole h str = writeConsole' >> writeConsole h ys
                     failIfFalse_ "WriteConsoleW"
                         $ c_WriteConsoleW h t_arr (toEnum $ length xs)
                                 numWritten nullPtr
-                        
+
 foreign import WINDOWS_CCONV "windows.h MessageBeep" c_messageBeep :: UINT -> IO Bool
 
 messageBeep :: IO ()
@@ -270,7 +272,7 @@ instance MonadTrans Draw where
 
 getPos :: MonadIO m => Draw m Coord
 getPos = asks hOut >>= liftIO . getPosition
-    
+
 setPos :: Coord -> DrawM ()
 setPos c = do
     h <- asks hOut
@@ -286,7 +288,7 @@ printText :: MonadIO m => String -> Draw m ()
 printText txt = do
     h <- asks hOut
     liftIO (writeConsole h txt)
-    
+
 printAfter :: [Grapheme] -> DrawM ()
 printAfter gs = do
     -- NOTE: you may be tempted to write
@@ -296,7 +298,7 @@ printAfter gs = do
     -- then the old value of p will be incorrect.
     printText (graphemesToString gs)
     movePosLeft gs
-    
+
 drawLineDiffWin :: LineChars -> LineChars -> DrawM ()
 drawLineDiffWin (xs1,ys1) (xs2,ys2) = case matchInit xs1 xs2 of
     ([],[])     | ys1 == ys2            -> return ()
@@ -358,13 +360,13 @@ instance (MonadException m, MonadReader Layout m) => Term (Draw m) where
 
     printLines [] = return ()
     printLines ls = printText $ intercalate crlf ls ++ crlf
-    
+
     clearLayout = clearScreen
-    
+
     moveToNextLine s = do
         movePosRight (snd s)
         printText "\r\n" -- make the console take care of creating a new line
-    
+
     ringBell True = liftIO messageBeep
     ringBell False = return () -- TODO
 
@@ -467,7 +469,7 @@ unicodeToCodePage cp wideStr = withCWStringLen wideStr $ \(wideBuff, wideLen) ->
     outSize <- wideCharToMultiByte cp 0 wideBuff (toEnum wideLen)
                     nullPtr 0 nullPtr nullPtr
     -- then, actually perform the encoding.
-    createAndTrim (fromEnum outSize) $ \outBuff -> 
+    createAndTrim (fromEnum outSize) $ \outBuff ->
         fmap fromEnum $ wideCharToMultiByte cp 0 wideBuff (toEnum wideLen)
                     (castPtr outBuff) outSize nullPtr nullPtr
 
@@ -482,7 +484,7 @@ codePageToUnicode cp bs = B.useAsCStringLen bs $ \(inBuff, inLen) -> do
     allocaArray0 (fromEnum outSize) $ \outBuff -> do
     outSize' <- multiByteToWideChar cp 0 inBuff (toEnum inLen) outBuff outSize
     peekCWStringLen (outBuff, fromEnum outSize')
-                
+
 
 getCodePage :: IO CodePage
 getCodePage = do
@@ -521,7 +523,7 @@ fillConsoleChar h c n start = with start $ \startPtr -> alloca $ \numWritten -> 
         $ c_FillConsoleCharacter h (toEnum $ fromEnum c)
             (toEnum n) startPtr numWritten
 
-foreign import ccall "haskeline_FillConsoleCharacter" c_FillConsoleCharacter 
+foreign import ccall "haskeline_FillConsoleCharacter" c_FillConsoleCharacter
     :: HANDLE -> TCHAR -> DWORD -> Ptr Coord -> Ptr DWORD -> IO BOOL
 
 fillConsoleAttribute :: HANDLE -> WORD -> Int -> Coord -> IO ()
@@ -529,7 +531,7 @@ fillConsoleAttribute h a n start = with start $ \startPtr -> alloca $ \numWritte
     failIfFalse_ "FillConsoleOutputAttribute"
         $ c_FillConsoleAttribute h a
             (toEnum n) startPtr numWritten
-            
+
 foreign import ccall "haskeline_FillConsoleAttribute" c_FillConsoleAttribute
     :: HANDLE -> WORD -> DWORD -> Ptr Coord -> Ptr DWORD -> IO BOOL
 
