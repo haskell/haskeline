@@ -23,12 +23,9 @@ data Settings m = Settings {complete :: CompletionFunc m, -- ^ Custom tab comple
                             historyFile :: Maybe FilePath, -- ^ Where to read/write the history at the
                                                         -- start and end of each
                                                         -- line input session.
-                            autoAddHistory :: Bool, -- ^ If 'True', each nonblank line returned by
+                            autoAddHistory :: Bool  -- ^ If 'True', each nonblank line returned by
                                 -- @getInputLine@ will be automatically added to the history.
-                            flushEveryCommand :: Bool -- ^ If 'True' and @historyFile@ not 'Nothing'
-                                -- flushed command history after every command
-
-                            }
+                           }
 
 -- | Because 'complete' is the only field of 'Settings' depending on @m@,
 -- the expression @defaultSettings {completionFunc = f}@ leads to a type error
@@ -66,7 +63,7 @@ getHistory = InputT get
 putHistory :: MonadIO m => History -> InputT m ()
 putHistory = InputT . put
 
--- | Flush history if @historyFile@ is not 'Nothing'
+-- | Writes command history to file if 'historyFile' is not 'Nothing'
 flushHistory :: forall m . MonadIO m => InputT m ()
 flushHistory = do
     settings :: Settings m <- InputT ask
