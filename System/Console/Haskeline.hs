@@ -111,8 +111,7 @@ import System.IO
 defaultSettings :: MonadIO m => Settings m
 defaultSettings = Settings {complete = completeFilename,
                         historyFile = Nothing,
-                        autoAddHistory = True,
-                        flushEveryCommand = False}
+                        autoAddHistory = True}
 
 {- $outputfncs
 The following functions enable cross-platform output of text that may contain
@@ -191,6 +190,7 @@ maybeAddHistory :: forall m . MonadIO m => Maybe String -> InputT m ()
 maybeAddHistory result = do
     settings :: Settings m <- InputT ask
     histDupes <- InputT $ asks historyDuplicates
+    doFlush <- InputT $ asks flushEveryCommand
     case result of
         Just line | autoAddHistory settings && not (all isSpace line)
             -> let adder = case histDupes of
@@ -199,8 +199,7 @@ maybeAddHistory result = do
                         IgnoreAll -> addHistoryRemovingAllDupes
                in do
                 modifyHistory (adder line)
-                when (flushEveryCommand settings)
-                    flushHistory
+                when doFlush flushHistory
         _ -> return ()
 
 ----------
