@@ -67,6 +67,7 @@ module System.Console.Haskeline(
                     getHistory,
                     putHistory,
                     modifyHistory,
+                    flushHistory,
                     -- * Ctrl-C handling
                     withInterrupt,
                     Interrupt(..),
@@ -92,6 +93,7 @@ import System.Console.Haskeline.RunCommand
 
 import System.IO
 import Data.Char (isSpace, isPrint)
+import Control.Monad (when)
 
 
 -- | A useful default.  In particular:
@@ -106,7 +108,8 @@ import Data.Char (isSpace, isPrint)
 defaultSettings :: MonadIO m => Settings m
 defaultSettings = Settings {complete = completeFilename,
                         historyFile = Nothing,
-                        autoAddHistory = True}
+                        autoAddHistory = True,
+                        flushEveryCommand = False}
 
 {- $outputfncs
 The following functions enable cross-platform output of text that may contain
@@ -188,7 +191,10 @@ maybeAddHistory result = do
                         AlwaysAdd -> addHistory
                         IgnoreConsecutive -> addHistoryUnlessConsecutiveDupe
                         IgnoreAll -> addHistoryRemovingAllDupes
-               in modifyHistory (adder line)
+               in do
+                modifyHistory (adder line)
+                when (flushEveryCommand settings)
+                    flushHistory
         _ -> return ()
 
 ----------
