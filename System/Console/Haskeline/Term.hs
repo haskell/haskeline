@@ -38,12 +38,13 @@ data RunTerm = RunTerm {
     }
 
 -- | Operations needed for terminal-style interaction.
-data TermOps = TermOps {
-            getLayout :: IO Layout
-            , withGetEvent :: forall m a . CommandMonad m => (m Event -> m a) -> m a
-            , evalTerm :: forall m . CommandMonad m => EvalTerm m
-            , saveUnusedKeys :: [Key] -> IO ()
-        }
+data TermOps = TermOps
+    { getLayout :: IO Layout
+    , withGetEvent :: forall m a . CommandMonad m => (m Event -> m a) -> m a
+    , evalTerm :: forall m . CommandMonad m => EvalTerm m
+    , saveUnusedKeys :: [Key] -> IO ()
+    , externalPrint :: String -> IO ()
+    }
 
 -- | Operations needed for file-style interaction.
 -- 
@@ -96,8 +97,12 @@ matchInit :: Eq a => [a] -> [a] -> ([a],[a])
 matchInit (x:xs) (y:ys)  | x == y = matchInit xs ys
 matchInit xs ys = (xs,ys)
 
-data Event = WindowResize | KeyInput [Key] | ErrorEvent SomeException
-                deriving Show
+data Event
+  = WindowResize
+  | KeyInput [Key]
+  | ErrorEvent SomeException
+  | ExternalPrint String
+  deriving Show
 
 keyEventLoop :: IO [Event] -> Chan Event -> IO Event
 keyEventLoop readEvents eventChan = do

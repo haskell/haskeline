@@ -51,6 +51,7 @@ module System.Console.Haskeline(
                     -- $outputfncs
                     outputStr,
                     outputStrLn,
+                    getExternalPrint,
                     -- * Customization
                     -- ** Settings
                     Settings(..),
@@ -318,3 +319,13 @@ withInterrupt act = do
 -- > handleInterrupt f = handle $ \Interrupt -> f
 handleInterrupt :: MonadException m => m a -> m a -> m a
 handleInterrupt f = handle $ \Interrupt -> f
+
+-- | Return a print function, which is thread-safe and preserves prompt in terminal-style interaction.
+
+getExternalPrint :: MonadException m => InputT m (String -> IO ())
+getExternalPrint = do
+    rterm <- InputT ask
+    return $ case termOps rterm of
+        Right _ -> putStrOut rterm
+        Left tops -> externalPrint tops
+        
