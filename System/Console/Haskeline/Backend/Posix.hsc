@@ -295,7 +295,7 @@ posixRunTerm hs layoutGetters keys wrapGetEvent evalBackend = do
                             }
                 , closeTerm = do
                     flushEventQueue (putStrOut fileRT) ch
-                    closeHandles hs
+                    closeTerm fileRT
                 }
 
 type PosixT m = ReaderT Encoder (ReaderT Handles m)
