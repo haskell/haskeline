@@ -294,25 +294,9 @@ posixRunTerm hs layoutGetters keys wrapGetEvent evalBackend = do
                             , externalPrint = writeChan ch . ExternalPrint
                             }
                 , closeTerm = do
-                    -- This hack is needed to grab latest writes from some other thread.
-                    -- Without it, if you are using another thread to process the logging
-                    -- and write on screen via exposed externalPrint, latest writes from
-                    -- this thread are not able to cross the thread boundary in time.
-                    threadDelay 1
                     flushEventQueue (putStrOut fileRT) ch
-                    closeTerm fileRT
+                    closeHandles hs
                 }
-
-flushEventQueue :: (String -> IO ()) -> Chan Event -> IO ()
-flushEventQueue print' eventChan = loop
-  where loop = do
-            flushed <- isEmptyChan eventChan
-            if flushed then return () else do
-                event <- readChan eventChan
-                case event of
-                    ExternalPrint str -> do
-                        print' (str ++ "\n") >> loop
-                    _ -> do loop
 
 type PosixT m = ReaderT Encoder (ReaderT Handles m)
 
