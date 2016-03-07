@@ -59,9 +59,8 @@ flushEventQueue print' eventChan = yield >> loopUntilFlushed
                   case event of
                       ExternalPrint str -> do
                           print' (str ++ "\n") >> loopUntilFlushed
-                      ErrorEvent e -> throwIO e
                       -- We don't want to raise exceptions when doing cleanup.
-                      _ -> do loopUntilFlushed
+                      _ -> loopUntilFlushed
 
 -- | Operations needed for file-style interaction.
 --
