@@ -1,7 +1,7 @@
-{- | 
+{- |
 
 A rich user interface for line input in command-line programs.  Haskeline is
-Unicode-aware and runs both on POSIX-compatible systems and on Windows.  
+Unicode-aware and runs both on POSIX-compatible systems and on Windows.
 
 Users may customize the interface with a @~/.haskeline@ file; see
 <http://trac.haskell.org/haskeline/wiki/UserPrefs> for more information.
@@ -10,10 +10,10 @@ An example use of this library for a simple read-eval-print loop (REPL) is the
 following:
 
 > import System.Console.Haskeline
-> 
+>
 > main :: IO ()
 > main = runInputT defaultSettings loop
->    where 
+>    where
 >        loop :: InputT IO ()
 >        loop = do
 >            minput <- getInputLine "% "
@@ -51,6 +51,7 @@ module System.Console.Haskeline(
                     -- $outputfncs
                     outputStr,
                     outputStrLn,
+                    getExternalPrint,
                     -- * Customization
                     -- ** Settings
                     Settings(..),
@@ -183,7 +184,7 @@ maybeAddHistory result = do
     settings :: Settings m <- InputT ask
     histDupes <- InputT $ asks historyDuplicates
     case result of
-        Just line | autoAddHistory settings && not (all isSpace line) 
+        Just line | autoAddHistory settings && not (all isSpace line)
             -> let adder = case histDupes of
                         AlwaysAdd -> addHistory
                         IgnoreConsecutive -> addHistoryUnlessConsecutiveDupe
@@ -214,9 +215,9 @@ getPrintableChar fops = do
     case fmap isPrint c of
         Just False -> getPrintableChar fops
         _ -> return c
-        
+
 getInputCmdChar :: MonadException m => TermOps -> String -> InputT m (Maybe Char)
-getInputCmdChar tops prefix = runInputCmdT tops 
+getInputCmdChar tops prefix = runInputCmdT tops
         $ runCommandLoop tops prefix acceptOneChar emptyIM
 
 acceptOneChar :: Monad m => KeyCommand m InsertMode (Maybe Char)
@@ -235,7 +236,7 @@ When using terminal-style interaction, the masking character (if given) will rep
 When using file-style interaction, this function turns off echoing while reading
 the line of input.
 -}
- 
+
 getPassword :: MonadException m => Maybe Char -- ^ A masking character; e.g., @Just \'*\'@
                             -> String -> InputT m (Maybe String)
 getPassword x = promptedInput
@@ -256,7 +257,7 @@ getPassword x = promptedInput
                      , ctrlChar 'l' +> clearScreenCmd >|> loop'
                      ]
     loop' = keyCommand loop
-                        
+
 {- $history
 The 'InputT' monad transformer provides direct, low-level access to the user's line history state.
 
@@ -302,7 +303,7 @@ every time Ctrl-C is pressed.
 > tryAction = wrapInterrupt loop
 >     where loop = handle (\Interrupt -> outputStrLn "Cancelled; try again." >> loop)
 >                    someLongAction
- 
+
 This behavior differs from GHC's built-in Ctrl-C handling, which
 may immediately terminate the program after the second time that the user presses
 Ctrl-C.
@@ -313,8 +314,18 @@ withInterrupt act = do
     rterm <- InputT ask
     liftIOOp_ (wrapInterrupt rterm) act
 
--- | Catch and handle an exception of type 'Interrupt'.  
+-- | Catch and handle an exception of type 'Interrupt'.
 --
 -- > handleInterrupt f = handle $ \Interrupt -> f
 handleInterrupt :: MonadException m => m a -> m a -> m a
 handleInterrupt f = handle $ \Interrupt -> f
+
+{- | Return a printing function, which in terminal-style interactions is
+thread-safe and may be run concurrently with user input without affecting the
+prompt. -}
+getExternalPrint :: MonadException m => InputT m (String -> IO ())
+getExternalPrint = do
+    rterm <- InputT ask
+    return $ case termOps rterm of
+        Right _ -> putStrOut rterm
+        Left tops -> externalPrint tops

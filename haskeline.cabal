@@ -9,7 +9,7 @@ Author:         Judah Jacobson
 Maintainer:     Judah Jacobson <judah.jacobson@gmail.com>
 Category:       User Interfaces
 Synopsis:       A command-line interface for user input, written in Haskell.
-Description:    
+Description:
                 Haskeline provides a user interface for line input in command-line
                 programs.  This library is similar in purpose to readline, but since
                 it is written in Haskell it is (hopefully) more easily used in other
@@ -54,7 +54,7 @@ Library
                    directory>=1.1 && < 1.3, bytestring>=0.9 && < 0.11,
                    filepath >= 1.2 && < 1.5, transformers >= 0.2 && < 0.6
     Default-Language: Haskell98
-    Default-Extensions: 
+    Default-Extensions:
                 ForeignFunctionInterface, Rank2Types, FlexibleInstances,
                 TypeSynonymInstances
                 FlexibleContexts, ExistentialQuantification
@@ -116,7 +116,7 @@ Library
             install-includes: h_iconv.h
             Other-modules: System.Console.Haskeline.Backend.Posix.IConv
         }
-        Other-modules: 
+        Other-modules:
                 System.Console.Haskeline.Backend.Posix
                 System.Console.Haskeline.Backend.Posix.Encoder
                 System.Console.Haskeline.Backend.DumbTerm

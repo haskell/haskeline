@@ -40,6 +40,9 @@ runCommandLoop' liftE tops prefix initState cmds getEvent = do
                     KeyInput ks -> do
                         bound_ks <- mapM (asks . lookupKeyBinding) ks
                         loopCmd s $ applyKeysToMap (concat bound_ks) next
+                    ExternalPrint str -> do
+                        printPreservingLineChars s str
+                        readMoreKeys s next
 
     loopCmd :: LineChars -> CmdM m (a,[Key]) -> n a
     loopCmd s (GetKey next) = readMoreKeys s next
@@ -57,6 +60,11 @@ runCommandLoop' liftE tops prefix initState cmds getEvent = do
                                     moveToNextLine s
                                     return x
 
+printPreservingLineChars :: Term m => LineChars -> String -> m ()
+printPreservingLineChars s str =  do
+    clearLine s
+    printLines . lines $ str
+    drawLine s
 
 drawReposition :: (Term n, MonadState Layout m)
     => (forall a . m a -> n a) -> TermOps -> LineChars -> n ()

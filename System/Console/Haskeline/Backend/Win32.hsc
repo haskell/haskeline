@@ -380,17 +380,20 @@ win32Term = do
     hs <- consoleHandles
     ch <- liftIO newChan
     fileRT <- liftIO $ fileRunTerm stdin
-    return fileRT {
-                            termOps = Left TermOps {
-                                getLayout = getBufferSize (hOut hs)
-                                , withGetEvent = withWindowMode hs
-                                                    . win32WithEvent hs ch
-                                , saveUnusedKeys = saveKeys ch
-                                , evalTerm = EvalTerm (runReaderT' hs . runDraw)
-                                                    (Draw . lift)
-                                },
-                            closeTerm = closeHandles hs
-                        }
+    return fileRT
+      { termOps = Left TermOps {
+          getLayout = getBufferSize (hOut hs)
+          , withGetEvent = withWindowMode hs
+                              . win32WithEvent hs ch
+          , saveUnusedKeys = saveKeys ch
+          , evalTerm = EvalTerm (runReaderT' hs . runDraw)
+                              (Draw . lift)
+          , externalPrint = writeChan ch . ExternalPrint
+          }
+      , closeTerm = do
+          flushEventQueue (putStrOut fileRT) ch
+          closeHandles hs
+      }
 
 win32WithEvent :: MonadException m => Handles -> Chan Event
                                         -> (m Event -> m a) -> m a
@@ -545,4 +548,3 @@ clearScreen = do
     liftIO $ fillConsoleChar h ' ' windowSize origin
     liftIO $ fillConsoleAttribute h attr windowSize origin
     setPos origin
-
