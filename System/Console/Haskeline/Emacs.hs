@@ -89,7 +89,7 @@ rotatePaste im = get >>= loop
 wordRight, wordLeft, bigWordLeft :: InsertMode -> InsertMode
 wordRight = goRightUntil (atStart (not . isAlphaNum))
 wordLeft = goLeftUntil (atStart isAlphaNum)
-bigWordLeft = goLeftUntil (atStart isSpace)
+bigWordLeft = goLeftUntil (atStart (not . isSpace))
 
 modifyWord :: ([Grapheme] -> [Grapheme]) -> InsertMode -> InsertMode
 modifyWord f im = IMode (reverse (f ys1) ++ xs) ys2
