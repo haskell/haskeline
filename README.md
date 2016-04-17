@@ -12,7 +12,7 @@ The most recent development source code can be downloaded with:
     git clone https://github.com/judah/haskeline
 
 Further documentation is also available at
-[http://trac.haskell.org/haskeline/wiki/WikiDocumentation](http://trac.haskell.org/haskeline/wiki/WikiDocumentation)
+[https://github.com/judah/haskeline/wiki](https://github.com/judah/haskeline/wiki)
 
 
 ##Features:
