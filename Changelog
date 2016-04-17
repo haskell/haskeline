@@ -1,3 +1,8 @@
+Changed in version 0.7.2.3:
+   * Fix hsc2hs-related warning on ghc-8
+   * Fix the behavior of ctrl-W in the emacs bindings
+   * Point to github instead of trac
+
 Changed in version 0.7.2.2:
    * Fix Linux to Windows cross-compile
    * Canonicalize AMP instances to make the code more future proof
