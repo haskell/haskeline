@@ -28,25 +28,42 @@ drawLine, clearLine :: Term m => LineChars -> m ()
 drawLine = drawLineDiff ([],[])
 
 clearLine = flip drawLineDiff ([],[])
-    
+
 data RunTerm = RunTerm {
             -- | Write unicode characters to stdout.
             putStrOut :: String -> IO (),
             termOps :: Either TermOps FileOps,
-            wrapInterrupt :: forall a . IO a -> IO a,            
+            wrapInterrupt :: forall a . IO a -> IO a,
             closeTerm :: IO ()
     }
 
 -- | Operations needed for terminal-style interaction.
-data TermOps = TermOps {
-            getLayout :: IO Layout
-            , withGetEvent :: forall m a . CommandMonad m => (m Event -> m a) -> m a
-            , evalTerm :: forall m . CommandMonad m => EvalTerm m
-            , saveUnusedKeys :: [Key] -> IO ()
-        }
+data TermOps = TermOps
+    { getLayout :: IO Layout
+    , withGetEvent :: forall m a . CommandMonad m => (m Event -> m a) -> m a
+    , evalTerm :: forall m . CommandMonad m => EvalTerm m
+    , saveUnusedKeys :: [Key] -> IO ()
+    , externalPrint :: String -> IO ()
+    }
+
+-- This hack is needed to grab latest writes from some other thread.
+-- Without it, if you are using another thread to process the logging
+-- and write on screen via exposed externalPrint, latest writes from
+-- this thread are not able to cross the thread boundary in time.
+flushEventQueue :: (String -> IO ()) -> Chan Event -> IO ()
+flushEventQueue print' eventChan = yield >> loopUntilFlushed
+    where loopUntilFlushed = do
+              flushed <- isEmptyChan eventChan
+              if flushed then return () else do
+                  event <- readChan eventChan
+                  case event of
+                      ExternalPrint str -> do
+                          print' (str ++ "\n") >> loopUntilFlushed
+                      -- We don't want to raise exceptions when doing cleanup.
+                      _ -> loopUntilFlushed
 
 -- | Operations needed for file-style interaction.
--- 
+--
 -- Backends can assume that getLocaleLine, getLocaleChar and maybeReadNewline
 -- are "wrapped" by wrapFileInput.
 data FileOps = FileOps {
@@ -96,8 +113,12 @@ matchInit :: Eq a => [a] -> [a] -> ([a],[a])
 matchInit (x:xs) (y:ys)  | x == y = matchInit xs ys
 matchInit xs ys = (xs,ys)
 
-data Event = WindowResize | KeyInput [Key] | ErrorEvent SomeException
-                deriving Show
+data Event
+  = WindowResize
+  | KeyInput [Key]
+  | ErrorEvent SomeException
+  | ExternalPrint String
+  deriving Show
 
 keyEventLoop :: IO [Event] -> Chan Event -> IO Event
 keyEventLoop readEvents eventChan = do
@@ -121,7 +142,7 @@ keyEventLoop readEvents eventChan = do
             else -- Use the lock to work around the fact that writeList2Chan
                  -- isn't atomic.  Otherwise, some events could be ignored if
                  -- the subthread is killed before it saves them in the chan.
-                 bracket_ (putMVar lock ()) (takeMVar lock) $ 
+                 bracket_ (putMVar lock ()) (takeMVar lock) $
                     writeList2Chan eventChan es
     handleErrorEvent = handle $ \e -> case fromException e of
                                 Just ThreadKilled -> return ()
@@ -166,7 +187,7 @@ guardedEOF f h = do
 -- 1) By itself, this (by using hReady) might crash on invalid characters.
 -- The handle should be set to binary mode or a TextEncoder that
 -- transliterates or ignores invalid input.
--- 
+--
 -- 1) Note that in ghc-6.8.3 and earlier, hReady returns False at an EOF,
 -- whereas in ghc-6.10.1 and later it throws an exception.  (GHC trac #1063).
 -- This code handles both of those cases.
@@ -191,4 +212,3 @@ hGetLocaleLine = guardedEOF $ \h -> do
     liftIO $ if buff == NoBuffering
         then fmap BC.pack $ System.IO.hGetLine h
         else BC.hGetLine h
-

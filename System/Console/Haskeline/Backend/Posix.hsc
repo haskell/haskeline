@@ -149,7 +149,7 @@ sttyKeys h = do
     attrs <- getTerminalAttributes (Fd fd)
     let getStty (k,c) = do {str <- controlChar attrs k; return ([str],c)}
     return $ catMaybes $ map getStty [(Erase,simpleKey Backspace),(Kill,simpleKey KillLine)]
-                        
+
 newtype TreeMap a b = TreeMap (Map.Map a (Maybe b, TreeMap a b))
                         deriving Show
 
@@ -200,7 +200,7 @@ lookupChars (TreeMap tm) (c:cs) = case Map.lookup c tm of
 
 -----------------------------
 
-withPosixGetEvent :: (MonadException m, MonadReader Prefs m) 
+withPosixGetEvent :: (MonadException m, MonadReader Prefs m)
         => Chan Event -> Handles -> [(String,Key)]
                 -> (m Event -> m a) -> m a
 withPosixGetEvent eventChan h termKeys f = wrapTerminalOps h $ do
@@ -209,13 +209,13 @@ withPosixGetEvent eventChan h termKeys f = wrapTerminalOps h $ do
         $ f $ liftIO $ getEvent (ehIn h) baseMap eventChan
 
 withWindowHandler :: MonadException m => Chan Event -> m a -> m a
-withWindowHandler eventChan = withHandler windowChange $ 
+withWindowHandler eventChan = withHandler windowChange $
     Catch $ writeChan eventChan WindowResize
 
 withSigIntHandler :: MonadException m => m a -> m a
 withSigIntHandler f = do
-    tid <- liftIO myThreadId 
-    withHandler keyboardSignal 
+    tid <- liftIO myThreadId
+    withHandler keyboardSignal
             (Catch (throwTo tid Interrupt))
             f
 
@@ -274,7 +274,7 @@ openTerm mode = handle (\(_::IOException) -> mzero)
             $ liftIO $ openInCodingMode "/dev/tty" mode
 
 
-posixRunTerm :: 
+posixRunTerm ::
     Handles
     -> [IO (Maybe Layout)]
     -> [(String,Key)]
@@ -285,16 +285,19 @@ posixRunTerm hs layoutGetters keys wrapGetEvent evalBackend = do
     ch <- newChan
     fileRT <- posixFileRunTerm hs
     return fileRT
-                { closeTerm = closeTerm fileRT
-                , termOps = Left TermOps
+                { termOps = Left TermOps
                             { getLayout = tryGetLayouts layoutGetters
-                            , withGetEvent = wrapGetEvent 
+                            , withGetEvent = wrapGetEvent
                                             . withPosixGetEvent ch hs
                                                 keys
                             , saveUnusedKeys = saveKeys ch
-                            , evalTerm =
-                                    mapEvalTerm (runPosixT hs) lift evalBackend
+                            , evalTerm = mapEvalTerm
+                                            (runPosixT hs) lift evalBackend
+                            , externalPrint = writeChan ch . ExternalPrint
                             }
+                , closeTerm = do
+                    flushEventQueue (putStrOut fileRT) ch
+                    closeTerm fileRT
                 }
 
 type PosixT m = ReaderT Handles m
