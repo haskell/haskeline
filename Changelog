@@ -1,3 +1,7 @@
+Changed in version 0.7.3.0:
+   * Require ghc version of at least 7.4.1, and clean up obsolete code
+   * Add thread-safe (in terminal-style interaction) external print function
+
 Changed in version 0.7.2.3:
    * Fix hsc2hs-related warning on ghc-8
    * Fix the behavior of ctrl-W in the emacs bindings
