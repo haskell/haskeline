@@ -44,7 +44,8 @@ Library
     -- wasn't fixed until 7.4.1
     Build-depends: base >=4.5 && < 4.10, containers>=0.4 && < 0.6,
                    directory>=1.1 && < 1.3, bytestring>=0.9 && < 0.11,
-                   filepath >= 1.2 && < 1.5, transformers >= 0.2 && < 0.6
+                   filepath >= 1.2 && < 1.5, transformers >= 0.2 && < 0.6,
+                   transformers-base < 0.5
     Default-Language: Haskell98
     Default-Extensions:
                 ForeignFunctionInterface, Rank2Types, FlexibleInstances,
@@ -54,7 +55,7 @@ Library
                 MultiParamTypeClasses, OverlappingInstances
                 UndecidableInstances
                 ScopedTypeVariables, CPP, DeriveDataTypeable,
-                PatternGuards
+                PatternGuards, StandaloneDeriving
     Exposed-Modules:
                 System.Console.Haskeline
                 System.Console.Haskeline.Completion
@@ -92,7 +93,7 @@ Library
         cpp-options: -DMINGW
     } else {
         Build-depends: unix>=2.0 && < 2.8
-        Other-modules: 
+        Other-modules:
                 System.Console.Haskeline.Backend.Posix
                 System.Console.Haskeline.Backend.Posix.Encoder
                 System.Console.Haskeline.Backend.DumbTerm

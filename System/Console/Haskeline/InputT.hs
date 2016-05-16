@@ -15,6 +15,7 @@ import System.Directory(getHomeDirectory)
 import System.FilePath
 import Control.Applicative
 import Control.Monad (liftM, ap)
+import Control.Monad.Base (MonadBase)
 import System.IO
 import Data.IORef
 
@@ -39,7 +40,7 @@ setComplete f s = s {complete = f}
 
 -- | A monad transformer which carries all of the state and settings
 -- relevant to a line-reading application.
-newtype InputT m a = InputT {unInputT :: 
+newtype InputT m a = InputT {unInputT ::
                                 ReaderT RunTerm
                                 -- Use ReaderT (IO _) vs StateT so that exceptions (e.g., ctrl-c)
                                 -- don't cause us to lose the existing state.
@@ -52,6 +53,7 @@ newtype InputT m a = InputT {unInputT ::
                 -- internal MonadState/MonadReader classes.  Otherwise haddock
                 -- displays those instances to the user, and it makes it seem like
                 -- we implement the mtl versions of those classes.
+deriving instance MonadBase b m => MonadBase b (InputT m)
 
 instance MonadTrans InputT where
     lift = InputT . lift . lift . lift . lift . lift
@@ -92,7 +94,7 @@ runInputTWithPrefs = runInputTBehaviorWithPrefs defaultBehavior
 
 -- | Run a line-reading application.  This function should suffice for most applications.
 --
--- This function is equivalent to @'runInputTBehavior' 'defaultBehavior'@.  It 
+-- This function is equivalent to @'runInputTBehavior' 'defaultBehavior'@.  It
 -- uses terminal-style interaction if 'stdin' is connected to a terminal and has
 -- echoing enabled.  Otherwise (e.g., if 'stdin' is a pipe), it uses file-style interaction.
 --
@@ -110,13 +112,13 @@ haveTerminalUI = InputT $ asks isTerminalStyle
 {- | Haskeline has two ways of interacting with the user:
 
  * \"Terminal-style\" interaction provides an rich user interface by connecting
-   to the user's terminal (which may be different than 'stdin' or 'stdout').  
- 
+   to the user's terminal (which may be different than 'stdin' or 'stdout').
+
  * \"File-style\" interaction treats the input as a simple stream of characters, for example
     when reading from a file or pipe.  Input functions (e.g., @getInputLine@) print the prompt to 'stdout'.
- 
- A 'Behavior' is a method for deciding at run-time which type of interaction to use.  
- 
+
+ A 'Behavior' is a method for deciding at run-time which type of interaction to use.
+
  For most applications (e.g., a REPL), 'defaultBehavior' should have the correct effect.
 -}
 data Behavior = Behavior (IO RunTerm)
@@ -159,16 +161,16 @@ mapInputT f = InputT . mapReaderT (mapReaderT (mapReaderT
                                   (mapReaderT (mapReaderT f))))
                     . unInputT
 
--- | Read input from 'stdin'.  
+-- | Read input from 'stdin'.
 -- Use terminal-style interaction if 'stdin' is connected to
 -- a terminal and has echoing enabled.  Otherwise (e.g., if 'stdin' is a pipe), use
 -- file-style interaction.
 --
--- This behavior should suffice for most applications.  
+-- This behavior should suffice for most applications.
 defaultBehavior :: Behavior
 defaultBehavior = Behavior defaultRunTerm
 
--- | Use file-style interaction, reading input from the given 'Handle'.  
+-- | Use file-style interaction, reading input from the given 'Handle'.
 useFileHandle :: Handle -> Behavior
 useFileHandle = Behavior . fileHandleRunTerm
 
