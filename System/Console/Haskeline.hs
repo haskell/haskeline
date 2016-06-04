@@ -294,13 +294,13 @@ of type 'Interrupt'.  For example:
 
 > tryAction :: InputT IO ()
 > tryAction = handle (\Interrupt -> outputStrLn "Cancelled.")
->                $ wrapInterrupt $ someLongAction
+>                $ withInterrupt $ someLongAction
 
 The action can handle the interrupt itself; a new 'Interrupt' exception will be thrown
 every time Ctrl-C is pressed.
 
 > tryAction :: InputT IO ()
-> tryAction = wrapInterrupt loop
+> tryAction = withInterrupt loop
 >     where loop = handle (\Interrupt -> outputStrLn "Cancelled; try again." >> loop)
 >                    someLongAction
 
