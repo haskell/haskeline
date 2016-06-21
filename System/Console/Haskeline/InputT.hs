@@ -15,6 +15,7 @@ import System.Directory(getHomeDirectory)
 import System.FilePath
 import Control.Applicative
 import Control.Monad (liftM, ap)
+import Control.Monad.Fix
 import System.IO
 import Data.IORef
 
@@ -55,6 +56,9 @@ newtype InputT m a = InputT {unInputT ::
 
 instance MonadTrans InputT where
     lift = InputT . lift . lift . lift . lift . lift
+
+instance ( MonadFix m ) => MonadFix (InputT m) where
+    mfix f = InputT (mfix (unInputT . f))
 
 -- | Get the current line input history.
 getHistory :: MonadIO m => InputT m History
