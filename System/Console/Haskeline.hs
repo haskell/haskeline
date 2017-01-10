@@ -80,6 +80,7 @@ module System.Console.Haskeline(
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Command
 import System.Console.Haskeline.Vi
+import System.Console.Haskeline.Echo
 import System.Console.Haskeline.Emacs
 import System.Console.Haskeline.Prefs
 import System.Console.Haskeline.History
@@ -244,8 +245,7 @@ getPassword x = promptedInput
                                         $ runCommandLoop tops prefix loop
                                         $ Password [] x)
                     (\fops -> let h_in = inputHandle fops
-                              in bracketSet (hGetEcho h_in) (hSetEcho h_in) False
-                                  $ runMaybeT $ getLocaleLine fops)
+                              in withoutInputEcho h_in $ runMaybeT $ getLocaleLine fops)
  where
     loop = choiceCmd [ simpleChar '\n' +> finish
                      , simpleKey Backspace +> change deletePasswordChar

@@ -18,14 +18,7 @@ import qualified System.Directory
 
 #include <windows.h>
 #include <shlobj.h>
-
-##if defined(i386_HOST_ARCH)
-## define WINDOWS_CCONV stdcall
-##elif defined(x86_64_HOST_ARCH)
-## define WINDOWS_CCONV ccall
-##else
-## error Unknown mingw32 arch
-##endif
+##include "windows_cconv.h"
 
 foreign import WINDOWS_CCONV "FindFirstFileW" c_FindFirstFile
             :: LPCTSTR -> Ptr () -> IO HANDLE
@@ -63,7 +56,7 @@ doesDirectoryExist file = do
 getHomeDirectory :: IO FilePath
 getHomeDirectory = System.Directory.getHomeDirectory
 
-#else 
+#else
 
 import System.Directory
 
