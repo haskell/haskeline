@@ -20,7 +20,7 @@ Homepage:       http://trac.haskell.org/haskeline
 Bug-Reports:    https://github.com/judah/haskeline/issues
 Stability:      Stable
 Build-Type:     Custom
-extra-source-files: examples/Test.hs Changelog include/*.h
+extra-source-files: examples/Test.hs Changelog includes/*.h
 
 source-repository head
     type: git
