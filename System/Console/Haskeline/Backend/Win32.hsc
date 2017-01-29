@@ -22,6 +22,7 @@ import System.Console.Haskeline.Monads hiding (Handler)
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.Backend.WCWidth
+import System.Console.Haskeline.Backend.Win32.Echo (hWithoutInputEcho)
 
 import Data.ByteString.Internal (createAndTrim)
 import qualified Data.ByteString as B
@@ -402,7 +403,7 @@ fileRunTerm h_in = do
                     putStrOut = putter,
                     wrapInterrupt = withCtrlCHandler,
                     termOps = Right FileOps
-                                { inputHandle = h_in
+                                { withoutInputEcho = hWithoutInputEcho h_in
                                 , wrapFileInput = hWithBinaryMode h_in
                                 , getLocaleChar = getMultiByteChar cp h_in
                                 , maybeReadNewline = hMaybeReadNewline h_in

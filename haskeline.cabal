@@ -70,7 +70,6 @@ Library
                 System.Console.Haskeline.Command.History
                 System.Console.Haskeline.Command.KillRing
                 System.Console.Haskeline.Directory
-                System.Console.Haskeline.Echo
                 System.Console.Haskeline.Emacs
                 System.Console.Haskeline.InputT
                 System.Console.Haskeline.Key
@@ -88,6 +87,7 @@ Library
     if os(windows) {
         Build-depends: Win32>=2.0
         Other-modules: System.Console.Haskeline.Backend.Win32
+                       System.Console.Haskeline.Backend.Win32.Echo
         c-sources: cbits/win_console.c
         includes: win_console.h, windows_cconv.h
         install-includes: win_console.h

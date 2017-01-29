@@ -320,12 +320,15 @@ posixFileRunTerm hs = do
                                         hFlush (ehOut hs)
                 , closeTerm = closeHandles hs
                 , wrapInterrupt = withSigIntHandler
-                , termOps = Right FileOps
-                          { inputHandle = ehIn hs
+                , termOps = let h_in = ehIn hs
+                            in Right FileOps
+                          { withoutInputEcho = bracketSet (hGetEcho h_in)
+                                                          (hSetEcho h_in)
+                                                          False
                           , wrapFileInput = withCodingMode (hIn hs)
-                          , getLocaleChar = guardedEOF hGetChar (ehIn hs)
-                          , maybeReadNewline = hMaybeReadNewline (ehIn hs)
-                          , getLocaleLine = guardedEOF hGetLine (ehIn hs)
+                          , getLocaleChar = guardedEOF hGetChar h_in
+                          , maybeReadNewline = hMaybeReadNewline h_in
+                          , getLocaleLine = guardedEOF hGetLine h_in
                           }
                 }
 
