@@ -1,20 +1,5 @@
 {-# LANGUAGE CPP #-}
 
-{-|
-Module:      System.Console.Haskeline.Echo
-Copyright:   (C) 2016-2017 Ryan Scott
-License:     BSD-style (see the file LICENSE)
-Maintainer:  Ryan Scott
-Stability:   Provisional
-Portability: Portable
-
-Exports functions that handle whether or not terminal input is handled in a way
-that should be portable across different platforms and consoles.
-
-Unlike "System.IO.Echo", this module exports internal functionality which, if
-used improperly, can lead to runtime errors. Make sure to read the
-documentation beforehand!
--}
 module System.Console.Haskeline.Echo (withoutInputEcho) where
 
 import Control.Exception (throw)
