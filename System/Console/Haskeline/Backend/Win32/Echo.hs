@@ -23,16 +23,17 @@ import Foreign.StablePtr (StablePtr, freeStablePtr, newStablePtr)
 import GHC.IO.FD (FD(..))
 import GHC.IO.Handle.Types (Handle(..), Handle__(..))
 
-import System.IO.Unsafe (unsafePerformIO)
 import System.Win32.Types (HANDLE)
 import System.Win32.MinTTY (isMinTTYHandle)
 #endif
 
 -- | Return the handle's current input 'EchoState'.
 hGetInputEchoState :: Handle -> IO EchoState
-hGetInputEchoState input = if minTTY input
-                              then fmap MinTTY (hGetInputEchoSTTY input)
-                              else fmap DefaultTTY $ hGetEcho input
+hGetInputEchoState input = do
+  min_tty <- minTTY input
+  if min_tty
+     then fmap MinTTY (hGetInputEchoSTTY input)
+     else fmap DefaultTTY $ hGetEcho input
 
 -- | Return all of @stty@'s current settings in a non-human-readable format.
 --
@@ -75,16 +76,11 @@ hBracketInputEcho input action =
 -- | Perform a computation with the handle's input echoing disabled. Before
 -- running the computation, the handle's input 'EchoState' is saved, and the
 -- saved 'EchoState' is restored after the computation finishes.
---
--- @
--- hWithoutInputEcho input action =
---   'hBracketInputEcho' input
---                       ('liftIO' ('hSetInputEchoState' input ('hEchoOff' input)) >> action)
--- @
 hWithoutInputEcho :: MonadException m => Handle -> m a -> m a
-hWithoutInputEcho input action =
+hWithoutInputEcho input action = do
+  echo_off <- liftIO $ hEchoOff input
   hBracketInputEcho input
-                    (liftIO (hSetInputEchoState input (hEchoOff input)) >> action)
+                    (liftIO (hSetInputEchoState input echo_off) >> action)
 
 -- | Create an @stty@ process, wait for it to complete, and return its output.
 hSttyRaw :: Handle -> String -> IO STTYSettings
@@ -121,20 +117,23 @@ data EchoState
   deriving (Eq, Ord, Show)
 
 -- | Indicates that the handle's input echoing is (or should be) off.
-hEchoOff :: Handle -> EchoState
-hEchoOff input = if minTTY input then MinTTY "-echo" else DefaultTTY False
+hEchoOff :: Handle -> IO EchoState
+hEchoOff input = do
+  min_tty <- minTTY input
+  return $ if min_tty
+              then MinTTY "-echo"
+              else DefaultTTY False
 
 -- | Settings used to configure the @stty@ command-line utility.
 type STTYSettings = String
 
 -- | Is the current process attached to a MinTTY console (e.g., Cygwin or MSYS)?
-minTTY :: Handle -> Bool
+minTTY :: Handle -> IO Bool
 #if MIN_VERSION_Win32(2,5,0)
-minTTY input = unsafePerformIO $ withHandleToHANDLE input isMinTTYHandle
-{-# NOINLINE minTTY #-}
+minTTY input = withHandleToHANDLE input isMinTTYHandle
 #else
 -- On older versions of Win32, we simply punt.
-minTTY _ = False
+minTTY _     = return False
 #endif
 
 #if MIN_VERSION_Win32(2,5,0)
