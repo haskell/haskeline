@@ -236,6 +236,10 @@ When using terminal-style interaction, the masking character (if given) will rep
 
 When using file-style interaction, this function turns off echoing while reading
 the line of input.
+
+Note that if Haskeline is built against a version of the @Win32@ library
+earlier than 2.5, 'getPassword' will incorrectly echo back input on MinTTY
+consoles (such as Cygwin or MSYS).
 -}
 
 getPassword :: MonadException m => Maybe Char -- ^ A masking character; e.g., @Just \'*\'@

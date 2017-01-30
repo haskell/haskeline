@@ -12,15 +12,11 @@ import System.IO (Handle, hGetContents, hGetEcho, hSetEcho)
 import System.Process (StdStream(..), createProcess, shell,
                        std_in, std_out, waitForProcess)
 
-#if defined(MINGW)
+#if defined(MINGW) && MIN_VERSION_Win32(2,5,0)
 import Graphics.Win32.Misc (getStdHandle, sTD_INPUT_HANDLE)
 
-# if MIN_VERSION_Win32(2,5,0)
-import System.Win32.MinTTY (isMinTTYHandle)
-# else
-import System.Console.Haskeline.Backend.Win32.MinTTY (isMinTTYHandle)
-# endif
 import System.IO.Unsafe (unsafePerformIO)
+import System.Win32.MinTTY (isMinTTYHandle)
 #endif
 
 -- | Return the handle's current input 'EchoState'.
@@ -122,7 +118,7 @@ type STTYSettings = String
 
 -- | Is the current process attached to a MinTTY console (e.g., Cygwin or MSYS)?
 minTTY :: Bool
-#if defined(MINGW)
+#if defined(MINGW) && MIN_VERSION_Win32(2,5,0)
 minTTY = unsafePerformIO $ do
   h <- getStdHandle sTD_INPUT_HANDLE
   isMinTTYHandle h

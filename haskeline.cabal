@@ -38,10 +38,6 @@ flag terminfo
     Description: Use the terminfo package for POSIX consoles.
     Default: True
 
-flag Win32-2-5
-    Description: Use Win32-2.5.0.0 or later on Windows.
-    Default: True
-
 Library
     -- We require ghc>=7.4.1 (base>=4.5) to use the base library encodings, even
     -- though it was implemented in earlier releases, due to GHC bug #5436 which
@@ -90,19 +86,12 @@ Library
     c-sources: cbits/h_wcwidth.c
 
     if os(windows) {
+        Build-depends: Win32>=2.0
         Other-modules: System.Console.Haskeline.Backend.Win32
         c-sources: cbits/win_console.c
         includes: win_console.h, windows_cconv.h
         install-includes: win_console.h
         cpp-options: -DMINGW
-        if flag(Win32-2-5) {
-          build-depends: Win32 >= 2.5
-        } else {
-          build-depends: Win32 >= 2.0 && < 2.5
-          includes: winternl_compat.h
-          other-modules: System.Console.Haskeline.Backend.Win32.MinTTY
-          extra-libraries: ntdll
-        }
     } else {
         Build-depends: unix>=2.0 && < 2.8
         Other-modules:
