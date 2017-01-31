@@ -67,7 +67,8 @@ flushEventQueue print' eventChan = yield >> loopUntilFlushed
 -- Backends can assume that getLocaleLine, getLocaleChar and maybeReadNewline
 -- are "wrapped" by wrapFileInput.
 data FileOps = FileOps {
-            inputHandle :: Handle, -- ^ e.g. for turning off echoing.
+            withoutInputEcho :: forall m a . MonadException m => m a -> m a,
+            -- ^ Perform an action without echoing input.
             wrapFileInput :: forall a . IO a -> IO a,
             getLocaleLine :: MaybeT IO String,
             getLocaleChar :: MaybeT IO Char,

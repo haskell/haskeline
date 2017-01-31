@@ -22,19 +22,13 @@ import System.Console.Haskeline.Monads hiding (Handler)
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.Backend.WCWidth
+import System.Console.Haskeline.Backend.Win32.Echo (hWithoutInputEcho)
 
 import Data.ByteString.Internal (createAndTrim)
 import qualified Data.ByteString as B
 
-##if defined(i386_HOST_ARCH)
-## define WINDOWS_CCONV stdcall
-##elif defined(x86_64_HOST_ARCH)
-## define WINDOWS_CCONV ccall
-##else
-## error Unknown mingw32 arch
-##endif
-
 #include "win_console.h"
+##include "windows_cconv.h"
 
 foreign import WINDOWS_CCONV "windows.h ReadConsoleInputW" c_ReadConsoleInput
     :: HANDLE -> Ptr () -> DWORD -> Ptr DWORD -> IO Bool
@@ -409,7 +403,7 @@ fileRunTerm h_in = do
                     putStrOut = putter,
                     wrapInterrupt = withCtrlCHandler,
                     termOps = Right FileOps
-                                { inputHandle = h_in
+                                { withoutInputEcho = hWithoutInputEcho h_in
                                 , wrapFileInput = hWithBinaryMode h_in
                                 , getLocaleChar = getMultiByteChar cp h_in
                                 , maybeReadNewline = hMaybeReadNewline h_in
