@@ -34,7 +34,7 @@ import System.Console.Haskeline.Prefs
 import System.Console.Haskeline.Backend.Posix.Encoder
 
 import GHC.IO.FD (fdFD)
-import Data.Dynamic (cast)
+import Data.Typeable (cast)
 import System.IO.Error
 import GHC.IO.Exception
 import GHC.IO.Handle.Types hiding (getState)
