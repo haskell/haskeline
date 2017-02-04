@@ -1,6 +1,6 @@
 Name:           haskeline
 Cabal-Version:  >=1.10
-Version:        0.7.3.0
+Version:        0.7.3.1
 Category:       User Interfaces
 License:        BSD3
 License-File:   LICENSE
