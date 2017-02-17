@@ -1,3 +1,5 @@
+next:
+   * Properly process Unicode key events on Windows.
 Changed in version 0.7.3.1:
    * Properly disable echoing in getPassword when running in MinTTY.
    * Use `cast` from Data.Typeable instead of Data.Dynamic.
