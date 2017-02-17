@@ -73,8 +73,12 @@ consoleHandles = do
 
 
 processEvent :: InputEvent -> Maybe Event
-processEvent KeyEvent {keyDown = True, unicodeChar = c, virtualKeyCode = vc,
+processEvent KeyEvent {keyDown = kd, unicodeChar = c, virtualKeyCode = vc,
                     controlKeyState = cstate}
+    | kd || ((testMod (#const LEFT_ALT_PRESSED) || vc == (#const VK_MENU))
+             && c /= '\NUL')
+      -- Make sure not to ignore Unicode key events! The Unicode character might
+      -- only be emitted on a keyup event. See also GH issue #54.
     = fmap (\e -> KeyInput [Key modifier' e]) $ keyFromCode vc `mplus` simpleKeyChar
   where
     simpleKeyChar = guard (c /= '\NUL') >> return (KeyChar c)
