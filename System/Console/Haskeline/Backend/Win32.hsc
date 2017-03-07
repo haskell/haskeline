@@ -226,7 +226,8 @@ writeConsole h str = writeConsole' >> writeConsole h ys
 foreign import WINDOWS_CCONV "windows.h MessageBeep" c_messageBeep :: UINT -> IO Bool
 
 messageBeep :: IO ()
-messageBeep = c_messageBeep (-1) >> return ()-- intentionally ignore failures.
+messageBeep = c_messageBeep simpleBeep >> return ()-- intentionally ignore failures.
+  where simpleBeep = 0xffffffff
 
 
 ----------
