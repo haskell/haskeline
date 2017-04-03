@@ -52,6 +52,7 @@ Library
                 TypeSynonymInstances
                 FlexibleContexts, ExistentialQuantification
                 ScopedTypeVariables, GeneralizedNewtypeDeriving
+                StandaloneDeriving
                 MultiParamTypeClasses, OverlappingInstances
                 UndecidableInstances
                 ScopedTypeVariables, CPP, DeriveDataTypeable,

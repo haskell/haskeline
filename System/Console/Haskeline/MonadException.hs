@@ -33,6 +33,7 @@ import Prelude hiding (catch)
 #endif
 import Control.Monad(liftM, join)
 import Control.Monad.IO.Class
+import Control.Monad.Trans.Identity
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Error
@@ -179,4 +180,4 @@ instance (Monoid w, MonadException m) => MonadException (RWST r w s m) where
                                     . run . (\m -> runRWST m r s))
                     in fmap (\m -> runRWST m r s) $ f run'
 
-
+deriving instance MonadException m => MonadException (IdentityT m)
