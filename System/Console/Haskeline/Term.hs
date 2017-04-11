@@ -7,6 +7,7 @@ import System.Console.Haskeline.Prefs(Prefs)
 import System.Console.Haskeline.Completion(Completion)
 
 import Control.Concurrent
+import Control.Concurrent.STM
 import Data.Word
 import Control.Exception (fromException, AsyncException(..),bracket_)
 import Data.Typeable
@@ -50,12 +51,12 @@ data TermOps = TermOps
 -- Without it, if you are using another thread to process the logging
 -- and write on screen via exposed externalPrint, latest writes from
 -- this thread are not able to cross the thread boundary in time.
-flushEventQueue :: (String -> IO ()) -> Chan Event -> IO ()
+flushEventQueue :: (String -> IO ()) -> TChan Event -> IO ()
 flushEventQueue print' eventChan = yield >> loopUntilFlushed
     where loopUntilFlushed = do
-              flushed <- isEmptyChan eventChan
+              flushed <- atomically $ isEmptyTChan eventChan
               if flushed then return () else do
-                  event <- readChan eventChan
+                  event <- atomically $ readTChan eventChan
                   case event of
                       ExternalPrint str -> do
                           print' (str ++ "\n") >> loopUntilFlushed
@@ -121,36 +122,29 @@ data Event
   | ExternalPrint String
   deriving Show
 
-keyEventLoop :: IO [Event] -> Chan Event -> IO Event
+keyEventLoop :: IO [Event] -> TChan Event -> IO Event
 keyEventLoop readEvents eventChan = do
     -- first, see if any events are already queued up (from a key/ctrl-c
     -- event or from a previous call to getEvent where we read in multiple
     -- keys)
-    isEmpty <- isEmptyChan eventChan
+    isEmpty <- atomically $ isEmptyTChan eventChan
     if not isEmpty
-        then readChan eventChan
+        then atomically $ readTChan eventChan
         else do
-            lock <- newEmptyMVar
-            tid <- forkIO $ handleErrorEvent (readerLoop lock)
-            readChan eventChan `finally` do
-                            putMVar lock ()
-                            killThread tid
+            tid <- forkIO $ handleErrorEvent readerLoop
+            atomically (readTChan eventChan) `finally` killThread tid
   where
-    readerLoop lock = do
+    readerLoop = do
         es <- readEvents
         if null es
-            then readerLoop lock
-            else -- Use the lock to work around the fact that writeList2Chan
-                 -- isn't atomic.  Otherwise, some events could be ignored if
-                 -- the subthread is killed before it saves them in the chan.
-                 bracket_ (putMVar lock ()) (takeMVar lock) $
-                    writeList2Chan eventChan es
+            then readerLoop
+            else atomically $ mapM_ (writeTChan eventChan) es
     handleErrorEvent = handle $ \e -> case fromException e of
                                 Just ThreadKilled -> return ()
-                                _ -> writeChan eventChan (ErrorEvent e)
+                                _ -> atomically $ writeTChan eventChan (ErrorEvent e)
 
-saveKeys :: Chan Event -> [Key] -> IO ()
-saveKeys ch = writeChan ch . KeyInput
+saveKeys :: TChan Event -> [Key] -> IO ()
+saveKeys ch = atomically . writeTChan ch . KeyInput
 
 data Layout = Layout {width, height :: Int}
                     deriving (Show,Eq)

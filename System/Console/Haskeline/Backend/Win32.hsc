@@ -45,7 +45,7 @@ getNumberOfEvents h = alloca $ \numEventsPtr -> do
         $ c_GetNumberOfConsoleInputEvents h numEventsPtr
     fmap fromEnum $ peek numEventsPtr
 
-getEvent :: HANDLE -> Chan Event -> IO Event
+getEvent :: HANDLE -> TChan Event -> IO Event
 getEvent h = keyEventLoop (eventReader h)
 
 eventReader :: HANDLE -> IO [Event]
@@ -377,7 +377,7 @@ win32TermStdin = do
 win32Term :: MaybeT IO RunTerm
 win32Term = do
     hs <- consoleHandles
-    ch <- liftIO newChan
+    ch <- liftIO newTChanIO
     fileRT <- liftIO $ fileRunTerm stdin
     return fileRT
       { termOps = Left TermOps {
@@ -387,14 +387,14 @@ win32Term = do
           , saveUnusedKeys = saveKeys ch
           , evalTerm = EvalTerm (runReaderT' hs . runDraw)
                               (Draw . lift)
-          , externalPrint = writeChan ch . ExternalPrint
+          , externalPrint = atomically . writeTChan ch . ExternalPrint
           }
       , closeTerm = do
           flushEventQueue (putStrOut fileRT) ch
           closeHandles hs
       }
 
-win32WithEvent :: MonadException m => Handles -> Chan Event
+win32WithEvent :: MonadException m => Handles -> TChan Event
                                         -> (m Event -> m a) -> m a
 win32WithEvent h eventChan f = f $ liftIO $ getEvent (hIn h) eventChan
 

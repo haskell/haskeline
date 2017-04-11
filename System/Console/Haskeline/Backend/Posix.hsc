@@ -18,6 +18,7 @@ import Foreign.C.Types
 import qualified Data.Map as Map
 import System.Posix.Terminal hiding (Interrupt)
 import Control.Monad
+import Control.Concurrent.STM
 import Control.Concurrent hiding (throwTo)
 import Data.Maybe (catMaybes)
 import System.Posix.Signals.Exts
@@ -201,16 +202,16 @@ lookupChars (TreeMap tm) (c:cs) = case Map.lookup c tm of
 -----------------------------
 
 withPosixGetEvent :: (MonadException m, MonadReader Prefs m)
-        => Chan Event -> Handles -> [(String,Key)]
+        => TChan Event -> Handles -> [(String,Key)]
                 -> (m Event -> m a) -> m a
 withPosixGetEvent eventChan h termKeys f = wrapTerminalOps h $ do
     baseMap <- getKeySequences (ehIn h) termKeys
     withWindowHandler eventChan
         $ f $ liftIO $ getEvent (ehIn h) baseMap eventChan
 
-withWindowHandler :: MonadException m => Chan Event -> m a -> m a
+withWindowHandler :: MonadException m => TChan Event -> m a -> m a
 withWindowHandler eventChan = withHandler windowChange $
-    Catch $ writeChan eventChan WindowResize
+    Catch $ atomically $ writeTChan eventChan WindowResize
 
 withSigIntHandler :: MonadException m => m a -> m a
 withSigIntHandler f = do
@@ -224,7 +225,7 @@ withHandler signal handler f = do
     old_handler <- liftIO $ installHandler signal handler Nothing
     f `finally` liftIO (installHandler signal old_handler Nothing)
 
-getEvent :: Handle -> TreeMap Char Key -> Chan Event -> IO Event
+getEvent :: Handle -> TreeMap Char Key -> TChan Event -> IO Event
 getEvent h baseMap = keyEventLoop $ do
         cs <- getBlockOfChars h
         return [KeyInput $ lexKeys baseMap cs]
@@ -282,7 +283,7 @@ posixRunTerm ::
     -> (forall m . (MonadException m, CommandMonad m) => EvalTerm (PosixT m))
     -> IO RunTerm
 posixRunTerm hs layoutGetters keys wrapGetEvent evalBackend = do
-    ch <- newChan
+    ch <- newTChanIO
     fileRT <- posixFileRunTerm hs
     return fileRT
                 { termOps = Left TermOps
@@ -293,7 +294,7 @@ posixRunTerm hs layoutGetters keys wrapGetEvent evalBackend = do
                             , saveUnusedKeys = saveKeys ch
                             , evalTerm = mapEvalTerm
                                             (runPosixT hs) lift evalBackend
-                            , externalPrint = writeChan ch . ExternalPrint
+                            , externalPrint = atomically . writeTChan ch . ExternalPrint
                             }
                 , closeTerm = do
                     flushEventQueue (putStrOut fileRT) ch
