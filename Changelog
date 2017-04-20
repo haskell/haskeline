@@ -1,8 +1,12 @@
-next:
+Changed in version 0.7.4.0:
    * Properly process Unicode key events on Windows.
+   * Add an instance MonadExcept IdentityT.
+   * Remove custom Setup logic to support Cabal 2.0.
+
 Changed in version 0.7.3.1:
    * Properly disable echoing in getPassword when running in MinTTY.
    * Use `cast` from Data.Typeable instead of Data.Dynamic.
+
 Changed in version 0.7.3.0:
    * Require ghc version of at least 7.4.1, and clean up obsolete code
    * Add thread-safe (in terminal-style interaction) external print function
