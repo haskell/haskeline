@@ -1,6 +1,6 @@
 Name:           haskeline
 Cabal-Version:  >=1.10
-Version:        0.7.3.1
+Version:        0.7.4.0
 Category:       User Interfaces
 License:        BSD3
 License-File:   LICENSE
@@ -19,7 +19,7 @@ Description:
 Homepage:       http://trac.haskell.org/haskeline
 Bug-Reports:    https://github.com/judah/haskeline/issues
 Stability:      Stable
-Build-Type:     Custom
+Build-Type:     Simple
 extra-source-files: examples/Test.hs Changelog includes/*.h
 
 source-repository head
@@ -37,6 +37,7 @@ source-repository head
 flag terminfo
     Description: Use the terminfo package for POSIX consoles.
     Default: True
+    Manual: True
 
 Library
     -- We require ghc>=7.4.1 (base>=4.5) to use the base library encodings, even
