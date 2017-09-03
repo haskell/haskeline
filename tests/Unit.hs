@@ -35,14 +35,21 @@ legacyEncoding = False
 --   whereas legacy will immediately stop.
 whenLegacy s = if legacyEncoding then s else B.empty
 
+toTest = do
+    args <- getArgs
+    return $ case args of [] -> ["cabal", "run", "-v0", "--ghc-options=-w", "--"]
+                          a -> a
+
 main = do
-    [p] <- getArgs
+    p : args <- toTest
+    home <- getEnv "HOME"
+    path <- getEnv "PATH"
     let i = setTerm "xterm"
             Invocation {
                 prog = p,
-                progArgs = [],
+                progArgs = args,
                 runInTTY = True,
-                environment = []
+                environment = [("HOME", home), ("PATH", path)]
             }
     runTestTT $ test [interactionTests i, fileStyleTests i]
 
@@ -175,7 +182,7 @@ inputChar i = "getInputChar" ~:
         ]
     ]
 
-setCharInput i = i { progArgs = ["chars"] }
+setCharInput i = i { progArgs = (progArgs i) ++ ["chars"] }
 
 
 fileStyleTests i = "file style" ~:
