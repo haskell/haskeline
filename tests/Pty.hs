@@ -89,7 +89,7 @@ forkCommandInPty prog args env = do
     pid <- forkProcess $ do
                     closeFd master
                     loginTTY slave
-                    executeFile prog False args env
+                    executeFile prog True args env
     return (master,pid)
 
 
