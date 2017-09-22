@@ -11,6 +11,7 @@ import Foreign.C
 import System.Win32 hiding (multiByteToWideChar)
 import Graphics.Win32.Misc(getStdHandle, sTD_OUTPUT_HANDLE)
 import Data.List(intercalate)
+import Control.Concurrent.STM
 import Control.Concurrent hiding (throwTo)
 import Data.Char(isPrint)
 import Data.Maybe(mapMaybe)
