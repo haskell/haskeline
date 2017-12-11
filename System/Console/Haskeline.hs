@@ -4,7 +4,7 @@ A rich user interface for line input in command-line programs.  Haskeline is
 Unicode-aware and runs both on POSIX-compatible systems and on Windows.
 
 Users may customize the interface with a @~/.haskeline@ file; see
-<http://trac.haskell.org/haskeline/wiki/UserPrefs> for more information.
+<https://github.com/judah/haskeline/wiki/UserPreferences> for more information.
 
 An example use of this library for a simple read-eval-print loop (REPL) is the
 following:

@@ -17,10 +17,10 @@ Further documentation is also available at
 
 ## Features:
 
- - Provides a [rich line editing interface](http://trac.haskell.org/haskeline/wiki/KeyBindings).
- - A `~/.haskeline` file allows customization of [preferences](http://trac.haskell.org/haskeline/wiki/UserPrefs) and [custom key bindings](http://trac.haskell.org/haskeline/wiki/CustomKeyBindings).
+ - Provides a [rich line editing interface](https://github.com/judah/haskeline/wiki/KeyBindings).
+ - A `~/.haskeline` file allows customization of [preferences](https://github.com/judah/haskeline/wiki/UserPreferences) and [custom key bindings](https://github.com/judah/haskeline/wiki/CustomKeyBindings).
  - Runs on POSIX-compatible systems, using the [terminfo](http://github.com/judah/terminfo) library to support non-ANSI terminals.
  - Runs on Windows using MinGW.
- - [Supports Unicode](http://trac.haskell.org/haskeline/wiki/UnicodeSupport) cross-platform.
+ - [Supports Unicode](https://github.com/judah/haskeline/wiki/UnicodeSupport) cross-platform.
  - History recall and incremental search.
  - Custom tab completion functions which may run in an arbitrary monad.
