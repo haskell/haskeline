@@ -406,8 +406,10 @@ searchText :: SearchEntry -> [Grapheme]
 searchText SearchEntry {entryState = IMode xs ys} = reverse xs ++ ys
 
 instance LineState SearchEntry where
-    beforeCursor prefix se = beforeCursor (prefix ++ stringToGraphemes [searchChar se])
-                                (entryState se)
+    beforeCursor _ prefix se = beforeCursor
+        noModePrefixes
+        (prefix ++ stringToGraphemes [searchChar se])
+        (entryState se)
     afterCursor = afterCursor . entryState
 
 viEnterSearch :: Monad m => Char -> Direction

@@ -35,13 +35,13 @@ import Control.Monad.Trans.Class
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Key
 
-data Effect = LineChange (Prefix -> LineChars)
+data Effect = LineChange (ModePrefixes -> Prefix -> LineChars)
               | PrintLines [String]
               | ClearScreen
               | RingBell
 
 lineChange :: LineState s => s -> Effect
-lineChange = LineChange . flip lineChars
+lineChange s = LineChange $ \mp p -> lineChars mp p s
 
 data KeyMap a = KeyMap {lookupKM :: Key -> Maybe (KeyConsumed a)}
 

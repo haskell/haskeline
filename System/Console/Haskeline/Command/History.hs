@@ -88,7 +88,7 @@ directionName Forward = "i-search"
 directionName Reverse = "reverse-i-search"
 
 instance LineState SearchMode where
-    beforeCursor _ sm = beforeCursor prefix (foundHistory sm)
+    beforeCursor _ _ sm = beforeCursor noModePrefixes prefix (foundHistory sm)
         where 
             prefix = stringToGraphemes ("(" ++ directionName (direction sm) ++ ")`")
                             ++ searchTerm sm ++ stringToGraphemes "': "

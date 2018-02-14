@@ -24,7 +24,8 @@ runCommandLoop' :: forall m n s a . (Term n, CommandMonad n,
         => (forall b . m b -> n b) -> TermOps -> Prefix -> s -> KeyCommand m s a -> n Event
         -> n a
 runCommandLoop' liftE tops prefix initState cmds getEvent = do
-    let s = lineChars prefix initState
+    mPrefixes <- asks modePrefixes
+    let s = lineChars mPrefixes prefix initState
     drawLine s
     readMoreKeys s (fmap (liftM (\x -> (x,[])) . ($ initState)) cmds)
   where
@@ -52,7 +53,8 @@ runCommandLoop' liftE tops prefix initState cmds getEvent = do
     loopCmd s (DoEffect (LineChange _)
                 e@(DoEffect (LineChange _) _)) = loopCmd s e
     loopCmd s (DoEffect e next) = do
-                                    t <- drawEffect prefix s e
+                                    mPrefixes <- asks modePrefixes
+                                    t <- drawEffect mPrefixes prefix s e
                                     loopCmd t next
     loopCmd s (CmdM next) = liftE next >>= loopCmd s
     loopCmd s (Result (x,ks)) = do
@@ -75,21 +77,21 @@ drawReposition liftE tops s = do
     when (oldLayout /= newLayout) $ reposition oldLayout s
 
 drawEffect :: (Term m, MonadReader Prefs m)
-    => Prefix -> LineChars -> Effect -> m LineChars
-drawEffect prefix s (LineChange ch) = do
-    let t = ch prefix
+    => ModePrefixes -> Prefix -> LineChars -> Effect -> m LineChars
+drawEffect mPrefixes prefix s (LineChange ch) = do
+    let t = ch mPrefixes prefix
     drawLineDiff s t
     return t
-drawEffect _ s ClearScreen = do
+drawEffect _ _ s ClearScreen = do
     clearLayout
     drawLine s
     return s
-drawEffect _ s (PrintLines ls) = do
+drawEffect _ _ s (PrintLines ls) = do
     when (s /= ([],[])) $ moveToNextLine s
     printLines ls
     drawLine s
     return s
-drawEffect _ s RingBell = actBell >> return s
+drawEffect _ _ s RingBell = actBell >> return s
 
 actBell :: (Term m, MonadReader Prefs m) => m ()
 actBell = do

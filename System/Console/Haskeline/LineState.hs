@@ -12,6 +12,9 @@ module System.Console.Haskeline.LineState(
                     -- * Line State class
                     LineState(..),
                     Prefix,
+                    ModePrefixes(..),
+                    noModePrefixes,
+                    modePrefixes,
                     -- ** Convenience functions for the drawing backends
                     LineChars,
                     lineChars,
@@ -69,6 +72,7 @@ module System.Console.Haskeline.LineState(
                     ) where
 
 import Data.Char
+import System.Console.Haskeline.Prefs (Prefs(..), EditMode(..))
 
 -- | A 'Grapheme' is a fundamental unit of display for the UI.  Several characters in sequence
 -- can represent one grapheme; for example, an @a@ followed by the diacritic @\'\\768\'@ should
@@ -128,7 +132,8 @@ graphemesToString = concatMap (\g -> (baseChar g : combiningChars g))
 -- | This class abstracts away the internal representations of the line state,
 -- for use by the drawing actions.  Line state is generally stored in a zipper format.
 class LineState s where
-    beforeCursor :: Prefix -- ^ The input prefix.
+    beforeCursor :: ModePrefixes -- ^ The mode indicators.
+                    -> Prefix -- ^ The input prefix.
                     -> s -- ^ The current line state.
                     -> [Grapheme] -- ^ The text to the left of the cursor
                                   -- (including the prefix).
@@ -136,13 +141,31 @@ class LineState s where
 
 type Prefix = [Grapheme]
 
+-- | User customizable prefixes that indicate the current vi mode.
+data ModePrefixes = ModePrefixes { insertModePrefix :: [Grapheme],
+                                   commandModePrefix :: [Grapheme]
+                                   }
+                                      deriving Show
+
+-- | Do not display mode prefixes.
+noModePrefixes :: ModePrefixes
+noModePrefixes = ModePrefixes [] []
+
+-- | Get mode prefixes from user preferences.
+modePrefixes :: Prefs -> ModePrefixes
+modePrefixes Prefs { editMode = Emacs } = noModePrefixes
+modePrefixes p@Prefs { editMode = Vi } = ModePrefixes
+    { insertModePrefix = stringToGraphemes $ viInsertModePrefix p,
+      commandModePrefix = stringToGraphemes $ viCommandModePrefix p
+      }
+
 -- | The characters in the line (with the cursor in the middle).  NOT in a zippered format;
 -- both lists are in the order left->right that appears on the screen.
 type LineChars = ([Grapheme],[Grapheme])
 
 -- | Accessor function for the various backends.
-lineChars :: LineState s => Prefix -> s -> LineChars
-lineChars prefix s = (beforeCursor prefix s, afterCursor s)
+lineChars :: LineState s => ModePrefixes -> Prefix -> s -> LineChars
+lineChars mPrefixes prefix s = (beforeCursor mPrefixes prefix s, afterCursor s)
 
 -- | Compute the number of characters under and to the right of the cursor.
 lengthToEnd :: LineChars -> Int
@@ -170,7 +193,8 @@ data InsertMode = IMode [Grapheme] [Grapheme]
                     deriving (Show, Eq)
 
 instance LineState InsertMode where
-    beforeCursor prefix (IMode xs _) = prefix ++ reverse xs
+    beforeCursor mPrefixes prefix (IMode xs _) =
+        insertModePrefix mPrefixes ++ prefix ++ reverse xs
     afterCursor (IMode _ ys) = ys
 
 instance Result InsertMode where
@@ -247,8 +271,9 @@ data CommandMode = CMode [Grapheme] Grapheme [Grapheme] | CEmpty
                     deriving Show
 
 instance LineState CommandMode where
-    beforeCursor prefix CEmpty = prefix
-    beforeCursor prefix (CMode xs _ _) = prefix ++ reverse xs
+    beforeCursor mPrefixes prefix CEmpty = commandModePrefix mPrefixes ++ prefix
+    beforeCursor mPrefixes prefix (CMode xs _ _) =
+        commandModePrefix mPrefixes ++ prefix ++ reverse xs
     afterCursor CEmpty = []
     afterCursor (CMode _ c ys) = c:ys
 
@@ -325,8 +350,8 @@ instance Functor ArgMode where
     fmap f am = am {argState = f (argState am)}
 
 instance LineState s => LineState (ArgMode s) where
-    beforeCursor _ am = let pre = map baseGrapheme $ "(arg: " ++ show (arg am) ++ ") "
-                             in beforeCursor pre (argState am) 
+    beforeCursor _ _ am = let pre = map baseGrapheme $ "(arg: " ++ show (arg am) ++ ") "
+                             in beforeCursor noModePrefixes pre (argState am)
     afterCursor = afterCursor . argState
 
 instance Result s => Result (ArgMode s) where
@@ -359,7 +384,7 @@ applyCmdArg f am = withCommandMode (repeatN (arg am) f) (argState am)
 newtype Message = Message {messageText :: String}
 
 instance LineState Message where
-    beforeCursor _ = stringToGraphemes . messageText
+    beforeCursor _ _ = stringToGraphemes . messageText
     afterCursor _ = []
 
 ----------------
@@ -368,7 +393,7 @@ data Password = Password {passwordState :: [Char], -- ^ reversed
                           passwordChar :: Maybe Char}
 
 instance LineState Password where
-    beforeCursor prefix p
+    beforeCursor _ prefix p
         = prefix ++ (stringToGraphemes
                       $ case passwordChar p of
                         Nothing -> []

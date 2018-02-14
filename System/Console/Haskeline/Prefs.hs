@@ -25,12 +25,16 @@ one field of the 'Prefs' datatype; field names are case-insensitive and
 unparseable lines are ignored.  For example:
 
 > editMode: Vi
+> viCommandModePrefix: ":"
+> viInsertModePrefix: "+"
 > completionType: MenuCompletion
 > maxhistorysize: Just 40
 
 -}
 data Prefs = Prefs { bellStyle :: !BellStyle,
                      editMode :: !EditMode,
+                     viCommandModePrefix :: String,
+                     viInsertModePrefix :: String,
                      maxHistorySize :: !(Maybe Int),
                      historyDuplicates :: HistoryDuplicates,
                      completionType :: !CompletionType,
@@ -61,6 +65,7 @@ data BellStyle = NoBell | VisualBell | AudibleBell
 data EditMode = Vi | Emacs
                     deriving (Show,Read)
 
+
 data HistoryDuplicates = AlwaysAdd | IgnoreConsecutive | IgnoreAll
                     deriving (Show,Read)
 
@@ -70,6 +75,8 @@ defaultPrefs :: Prefs
 defaultPrefs = Prefs {bellStyle = AudibleBell,
                       maxHistorySize = Just 100,
                       editMode = Emacs,
+                      viCommandModePrefix = "",
+                      viInsertModePrefix = "",
                       completionType = ListCompletion,
                       completionPaging = True,
                       completionPromptLimit = Just 100,
@@ -91,6 +98,8 @@ readMaybe str = case reads str of
 settors :: [(String, String -> Prefs -> Prefs)]
 settors = [("bellstyle", mkSettor $ \x p -> p {bellStyle = x})
           ,("editmode", mkSettor $ \x p -> p {editMode = x})
+          ,("viinsertmodeprefix", mkSettor $ \x p -> p {viInsertModePrefix = x})
+          ,("vicommandmodeprefix", mkSettor $ \x p -> p {viCommandModePrefix = x})
           ,("maxhistorysize", mkSettor $ \x p -> p {maxHistorySize = x})
           ,("completiontype", mkSettor $ \x p -> p {completionType = x})
           ,("completionpaging", mkSettor $ \x p -> p {completionPaging = x})

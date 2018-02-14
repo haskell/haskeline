@@ -105,7 +105,7 @@ pageCompletions wws@(w:ws) = do
         ]
   where
     oneLine = clearMessage >> effect (PrintLines [w]) >> pageCompletions ws
-    clearMessage = effect $ LineChange $ const ([],[])
+    clearMessage = effect . LineChange $ \_ _ -> ([],[])
 
 printPage :: MonadReader Layout m => [String] -> CmdM m ()
 printPage ls = do
