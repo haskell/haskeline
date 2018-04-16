@@ -95,7 +95,7 @@ Library
         install-includes: win_console.h
         cpp-options: -DMINGW
     } else {
-        Build-depends: unix>=2.0 && < 2.8
+        Build-depends: unix>=2.0 && < 2.9
         Other-modules:
                 System.Console.Haskeline.Backend.Posix
                 System.Console.Haskeline.Backend.Posix.Encoder
