@@ -1,3 +1,6 @@
+Changed in version 0.7.4.3:
+   * Bump upper bounds on base, containers, stm and unix
+
 Changed in version 0.7.4.2:
    * Clean up the rest of the references to trac.haskell.org
 
