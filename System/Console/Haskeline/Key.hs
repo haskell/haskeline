@@ -39,6 +39,7 @@ data BaseKey = KeyChar Char
              -- TODO: is KillLine really a key?
              | KillLine | Home | End | PageDown | PageUp
              | Backspace | Delete
+             | UpOrSearch | DownOrSearch
             deriving (Show,Eq,Ord)
 
 simpleKey :: BaseKey -> Key
@@ -77,6 +78,8 @@ specialKeys = [("left",LeftKey)
               ,("tab",KeyChar '\t')
               ,("esc",KeyChar '\ESC')
               ,("escape",KeyChar '\ESC')
+              ,("up_or_search",UpOrSearch)
+              ,("down_or_search",DownOrSearch)
               ]
 
 parseModifiers :: [String] -> BaseKey -> Key
