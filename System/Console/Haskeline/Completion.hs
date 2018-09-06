@@ -3,6 +3,7 @@ module System.Console.Haskeline.Completion(
                             Completion(..),
                             noCompletion,
                             simpleCompletion,
+                            fallbackCompletion,
                             -- * Word completion
                             completeWord,
                             completeWordWithPrev,
@@ -188,3 +189,14 @@ fixPath ('~':c:path) | isPathSeparator c = do
     home <- getHomeDirectory
     return (home </> path)
 fixPath path = return path
+
+fallbackCompletion :: Monad m => CompletionFunc m -> CompletionFunc m -> CompletionFunc m
+fallbackCompletion preferred fallback input = do
+    (preferredIgnored, preferredCompletions) <- preferred input
+    (fallbackIgnored, fallbackCompletions) <- fallback input
+    return $ case compare (length preferredIgnored) (length fallbackIgnored) of
+        LT -> (preferredIgnored, preferredCompletions)
+        GT -> (fallbackIgnored, fallbackCompletions)
+        EQ -> if preferredIgnored == fallbackIgnored
+            then (preferredIgnored, preferredCompletions ++ fallbackCompletions)
+            else error "Preferred and fallback completions ignored different input of same length."
