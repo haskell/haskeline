@@ -5,7 +5,6 @@ module System.Console.Haskeline.Backend.Terminfo(
                              where
 
 import System.Console.Terminfo
-import Control.Applicative
 import Control.Monad
 import Data.List(foldl')
 import System.IO

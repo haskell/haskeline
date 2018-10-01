@@ -9,7 +9,7 @@ import System.Console.Haskeline.Completion(Completion)
 import Control.Concurrent
 import Control.Concurrent.STM
 import Data.Word
-import Control.Exception (fromException, AsyncException(..),bracket_)
+import Control.Exception (fromException, AsyncException(..))
 import Data.Typeable
 import System.IO
 import Control.Monad(liftM,when,guard)
@@ -104,7 +104,7 @@ class (MonadReader Prefs m , MonadReader Layout m, MonadException m)
         => CommandMonad m where
     runCompletion :: (String,String) -> m (String,[Completion])
 
-instance (MonadTrans t, CommandMonad m, MonadReader Prefs (t m),
+instance {-# OVERLAPPABLE #-} (MonadTrans t, CommandMonad m, MonadReader Prefs (t m),
         MonadException (t m),
         MonadReader Layout (t m))
             => CommandMonad (t m) where

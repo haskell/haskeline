@@ -28,15 +28,12 @@ module System.Console.Haskeline.MonadException(
 
 import qualified Control.Exception as E
 import Control.Exception (Exception,SomeException)
-#if __GLASGOW_HASKELL__ < 705
-import Prelude hiding (catch)
-#endif
 import Control.Monad(liftM, join)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Identity
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State.Strict
-import Control.Monad.Trans.Error
+import Control.Monad.Trans.Except
 import Control.Monad.Trans.List
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.RWS
@@ -159,10 +156,10 @@ instance MonadException m => MonadException (MaybeT m) where
                     run' = RunIO (fmap MaybeT . run . runMaybeT)
                     in fmap runMaybeT $ f run' 
 
-instance (MonadException m, Error e) => MonadException (ErrorT e m) where
-    controlIO f = ErrorT $ controlIO $ \(RunIO run) -> let
-                    run' = RunIO (fmap ErrorT . run . runErrorT)
-                    in fmap runErrorT $ f run'
+instance MonadException m => MonadException (ExceptT e m) where
+    controlIO f = ExceptT $ controlIO $ \(RunIO run) -> let
+                    run' = RunIO (fmap ExceptT . run . runExceptT)
+                    in fmap runExceptT $ f run'
 
 instance MonadException m => MonadException (ListT m) where
     controlIO f = ListT $ controlIO $ \(RunIO run) -> let
