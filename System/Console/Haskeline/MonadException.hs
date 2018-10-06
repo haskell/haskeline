@@ -28,9 +28,6 @@ module System.Console.Haskeline.MonadException(
 
 import qualified Control.Exception as E
 import Control.Exception (Exception,SomeException)
-#if __GLASGOW_HASKELL__ < 705
-import Prelude hiding (catch)
-#endif
 import Control.Monad(liftM, join)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Identity
