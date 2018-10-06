@@ -166,9 +166,6 @@ getKeyEvent p = do
 data Coord = Coord {coordX, coordY :: Int}
                 deriving Show
 
-#if __GLASGOW_HASKELL__ < 711
-#let alignment t = "%lu", (unsigned long)offsetof(struct {char x__; t (y__); }, y__)
-#endif
 instance Storable Coord where
     sizeOf _ = (#size COORD)
     alignment _ = (#alignment COORD)

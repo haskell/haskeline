@@ -29,9 +29,6 @@ import Control.Monad.Trans.Maybe (MaybeT(MaybeT),runMaybeT)
 import Control.Monad.Trans.Reader hiding (ask,asks)
 import qualified Control.Monad.Trans.Reader as Reader
 import Data.IORef
-#if __GLASGOW_HASKELL__ < 705
-import Prelude hiding (catch)
-#endif
 
 import System.Console.Haskeline.MonadException
 
@@ -44,7 +41,8 @@ instance Monad m => MonadReader r (ReaderT r m) where
 instance Monad m => MonadReader s (StateT s m) where
     ask = get
 
-instance (MonadReader r m, MonadTrans t, Monad (t m)) => MonadReader r (t m) where
+instance {-# OVERLAPPABLE #-} (MonadReader r m, MonadTrans t, Monad (t m))
+    => MonadReader r (t m) where
     ask = lift ask
 
 asks :: MonadReader r m => (r -> a) -> m a
@@ -111,7 +109,8 @@ instance Monad m => MonadState s (StateT s m) where
     get = StateT $ \s -> return $ \f -> f s s
     put s = s `seq` StateT $ \_ -> return $ \f -> f () s
 
-instance (MonadState s m, MonadTrans t, Monad (t m)) => MonadState s (t m) where
+instance {-# OVERLAPPABLE #-} (MonadState s m, MonadTrans t, Monad (t m))
+    => MonadState s (t m) where
     get = lift get
     put = lift . put
 

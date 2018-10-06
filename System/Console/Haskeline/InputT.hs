@@ -13,8 +13,6 @@ import System.Console.Haskeline.Term
 
 import System.Directory(getHomeDirectory)
 import System.FilePath
-import Control.Applicative
-import Control.Monad (liftM, ap)
 import Control.Monad.Fix
 import System.IO
 import Data.IORef
