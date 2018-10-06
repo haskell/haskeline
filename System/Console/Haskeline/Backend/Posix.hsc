@@ -303,7 +303,7 @@ posixRunTerm hs layoutGetters keys wrapGetEvent evalBackend = do
 
 type PosixT m = ReaderT Handles m
 
-runPosixT :: Monad m => Handles -> PosixT m a -> m a
+runPosixT :: Handles -> PosixT m a -> m a
 runPosixT h = runReaderT' h
 
 fileRunTerm :: Handle -> IO RunTerm

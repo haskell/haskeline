@@ -160,7 +160,7 @@ hWithBinaryMode h = bracket (liftIO $ hGetEncoding h)
 
 -- | Utility function for changing a property of a terminal for the duration of
 -- a computation.
-bracketSet :: (Eq a, MonadException m) => IO a -> (a -> IO ()) -> a -> m b -> m b
+bracketSet :: MonadException m => IO a -> (a -> IO ()) -> a -> m b -> m b
 bracketSet getState set newState f = bracket (liftIO getState)
                             (liftIO . set)
                             (\_ -> liftIO (set newState) >> f)

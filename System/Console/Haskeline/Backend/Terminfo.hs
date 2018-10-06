@@ -1,3 +1,6 @@
+#if __GLASGOW_HASKELL__ <= 802
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
+#endif
 module System.Console.Haskeline.Backend.Terminfo(
                             Draw(),
                             runTerminfoDraw
