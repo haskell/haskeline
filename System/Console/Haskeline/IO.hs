@@ -42,6 +42,7 @@ module System.Console.Haskeline.IO(
 import System.Console.Haskeline hiding (completeFilename)
 import Control.Concurrent
 
+import Control.Exception (finally)
 import Control.Monad.IO.Class
 
 -- Providing a non-monadic API for haskeline

@@ -73,8 +73,7 @@ module System.Console.Haskeline(
                     Interrupt(..),
                     handleInterrupt,
                     -- * Additional submodules
-                    module System.Console.Haskeline.Completion,
-                    module System.Console.Haskeline.MonadException)
+                    module System.Console.Haskeline.Completion)
                      where
 
 import System.Console.Haskeline.LineState
@@ -84,15 +83,15 @@ import System.Console.Haskeline.Emacs
 import System.Console.Haskeline.Prefs
 import System.Console.Haskeline.History
 import System.Console.Haskeline.Monads
-import System.Console.Haskeline.MonadException
 import System.Console.Haskeline.InputT
 import System.Console.Haskeline.Completion
 import System.Console.Haskeline.Term
 import System.Console.Haskeline.Key
 import System.Console.Haskeline.RunCommand
 
-import System.IO
+import Control.Monad.Catch (MonadMask, handle)
 import Data.Char (isSpace, isPrint)
+import System.IO
 
 
 -- | A useful default.  In particular:
@@ -141,7 +140,8 @@ an @EOF@ was encountered before any characters were read.
 If @'autoAddHistory' == 'True'@ and the line input is nonblank (i.e., is not all
 spaces), it will be automatically added to the history.
 -}
-getInputLine :: MonadException m => String -- ^ The input prompt
+getInputLine :: (MonadIO m, MonadMask m)
+            => String -- ^ The input prompt
                             -> InputT m (Maybe String)
 getInputLine = promptedInput (getInputCmdLine emptyIM) $ runMaybeT . getLocaleLine
 
@@ -160,7 +160,7 @@ Some examples of calling of this function are:
 > getInputLineWithInitial "prompt> " ("left", "") -- The cursor starts at the end of the line.
 > getInputLineWithInitial "prompt> " ("left ", "right") -- The cursor starts before the second word.
  -}
-getInputLineWithInitial :: MonadException m
+getInputLineWithInitial :: (MonadIO m, MonadMask m)
                             => String           -- ^ The input prompt
                             -> (String, String) -- ^ The initial value left and right of the cursor
                             -> InputT m (Maybe String)
@@ -169,7 +169,7 @@ getInputLineWithInitial prompt (left,right) = promptedInput (getInputCmdLine ini
   where
     initialIM = insertString left $ moveToStart $ insertString right $ emptyIM
 
-getInputCmdLine :: MonadException m => InsertMode -> TermOps -> String -> InputT m (Maybe String)
+getInputCmdLine :: (MonadIO m, MonadMask m) => InsertMode -> TermOps -> String -> InputT m (Maybe String)
 getInputCmdLine initialIM tops prefix = do
     emode <- InputT $ asks editMode
     result <- runInputCmdT tops $ case emode of
@@ -202,7 +202,7 @@ for a newline.
 When using file-style interaction, a newline will be read if it is immediately
 available after the input character.
 -}
-getInputChar :: MonadException m => String -- ^ The input prompt
+getInputChar :: (MonadIO m, MonadMask m) => String -- ^ The input prompt
                     -> InputT m (Maybe Char)
 getInputChar = promptedInput getInputCmdChar $ \fops -> do
                         c <- getPrintableChar fops
@@ -216,7 +216,7 @@ getPrintableChar fops = do
         Just False -> getPrintableChar fops
         _ -> return c
 
-getInputCmdChar :: MonadException m => TermOps -> String -> InputT m (Maybe Char)
+getInputCmdChar :: (MonadIO m, MonadMask m) => TermOps -> String -> InputT m (Maybe Char)
 getInputCmdChar tops prefix = runInputCmdT tops
         $ runCommandLoop tops prefix acceptOneChar emptyIM
 
@@ -241,7 +241,7 @@ earlier than 2.5, 'getPassword' will incorrectly echo back input on MinTTY
 consoles (such as Cygwin or MSYS).
 -}
 
-getPassword :: MonadException m => Maybe Char -- ^ A masking character; e.g., @Just \'*\'@
+getPassword :: (MonadIO m, MonadMask m) => Maybe Char -- ^ A masking character; e.g., @Just \'*\'@
                             -> String -> InputT m (Maybe String)
 getPassword x = promptedInput
                     (\tops prefix -> runInputCmdT tops
@@ -311,21 +311,21 @@ may immediately terminate the program after the second time that the user presse
 Ctrl-C.
 
 -}
-withInterrupt :: MonadException m => InputT m a -> InputT m a
+withInterrupt :: (MonadIO m, MonadMask m) => InputT m a -> InputT m a
 withInterrupt act = do
     rterm <- InputT ask
-    liftIOOp_ (wrapInterrupt rterm) act
+    wrapInterrupt rterm act
 
 -- | Catch and handle an exception of type 'Interrupt'.
 --
 -- > handleInterrupt f = handle $ \Interrupt -> f
-handleInterrupt :: MonadException m => m a -> m a -> m a
+handleInterrupt :: MonadMask m => m a -> m a -> m a
 handleInterrupt f = handle $ \Interrupt -> f
 
 {- | Return a printing function, which in terminal-style interactions is
 thread-safe and may be run concurrently with user input without affecting the
 prompt. -}
-getExternalPrint :: MonadException m => InputT m (String -> IO ())
+getExternalPrint :: MonadIO m => InputT m (String -> IO ())
 getExternalPrint = do
     rterm <- InputT ask
     return $ case termOps rterm of
