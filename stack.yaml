@@ -2,3 +2,6 @@ resolver: lts-9.14
 
 packages:
 - .
+
+ghc-options:
+  "$locals": -Wall -Werror

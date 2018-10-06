@@ -25,6 +25,6 @@ install:
 script:
  - if [ -f configure.ac ]; then autoreconf -i; fi
  - cabal --version
- - cabal configure -v2  # -v2 provides useful information for debugging
+ - cabal configure -v2 --ghc-options='-Werror'  # -v2 provides useful information for debugging
  - cabal build   # this builds all libraries and executables (including tests/benchmarks)
  - cabal check
