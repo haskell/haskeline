@@ -65,7 +65,7 @@ update f = do
     put s'
     return x
 
-runReaderT' :: Monad m => r -> ReaderT r m a -> m a
+runReaderT' :: r -> ReaderT r m a -> m a
 runReaderT' = flip runReaderT
 
 newtype StateT s m a = StateT { getStateTFunc 

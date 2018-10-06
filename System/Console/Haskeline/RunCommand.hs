@@ -20,7 +20,7 @@ runCommandLoop tops@TermOps{evalTerm = e} prefix cmds initState
                     cmds 
 
 runCommandLoop' :: forall m n s a . (Term n, CommandMonad n,
-        MonadState Layout m, MonadReader Prefs n, LineState s)
+        MonadState Layout m, LineState s)
         => (forall b . m b -> n b) -> TermOps -> Prefix -> s -> KeyCommand m s a -> n Event
         -> n a
 runCommandLoop' liftE tops prefix initState cmds getEvent = do
