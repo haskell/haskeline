@@ -3,6 +3,7 @@ module System.Console.Haskeline.Completion(
                             Completion(..),
                             noCompletion,
                             simpleCompletion,
+                            fallbackCompletion,
                             -- * Word completion
                             completeWord,
                             completeWordWithPrev,
@@ -188,3 +189,12 @@ fixPath ('~':c:path) | isPathSeparator c = do
     home <- getHomeDirectory
     return (home </> path)
 fixPath path = return path
+
+-- | If the first completer produces no suggestions, fallback to the second
+-- completer's output.
+fallbackCompletion :: Monad m => CompletionFunc m -> CompletionFunc m -> CompletionFunc m
+fallbackCompletion a b input = do
+    aCompletions <- a input
+    if null (snd aCompletions)
+        then b input
+        else return aCompletions
