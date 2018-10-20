@@ -13,6 +13,7 @@ module System.Console.Haskeline.Backend.Posix.Encoder (
         openInCodingMode,
         ) where
 
+import Control.Monad.Catch (MonadMask, bracket)
 import System.IO
 import System.Console.Haskeline.Monads
 
@@ -41,13 +42,13 @@ externalHandle = ExternalHandle OtherMode
 
 -- | Use to ensure that an external handle is in the correct mode
 -- for the duration of the given action.
-withCodingMode :: ExternalHandle -> IO a -> IO a
+withCodingMode :: (MonadIO m, MonadMask m) => ExternalHandle -> m a -> m a
 withCodingMode ExternalHandle {externalMode=CodingMode} act = act
 withCodingMode (ExternalHandle OtherMode h) act = do
     bracket (liftIO $ hGetEncoding h)
             (liftIO . hSetBinOrEncoding h)
             $ const $ do
-                hSetEncoding h haskelineEncoding
+                liftIO $ hSetEncoding h haskelineEncoding
                 act
 
 hSetBinOrEncoding :: Handle -> Maybe TextEncoding -> IO ()

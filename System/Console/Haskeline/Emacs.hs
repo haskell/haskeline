@@ -1,3 +1,6 @@
+#if __GLASGOW_HASKELL__ < 802
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
+#endif
 module System.Console.Haskeline.Emacs where
 
 import System.Console.Haskeline.Command
@@ -10,10 +13,11 @@ import System.Console.Haskeline.Command.KillRing
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.InputT
 
+import Control.Monad.Catch (MonadMask)
 import Data.Char
 
-type InputCmd s t = forall m . MonadException m => Command (InputCmdT m) s t
-type InputKeyCmd s t = forall m . MonadException m => KeyCommand (InputCmdT m) s t
+type InputCmd s t = forall m . (MonadIO m, MonadMask m) => Command (InputCmdT m) s t
+type InputKeyCmd s t = forall m . (MonadIO m, MonadMask m) => KeyCommand (InputCmdT m) s t
 
 emacsCommands :: InputKeyCmd InsertMode (Maybe String)
 emacsCommands = choiceCmd [

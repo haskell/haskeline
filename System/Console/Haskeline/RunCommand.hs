@@ -7,7 +7,9 @@ import System.Console.Haskeline.Monads
 import System.Console.Haskeline.Prefs
 import System.Console.Haskeline.Key
 
+import Control.Exception (SomeException)
 import Control.Monad
+import Control.Monad.Catch (handle, throwM)
 
 runCommandLoop :: (CommandMonad m, MonadState Layout m, LineState s)
     => TermOps -> String -> KeyCommand m s a -> s -> m a
@@ -30,10 +32,10 @@ runCommandLoop' liftE tops prefix initState cmds getEvent = do
   where
     readMoreKeys :: LineChars -> KeyMap (CmdM m (a,[Key])) -> n a
     readMoreKeys s next = do
-        event <- handle (\(e::SomeException) -> moveToNextLine s
-                                    >> throwIO e) getEvent
+        event <- handle (\(e::SomeException) -> moveToNextLine s >> throwM e)
+                    getEvent
         case event of
-                    ErrorEvent e -> moveToNextLine s >> throwIO e
+                    ErrorEvent e -> moveToNextLine s >> throwM e
                     WindowResize -> do
                         drawReposition liftE tops s
                         readMoreKeys s next

@@ -1,3 +1,6 @@
+#if __GLASGOW_HASKELL__ < 802
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
+#endif
 module System.Console.Haskeline.Vi where
 
 import System.Console.Haskeline.Command
@@ -12,6 +15,7 @@ import System.Console.Haskeline.InputT
 
 import Data.Char
 import Control.Monad(liftM)
+import Control.Monad.Catch (MonadMask)
 
 type EitherMode = Either CommandMode InsertMode
 
@@ -30,8 +34,8 @@ emptyViState = ViState {
 
 type ViT m = StateT (ViState m) (InputCmdT m)
 
-type InputCmd s t = forall m . MonadException m => Command (ViT m) s t
-type InputKeyCmd s t = forall m . MonadException m => KeyCommand (ViT m) s t
+type InputCmd s t = forall m . (MonadIO m, MonadMask m) => Command (ViT m) s t
+type InputKeyCmd s t = forall m . (MonadIO m, MonadMask m) => KeyCommand (ViT m) s t
 
 viKeyCommands :: InputKeyCmd InsertMode (Maybe String)
 viKeyCommands = choiceCmd [
