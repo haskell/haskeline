@@ -5,6 +5,3 @@ packages:
 
 extra-deps:
 - exceptions-0.10.0
-
-ghc-options:
-  "$locals": -Wall -Werror

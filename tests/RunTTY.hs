@@ -13,12 +13,11 @@ module RunTTY (Invocation(..),
 
 import Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import System.Posix.Env.ByteString hiding (setEnv)
 import System.Process
 import Control.Concurrent
 import System.IO
 import Test.HUnit
-import Control.Monad (unless, liftM2, zipWithM_)
+import Control.Monad (unless)
 
 import Pty
 

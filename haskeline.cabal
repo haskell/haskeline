@@ -108,4 +108,31 @@ Library
             cpp-options: -DUSE_TERMIOS_H
         }
     }
-    ghc-options: -Wall
+    ghc-options: -Wall -Werror
+
+
+Executable tests
+    Build-depends: base, containers, text, bytestring, HUnit, process, unix
+    Default-Language: Haskell2010
+    Default-Extensions:
+                ForeignFunctionInterface, Rank2Types, FlexibleInstances,
+                TypeSynonymInstances
+                FlexibleContexts, ExistentialQuantification
+                ScopedTypeVariables, GeneralizedNewtypeDeriving
+                StandaloneDeriving
+                MultiParamTypeClasses,
+                UndecidableInstances
+                ScopedTypeVariables, CPP, DeriveDataTypeable,
+                PatternGuards
+    hs-source-dirs: tests
+    Main-Is:    Unit.hs
+    Other-Modules: RunTTY, Pty
+    ghc-options: -Wall -fno-warn-name-shadowing -fno-warn-missing-signatures
+
+-- The following program is used by unit tests in `tests`
+Executable examples-Test
+    Build-depends: base, containers, haskeline
+    Default-Language: Haskell2010
+    hs-source-dirs: examples
+    Main-Is: Test.hs
+    ghc-options: -Wall -fno-warn-name-shadowing -fno-warn-missing-signatures

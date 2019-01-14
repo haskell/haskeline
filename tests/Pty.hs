@@ -18,9 +18,7 @@ import Foreign.Marshal.Alloc
 import Foreign.C.Error
 import Foreign.C.Types
 import Foreign.Ptr
-import Control.Exception
 import Control.Concurrent
-import Control.Monad (liftM2)
 
 -- Run the given command in a pseudoterminal, and return its output chunks.
 -- Read the initial output, then feed the given input to it
@@ -38,7 +36,7 @@ runCommandInPty prog args env inputs = do
     setFdOption fd NonBlockingRead True
     outputs <- mapM (inputOutput fd) inputs
     signalProcess killProcess pid
-    status <- getProcessStatus True False pid
+    _status <- getProcessStatus True False pid
     closeFd fd
     return (firstOutput : outputs)
 
