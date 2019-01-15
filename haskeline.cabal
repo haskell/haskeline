@@ -110,26 +110,20 @@ Library
     }
     ghc-options: -Wall -Werror
 
-
 Executable tests
-    Build-depends: base, containers, text, bytestring, HUnit, process, unix
-    Default-Language: Haskell2010
-    Default-Extensions:
-                ForeignFunctionInterface, Rank2Types, FlexibleInstances,
-                TypeSynonymInstances
-                FlexibleContexts, ExistentialQuantification
-                ScopedTypeVariables, GeneralizedNewtypeDeriving
-                StandaloneDeriving
-                MultiParamTypeClasses,
-                UndecidableInstances
-                ScopedTypeVariables, CPP, DeriveDataTypeable,
-                PatternGuards
     hs-source-dirs: tests
-    Main-Is:    Unit.hs
-    Other-Modules: RunTTY, Pty
-    ghc-options: -Wall -fno-warn-name-shadowing -fno-warn-missing-signatures
+    Default-Language: Haskell98
 
--- The following program is used by unit tests in `tests`
+    if (os(windows))
+        -- this is dummy module, tests don't compile on windows
+        Main-Is: Windows.hs
+    else
+        Main-Is:    Unit.hs
+        Build-depends: base, containers, text, bytestring, HUnit, process, unix
+        Other-Modules: RunTTY, Pty
+        ghc-options: -Wall -fno-warn-name-shadowing -fno-warn-missing-signatures
+
+-- The following program is used by unit tests in `tests` executable
 Executable examples-Test
     Build-depends: base, containers, haskeline
     Default-Language: Haskell2010
