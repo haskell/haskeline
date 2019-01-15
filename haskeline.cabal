@@ -114,9 +114,10 @@ Executable tests
     hs-source-dirs: tests
     Default-Language: Haskell98
 
-    if (os(windows))
+    if os(windows)
         -- this is dummy module, tests don't compile on windows
         Main-Is: Windows.hs
+        Build-depends: base
     else
         Main-Is:    Unit.hs
         Build-depends: base, containers, text, bytestring, HUnit, process, unix
