@@ -33,8 +33,10 @@ legacyEncoding = False
 -- 2. if there's an incomplete sequence and no more input immediately
 --   available (but not eof), then base will pause to wait for more input,
 --   whereas legacy will immediately stop.
+whenLegacy :: BC.ByteString -> BC.ByteString
 whenLegacy s = if legacyEncoding then s else B.empty
 
+main :: IO Counts
 main = do
     [p] <- getArgs
     let i = setTerm "xterm"
@@ -47,6 +49,7 @@ main = do
     runTestTT $ test [interactionTests i, fileStyleTests i]
 
 
+interactionTests :: Invocation -> Test
 interactionTests i = "interaction" ~: test
     [ unicodeEncoding i
     , unicodeMovement i
@@ -57,6 +60,7 @@ interactionTests i = "interaction" ~: test
     , dumbTests $ setTerm "dumb" i
     ]
 
+unicodeEncoding :: Invocation -> Test
 unicodeEncoding i = "Unicode encoding (valid)" ~:
     [ utf8Test i [utf8 "xαβγy"]
         [prompt 0, utf8 "xαβγy"]
@@ -81,13 +85,14 @@ unicodeEncoding i = "Unicode encoding (valid)" ~:
   where
     l1 = utf8 $ T.replicate 30 "안" -- three bytes, width 60
 
+unicodeMovement :: Invocation -> Test
 unicodeMovement i = "Unicode movement" ~:
     [ "separate" ~: utf8Test i [utf8 "α", utf8 "\ESC[Dx"]
         [prompt 0, utf8 "α", utf8 "\bxα\b"]
     , "coalesced" ~: utf8Test i [utf8 "α\ESC[Dx"]
         [prompt 0, utf8 "xα\b"]
     , "lineWrap" ~: utf8Test i
-        [ utf8 longWideChar 
+        [ utf8 longWideChar
         , raw [1]
         , raw [5]
         ]
@@ -101,24 +106,26 @@ unicodeMovement i = "Unicode movement" ~:
     longWideChar = T.concat $ replicate 30 $ "안기영"
     (lwc1,lwcs1) = T.splitAt ((80-2)`div`2) longWideChar
     (lwc2,lwcs2) = T.splitAt (80`div`2) lwcs1
-    (lwc3,lwcs3) = T.splitAt (80`div`2) lwcs2
+    (lwc3,_lwcs3) = T.splitAt (80`div`2) lwcs2
     -- lwc3 has length 90 - (80-2)/2 - 80/2 = 11,
     -- so the last line as wide width 2*11=22.
 
+tabCompletion :: Invocation -> Test
 tabCompletion i = "tab completion" ~:
     [ utf8Test i [ utf8 "dummy-μ\t\t" ]
-        [ prompt 0, utf8 "dummy-μασ/" 
+        [ prompt 0, utf8 "dummy-μασ/"
             <> nl <> utf8 "bar   ςερτ" <> nl
             <> prompt' 0 <> utf8 "dummy-μασ/"
         ]
     ]
 
+incorrectInput :: Invocation -> Test
 incorrectInput i = "incorrect input" ~:
     [ utf8Test i [ utf8 "x" <> raw [206] ]  -- needs one more byte
         -- non-legacy encoder ignores the "206" since it's still waiting
         -- for more input.
         [ prompt 0, utf8 "x" <> whenLegacy err ]
-    , utf8Test i [ raw [206] <> utf8 "x" ]  
+    , utf8Test i [ raw [206] <> utf8 "x" ]
         -- 'x' is not valid after '\206', so both the legacy and
         -- non-legacy encoders should handle the "x" correctly.
         [ prompt 0, err <> utf8 "x"]
@@ -126,6 +133,7 @@ incorrectInput i = "incorrect input" ~:
         [prompt 0, err <> err <> utf8 "x"]
     ]
 
+historyTests :: Invocation -> Test
 historyTests i =  "history encoding" ~:
     [ utf8TestValidHist i [ "\ESC[A" ]
         [prompt 0, utf8 "abcα" ]
@@ -138,16 +146,19 @@ historyTests i =  "history encoding" ~:
         [prompt 0, utf8 "abc??x?x?" ]
     ]
 
-invalidHist =  utf8 "abcα" 
+invalidHist :: BC.ByteString
+invalidHist =  utf8 "abcα"
               `B.append` raw [149] -- invalid start of UTF-8 sequence
               `B.append` utf8 "x"
-              `B.append` raw [206] -- incomplete start 
+              `B.append` raw [206] -- incomplete start
               `B.append` utf8 "x"
               -- incomplete at end of file
               `B.append` raw [206]
 
+validHist :: BC.ByteString
 validHist = utf8 "abcα"
 
+inputChar :: Invocation -> Test
 inputChar i = "getInputChar" ~:
     [ utf8Test i [utf8 "xαβ"]
         [ prompt 0, utf8 "x" <> end <> output 0 (utf8 "x")
@@ -155,14 +166,14 @@ inputChar i = "getInputChar" ~:
           <> prompt 2 <> utf8 "β" <> end <> output 2 (utf8 "β")
           <> prompt 3
         ]
-    , "bad encoding (separate)" ~: 
+    , "bad encoding (separate)" ~:
         utf8Test i [utf8 "α", raw [149], utf8 "x", raw [206]]
         [ prompt 0, utf8 "α" <> end <> output 0 (utf8 "α") <> prompt 1
         , err <> end <> output 1 err <> prompt 2
         , utf8 "x" <> end <> output 2 (utf8 "x") <> prompt 3
         , whenLegacy (err <> end <> output 3 err <> prompt 4)
         ]
-    , "bad encoding (together)" ~: 
+    , "bad encoding (together)" ~:
         utf8Test i [utf8 "α" <> raw [149] <> utf8 "x" <> raw [206]]
         [ prompt 0, utf8 "α" <> end <> output 0 (utf8 "α")
         <> prompt 1 <> err <> end <> output 1 err
@@ -175,9 +186,11 @@ inputChar i = "getInputChar" ~:
         ]
     ]
 
+setCharInput :: Invocation -> Invocation
 setCharInput i = i { progArgs = ["chars"] }
 
 
+fileStyleTests :: Invocation -> Test
 fileStyleTests i = "file style" ~:
     [ "line input" ~: utf8Test iFile
         [utf8 "xαβyψ안기q영\nquit\n"]
@@ -194,7 +207,7 @@ fileStyleTests i = "file style" ~:
         -- NOTE: the 206 is an incomplete byte sequence,
         -- but we MUST not pause since we're at EOF, not just
         -- end of term.
-        -- 
+        --
         -- Also recall GHC bug #5436 which caused a crash
         -- if the last byte started an incomplete sequence.
         [ utf8 "a" <> raw [149] <> utf8 "x" <> raw [206] ]
@@ -234,6 +247,7 @@ fileStyleTests i = "file style" ~:
 -- If all the above tests work for the terminfo backend,
 -- then we just need to make sure the dumb term plugs into everything
 -- correctly, i.e., encodes the input/output and doesn't double-encode.
+dumbTests :: Invocation -> Test
 dumbTests i = "dumb term" ~:
     [ "line input" ~: utf8Test i
         [ utf8 "xαβγy" ]
@@ -299,16 +313,24 @@ err = if legacyEncoding
 
 ----------------------
 
+utf8Test ::
+  Invocation -> [BC.ByteString] -> [BC.ByteString] -> Test
 utf8Test = testI . setUTF8
 
-utf8TestInvalidHist i input output = test $ do
+utf8TestInvalidHist ::
+  Invocation -> [BC.ByteString] -> [BC.ByteString] -> Test
+utf8TestInvalidHist i input output' = test $ do
     B.writeFile "myhist" $ invalidHist
-    assertInvocation (setUTF8 i) input output
+    assertInvocation (setUTF8 i) input output'
 
-utf8TestValidHist i input output = test $ do
+utf8TestValidHist ::
+  Invocation -> [BC.ByteString] -> [BC.ByteString] -> Test
+utf8TestValidHist i input output' = test $ do
     B.writeFile "myhist" validHist
-    assertInvocation (setUTF8 i) input output
+    assertInvocation (setUTF8 i) input output'
 
-latin1TestInvalidHist i input output = test $ do
+latin1TestInvalidHist ::
+  Invocation -> [BC.ByteString] -> [BC.ByteString] -> Test
+latin1TestInvalidHist i input output' = test $ do
     B.writeFile "myhist" $ invalidHist
-    assertInvocation (setLatin1 i) input output
+    assertInvocation (setLatin1 i) input output'

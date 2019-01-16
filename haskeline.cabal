@@ -108,7 +108,6 @@ Library
             cpp-options: -DUSE_TERMIOS_H
         }
     }
-    ghc-options: -Wall -Werror
 
 Executable tests
     hs-source-dirs: tests
@@ -122,7 +121,6 @@ Executable tests
         Main-Is:    Unit.hs
         Build-depends: base, containers, text, bytestring, HUnit, process, unix
         Other-Modules: RunTTY, Pty
-        ghc-options: -Wall -fno-warn-name-shadowing -fno-warn-missing-signatures
 
 -- The following program is used by unit tests in `tests` executable
 Executable examples-Test
@@ -130,4 +128,3 @@ Executable examples-Test
     Default-Language: Haskell2010
     hs-source-dirs: examples
     Main-Is: Test.hs
-    ghc-options: -Wall -fno-warn-name-shadowing -fno-warn-missing-signatures
