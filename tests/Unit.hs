@@ -21,6 +21,7 @@ import qualified Data.ByteString.Char8 as BC
 import Data.Word
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as E
+import Data.Monoid ((<>))
 
 import RunTTY
 
@@ -296,9 +297,6 @@ output k s = utf8 (T.pack $ "line " ++ show k ++ ":")
 
 wrap :: B.ByteString
 wrap = utf8 " \b"
-
-(<>) :: B.ByteString -> B.ByteString -> B.ByteString
-(<>) = B.append
 
 utf8 :: T.Text -> B.ByteString
 utf8 = E.encodeUtf8
