@@ -1,3 +1,9 @@
+Changed in version 0.7.5.0:
+   * Add the new function `fallbackCompletion` to combine
+     multiple `CompletionFunc`s
+   * Fix warnings
+   * Bump the lower bound to ghc-8.0
+
 Changed in version 0.7.4.3:
    * Bump upper bounds on base, containers, stm and unix
    * Fix redundant "Category" field in haskeline.cabal
