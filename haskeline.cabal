@@ -109,6 +109,8 @@ Library
         }
     }
 
+    ghc-opitons: -Wall
+
 Executable tests
     hs-source-dirs: tests
     Default-Language: Haskell98
