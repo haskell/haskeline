@@ -47,7 +47,7 @@ module System.Console.Haskeline(
                     getInputLineWithInitial,
                     getInputChar,
                     getPassword,
-                    waitForKey,
+                    waitForAnyKey,
                     -- ** Outputting text
                     -- $outputfncs
                     outputStr,
@@ -233,7 +233,7 @@ acceptOneChar = choiceCmd [useChar $ \c s -> change (insertChar c) s
 
 ----------
 {- | Waits for one key to be pressed, then returns.  Ignores the value
-of the input key.
+of the specific key.
 
 Returns 'True' if it successfully accepted one key.  Returns 'False'
 if it encountered the end of input; i.e., an @EOF@ in file-style interaction,
@@ -242,10 +242,10 @@ or a @Ctrl-D@ in terminal-style interaction.
 When using file-style interaction, consumes a single character from the input which may
 be non-printable.
 -}
-waitForKey :: (MonadIO m, MonadMask m)
+waitForAnyKey :: (MonadIO m, MonadMask m)
     => String -- ^ The input prompt
     -> InputT m Bool
-waitForKey = promptedInput getAnyKeyCmd
+waitForAnyKey = promptedInput getAnyKeyCmd
             $ \fops -> fmap isJust . runMaybeT $ getLocaleChar fops
 
 getAnyKeyCmd :: (MonadIO m, MonadMask m) => TermOps -> Prefix -> InputT m Bool
