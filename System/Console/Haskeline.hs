@@ -47,6 +47,7 @@ module System.Console.Haskeline(
                     getInputLineWithInitial,
                     getInputChar,
                     getPassword,
+                    acceptAnyKey,
                     -- ** Outputting text
                     -- $outputfncs
                     outputStr,
@@ -91,6 +92,7 @@ import System.Console.Haskeline.RunCommand
 
 import Control.Monad.Catch (MonadMask, handle)
 import Data.Char (isSpace, isPrint)
+import Data.Maybe (isJust)
 import System.IO
 
 
@@ -226,6 +228,32 @@ acceptOneChar = choiceCmd [useChar $ \c s -> change (insertChar c) s
                           , ctrlChar 'l' +> clearScreenCmd >|>
                                         keyCommand acceptOneChar
                           , ctrlChar 'd' +> failCmd]
+
+----------
+{- | Waits for one key to be pressed, then returns.  Ignores the value
+of the input key.
+
+Returns 'True' if it successfully accepted one key.  Returns 'False'
+if it encountered the end of input; i.e., an @EOF@ in file-style interaction,
+or a @Ctrl-D@ in terminal-style interaction.
+
+When using file-style interaction, consumes a single character from the input which may
+be non-printable.
+-}
+acceptAnyKey :: (MonadIO m, MonadMask m)
+    => String -- ^ The input prompt
+    -> InputT m Bool
+acceptAnyKey = promptedInput getAnyKeyCmd
+            $ \fops -> fmap isJust . runMaybeT $ getLocaleChar fops
+
+getAnyKeyCmd :: (MonadIO m, MonadMask m) => TermOps -> String -> InputT m Bool
+getAnyKeyCmd tops prefix = runInputCmdT tops
+    $ runCommandLoop tops prefix acceptAnyChar emptyIM
+  where
+    acceptAnyChar = choiceCmd
+                [ ctrlChar 'd' +> const (return False)
+                , KeyMap $ const $ Just (Consumed $ const $ return True)
+                ]
 
 ----------
 -- Passwords
