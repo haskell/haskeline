@@ -47,7 +47,7 @@ module System.Console.Haskeline(
                     getInputLineWithInitial,
                     getInputChar,
                     getPassword,
-                    acceptAnyKey,
+                    waitForKey,
                     -- ** Outputting text
                     -- $outputfncs
                     outputStr,
@@ -242,10 +242,10 @@ or a @Ctrl-D@ in terminal-style interaction.
 When using file-style interaction, consumes a single character from the input which may
 be non-printable.
 -}
-acceptAnyKey :: (MonadIO m, MonadMask m)
+waitForKey :: (MonadIO m, MonadMask m)
     => String -- ^ The input prompt
     -> InputT m Bool
-acceptAnyKey = promptedInput getAnyKeyCmd
+waitForKey = promptedInput getAnyKeyCmd
             $ \fops -> fmap isJust . runMaybeT $ getLocaleChar fops
 
 getAnyKeyCmd :: (MonadIO m, MonadMask m) => TermOps -> Prefix -> InputT m Bool
