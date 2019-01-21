@@ -12,13 +12,13 @@ import Control.Monad
 import Control.Monad.Catch (handle, throwM)
 
 runCommandLoop :: (CommandMonad m, MonadState Layout m, LineState s)
-    => TermOps -> String -> KeyCommand m s a -> s -> m a
+    => TermOps -> Prefix -> KeyCommand m s a -> s -> m a
 runCommandLoop tops@TermOps{evalTerm = e} prefix cmds initState
     = case e of -- NB: Need to separate this case out from the above pattern
                 -- in order to build on ghc-6.12.3
         EvalTerm eval liftE
             -> eval $ withGetEvent tops
-                $ runCommandLoop' liftE tops (stringToGraphemes prefix) initState 
+                $ runCommandLoop' liftE tops prefix initState
                     cmds 
 
 runCommandLoop' :: forall m n s a . (Term n, CommandMonad n,
