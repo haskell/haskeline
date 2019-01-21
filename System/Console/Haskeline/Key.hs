@@ -79,8 +79,8 @@ specialKeys = [("left",LeftKey)
               ,("tab",KeyChar '\t')
               ,("esc",KeyChar '\ESC')
               ,("escape",KeyChar '\ESC')
-              ,("searchreverse",SearchReverse)
-              ,("searchforward",SearchForward)
+              ,("reversesearchhistory",SearchReverse)
+              ,("forwardsearchhistory",SearchForward)
               ]
 
 parseModifiers :: [String] -> BaseKey -> Key
