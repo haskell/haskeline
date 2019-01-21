@@ -171,7 +171,7 @@ getInputLineWithInitial prompt (left,right) = promptedInput (getInputCmdLine ini
   where
     initialIM = insertString left $ moveToStart $ insertString right $ emptyIM
 
-getInputCmdLine :: (MonadIO m, MonadMask m) => InsertMode -> TermOps -> String -> InputT m (Maybe String)
+getInputCmdLine :: (MonadIO m, MonadMask m) => InsertMode -> TermOps -> Prefix -> InputT m (Maybe String)
 getInputCmdLine initialIM tops prefix = do
     emode <- InputT $ asks editMode
     result <- runInputCmdT tops $ case emode of
@@ -218,7 +218,7 @@ getPrintableChar fops = do
         Just False -> getPrintableChar fops
         _ -> return c
 
-getInputCmdChar :: (MonadIO m, MonadMask m) => TermOps -> String -> InputT m (Maybe Char)
+getInputCmdChar :: (MonadIO m, MonadMask m) => TermOps -> Prefix -> InputT m (Maybe Char)
 getInputCmdChar tops prefix = runInputCmdT tops
         $ runCommandLoop tops prefix acceptOneChar emptyIM
 
@@ -275,7 +275,7 @@ and 'historyFile' flags.
 -- | Wrapper for input functions.
 -- This is the function that calls "wrapFileInput" around file backend input
 -- functions (see Term.hs).
-promptedInput :: MonadIO m => (TermOps -> String -> InputT m a)
+promptedInput :: MonadIO m => (TermOps -> Prefix -> InputT m a)
                         -> (FileOps -> IO a)
                         -> String -> InputT m a
 promptedInput doTerm doFile prompt = do
@@ -288,9 +288,13 @@ promptedInput doTerm doFile prompt = do
                         putStrOut rterm prompt
                         wrapFileInput fops $ doFile fops
         Left tops -> do
+            -- Convert the full prompt to graphemes (not just the last line)
+            -- to account for the `\ESC...STX` appearing anywhere in it.
+            let prompt' = stringToGraphemes prompt
             -- If the prompt contains newlines, print all but the last line.
-            let (lastLine,rest) = break (`elem` "\r\n") $ reverse prompt
-            outputStr $ reverse rest
+            let (lastLine,rest) = break (`elem` stringToGraphemes "\r\n")
+                                    $ reverse prompt'
+            outputStr $ graphemesToString $ reverse rest
             doTerm tops $ reverse lastLine
 
 {- | If Ctrl-C is pressed during the given action, throw an exception
