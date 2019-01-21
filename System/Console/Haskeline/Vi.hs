@@ -61,6 +61,8 @@ simpleInsertions = choiceCmd
                    , ctrlChar 'l' +> clearScreenCmd
                    , simpleKey UpKey +> historyBack
                    , simpleKey DownKey +> historyForward
+                   , simpleKey SearchReverse +> searchForPrefix Reverse
+                   , simpleKey SearchForward +> searchForPrefix Forward
                    , searchHistory
                    , simpleKey KillLine +> killFromHelper (SimpleMove moveToStart)
                    , ctrlChar 'w' +> killFromHelper wordErase

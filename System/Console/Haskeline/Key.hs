@@ -33,12 +33,14 @@ instance Show Modifier where
 noModifier :: Modifier
 noModifier = Modifier False False False
 
+-- Note: a few of these aren't really keys (e.g., KillLine),
+-- but they provide useful enough binding points to include.
 data BaseKey = KeyChar Char
              | FunKey Int
              | LeftKey | RightKey | DownKey | UpKey
-             -- TODO: is KillLine really a key?
              | KillLine | Home | End | PageDown | PageUp
              | Backspace | Delete
+             | SearchReverse | SearchForward
             deriving (Show,Eq,Ord)
 
 simpleKey :: BaseKey -> Key
@@ -77,6 +79,8 @@ specialKeys = [("left",LeftKey)
               ,("tab",KeyChar '\t')
               ,("esc",KeyChar '\ESC')
               ,("escape",KeyChar '\ESC')
+              ,("reversesearchhistory",SearchReverse)
+              ,("forwardsearchhistory",SearchForward)
               ]
 
 parseModifiers :: [String] -> BaseKey -> Key

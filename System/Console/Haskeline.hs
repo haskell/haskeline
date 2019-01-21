@@ -129,11 +129,13 @@ outputStrLn = outputStr . (++ "\n")
 {- $inputfncs
 The following functions read one line or character of input from the user.
 
-When using terminal-style interaction, these functions return 'Nothing' if the user
-pressed @Ctrl-D@ when the input text was empty.
+They return `Nothing` if they encounter the end of input.  More specifically:
 
-When using file-style interaction, these functions return 'Nothing' if
-an @EOF@ was encountered before any characters were read.
+- When using terminal-style interaction, they return `Nothing` if the user
+  pressed @Ctrl-D@ when the input text was empty.
+
+- When using file-style interaction, they return `Nothing` if an @EOF@ was
+  encountered before any characters were read.
 -}
 
 
@@ -171,7 +173,7 @@ getInputLineWithInitial prompt (left,right) = promptedInput (getInputCmdLine ini
   where
     initialIM = insertString left $ moveToStart $ insertString right $ emptyIM
 
-getInputCmdLine :: (MonadIO m, MonadMask m) => InsertMode -> TermOps -> String -> InputT m (Maybe String)
+getInputCmdLine :: (MonadIO m, MonadMask m) => InsertMode -> TermOps -> Prefix -> InputT m (Maybe String)
 getInputCmdLine initialIM tops prefix = do
     emode <- InputT $ asks editMode
     result <- runInputCmdT tops $ case emode of
@@ -218,7 +220,7 @@ getPrintableChar fops = do
         Just False -> getPrintableChar fops
         _ -> return c
 
-getInputCmdChar :: (MonadIO m, MonadMask m) => TermOps -> String -> InputT m (Maybe Char)
+getInputCmdChar :: (MonadIO m, MonadMask m) => TermOps -> Prefix -> InputT m (Maybe Char)
 getInputCmdChar tops prefix = runInputCmdT tops
         $ runCommandLoop tops prefix acceptOneChar emptyIM
 
@@ -246,7 +248,7 @@ acceptAnyKey :: (MonadIO m, MonadMask m)
 acceptAnyKey = promptedInput getAnyKeyCmd
             $ \fops -> fmap isJust . runMaybeT $ getLocaleChar fops
 
-getAnyKeyCmd :: (MonadIO m, MonadMask m) => TermOps -> String -> InputT m Bool
+getAnyKeyCmd :: (MonadIO m, MonadMask m) => TermOps -> Prefix -> InputT m Bool
 getAnyKeyCmd tops prefix = runInputCmdT tops
     $ runCommandLoop tops prefix acceptAnyChar emptyIM
   where
@@ -301,7 +303,7 @@ and 'historyFile' flags.
 -- | Wrapper for input functions.
 -- This is the function that calls "wrapFileInput" around file backend input
 -- functions (see Term.hs).
-promptedInput :: MonadIO m => (TermOps -> String -> InputT m a)
+promptedInput :: MonadIO m => (TermOps -> Prefix -> InputT m a)
                         -> (FileOps -> IO a)
                         -> String -> InputT m a
 promptedInput doTerm doFile prompt = do
@@ -314,9 +316,13 @@ promptedInput doTerm doFile prompt = do
                         putStrOut rterm prompt
                         wrapFileInput fops $ doFile fops
         Left tops -> do
+            -- Convert the full prompt to graphemes (not just the last line)
+            -- to account for the `\ESC...STX` appearing anywhere in it.
+            let prompt' = stringToGraphemes prompt
             -- If the prompt contains newlines, print all but the last line.
-            let (lastLine,rest) = break (`elem` "\r\n") $ reverse prompt
-            outputStr $ reverse rest
+            let (lastLine,rest) = break (`elem` stringToGraphemes "\r\n")
+                                    $ reverse prompt'
+            outputStr $ graphemesToString $ reverse rest
             doTerm tops $ reverse lastLine
 
 {- | If Ctrl-C is pressed during the given action, throw an exception
