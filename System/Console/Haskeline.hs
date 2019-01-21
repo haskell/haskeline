@@ -127,11 +127,13 @@ outputStrLn = outputStr . (++ "\n")
 {- $inputfncs
 The following functions read one line or character of input from the user.
 
-When using terminal-style interaction, these functions return 'Nothing' if the user
-pressed @Ctrl-D@ when the input text was empty.
+They return `Nothing` if they encounter the end of input.  More specifically:
 
-When using file-style interaction, these functions return 'Nothing' if
-an @EOF@ was encountered before any characters were read.
+- When using terminal-style interaction, they return `Nothing` if the user
+  pressed @Ctrl-D@ when the input text was empty.
+
+- When using file-style interaction, they return `Nothing` if an @EOF@ was
+  encountered before any characters were read.
 -}
 
 
