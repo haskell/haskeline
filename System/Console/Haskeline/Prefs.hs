@@ -9,10 +9,11 @@ module System.Console.Haskeline.Prefs(
                         lookupKeyBinding
                         ) where
 
+import Control.Monad.Catch (handle)
+import Control.Exception (IOException)
 import Data.Char(isSpace,toLower)
 import Data.List(foldl')
 import qualified Data.Map as Map
-import System.Console.Haskeline.MonadException(handle,IOException)
 import System.Console.Haskeline.Key
 
 {- |

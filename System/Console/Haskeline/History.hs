@@ -86,7 +86,7 @@ addHistory :: String -> History -> History
 addHistory s h = h {histLines = maybeDropLast (stifleAmt h) (s <| (histLines h))}
 
 -- If the sequence is too big, drop the last entry.
-maybeDropLast :: Ord a => Maybe Int -> Seq a -> Seq a
+maybeDropLast :: Maybe Int -> Seq a -> Seq a
 maybeDropLast maxAmt hs
     | rightSize = hs
     | otherwise = case viewr hs of

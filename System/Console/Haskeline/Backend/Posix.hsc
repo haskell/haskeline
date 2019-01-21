@@ -17,7 +17,9 @@ import Foreign
 import Foreign.C.Types
 import qualified Data.Map as Map
 import System.Posix.Terminal hiding (Interrupt)
+import Control.Exception (throwTo)
 import Control.Monad
+import Control.Monad.Catch (MonadMask, handle, finally)
 import Control.Concurrent.STM
 import Control.Concurrent hiding (throwTo)
 import Data.Maybe (catMaybes)
@@ -27,7 +29,7 @@ import Data.List
 import System.IO
 import System.Environment
 
-import System.Console.Haskeline.Monads hiding (Handler)
+import System.Console.Haskeline.Monads
 import System.Console.Haskeline.Key
 import System.Console.Haskeline.Term as Term
 import System.Console.Haskeline.Prefs
@@ -201,7 +203,7 @@ lookupChars (TreeMap tm) (c:cs) = case Map.lookup c tm of
 
 -----------------------------
 
-withPosixGetEvent :: (MonadException m, MonadReader Prefs m)
+withPosixGetEvent :: (MonadIO m, MonadMask m, MonadReader Prefs m)
         => TChan Event -> Handles -> [(String,Key)]
                 -> (m Event -> m a) -> m a
 withPosixGetEvent eventChan h termKeys f = wrapTerminalOps h $ do
@@ -209,18 +211,18 @@ withPosixGetEvent eventChan h termKeys f = wrapTerminalOps h $ do
     withWindowHandler eventChan
         $ f $ liftIO $ getEvent (ehIn h) baseMap eventChan
 
-withWindowHandler :: MonadException m => TChan Event -> m a -> m a
+withWindowHandler :: (MonadIO m, MonadMask m) => TChan Event -> m a -> m a
 withWindowHandler eventChan = withHandler windowChange $
     Catch $ atomically $ writeTChan eventChan WindowResize
 
-withSigIntHandler :: MonadException m => m a -> m a
+withSigIntHandler :: (MonadIO m, MonadMask m) => m a -> m a
 withSigIntHandler f = do
     tid <- liftIO myThreadId
     withHandler keyboardSignal
             (Catch (throwTo tid Interrupt))
             f
 
-withHandler :: MonadException m => Signal -> Handler -> m a -> m a
+withHandler :: (MonadIO m, MonadMask m) => Signal -> Handler -> m a -> m a
 withHandler signal handler f = do
     old_handler <- liftIO $ installHandler signal handler Nothing
     f `finally` liftIO (installHandler signal old_handler Nothing)
@@ -279,8 +281,8 @@ posixRunTerm ::
     Handles
     -> [IO (Maybe Layout)]
     -> [(String,Key)]
-    -> (forall m b . MonadException m => m b -> m b)
-    -> (forall m . (MonadException m, CommandMonad m) => EvalTerm (PosixT m))
+    -> (forall m b . (MonadIO m, MonadMask m) => m b -> m b)
+    -> (forall m . (MonadMask m, CommandMonad m) => EvalTerm (PosixT m))
     -> IO RunTerm
 posixRunTerm hs layoutGetters keys wrapGetEvent evalBackend = do
     ch <- newTChanIO
@@ -303,7 +305,7 @@ posixRunTerm hs layoutGetters keys wrapGetEvent evalBackend = do
 
 type PosixT m = ReaderT Handles m
 
-runPosixT :: Monad m => Handles -> PosixT m a -> m a
+runPosixT :: Handles -> PosixT m a -> m a
 runPosixT h = runReaderT' h
 
 fileRunTerm :: Handle -> IO RunTerm
@@ -336,7 +338,7 @@ posixFileRunTerm hs = do
 -- NOTE: If we set stdout to NoBuffering, there can be a flicker effect when many
 -- characters are printed at once.  We'll keep it buffered here, and let the Draw
 -- monad manually flush outputs that don't print a newline.
-wrapTerminalOps :: MonadException m => Handles -> m a -> m a
+wrapTerminalOps :: (MonadIO m, MonadMask m) => Handles -> m a -> m a
 wrapTerminalOps hs =
     bracketSet (hGetBuffering h_in) (hSetBuffering h_in) NoBuffering
     -- TODO: block buffering?  Certain \r and \n's are causing flicker...
@@ -344,8 +346,8 @@ wrapTerminalOps hs =
     -- - breaking line after offset widechar?
     . bracketSet (hGetBuffering h_out) (hSetBuffering h_out) LineBuffering
     . bracketSet (hGetEcho h_in) (hSetEcho h_in) False
-    . liftIOOp_ (withCodingMode $ hIn hs)
-    . liftIOOp_ (withCodingMode $ hOut hs)
+    . withCodingMode (hIn hs)
+    . withCodingMode (hOut hs)
   where
     h_in = ehIn hs
     h_out = ehOut hs

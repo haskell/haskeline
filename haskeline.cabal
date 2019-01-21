@@ -1,13 +1,12 @@
 Name:           haskeline
 Cabal-Version:  >=1.10
-Version:        0.7.4.3
+Version:        0.8.0.0
 Category:       User Interfaces
 License:        BSD3
 License-File:   LICENSE
 Copyright:      (c) Judah Jacobson
 Author:         Judah Jacobson
 Maintainer:     Judah Jacobson <judah.jacobson@gmail.com>
-Category:       User Interfaces
 Synopsis:       A command-line interface for user input, written in Haskell.
 Description:
                 Haskeline provides a user interface for line input in command-line
@@ -43,10 +42,11 @@ Library
     -- We require ghc>=7.4.1 (base>=4.5) to use the base library encodings, even
     -- though it was implemented in earlier releases, due to GHC bug #5436 which
     -- wasn't fixed until 7.4.1
-    Build-depends: base >=4.5 && < 4.13, containers>=0.4 && < 0.7,
+    Build-depends: base >=4.9 && < 4.13, containers>=0.4 && < 0.7,
                    directory>=1.1 && < 1.4, bytestring>=0.9 && < 0.11,
                    filepath >= 1.2 && < 1.5, transformers >= 0.2 && < 0.6,
-                   process >= 1.0 && < 1.7, stm >= 2.4 && < 2.6
+                   process >= 1.0 && < 1.7, stm >= 2.4 && < 2.6,
+                   exceptions == 0.10.*
     Default-Language: Haskell98
     Default-Extensions:
                 ForeignFunctionInterface, Rank2Types, FlexibleInstances,
@@ -54,14 +54,13 @@ Library
                 FlexibleContexts, ExistentialQuantification
                 ScopedTypeVariables, GeneralizedNewtypeDeriving
                 StandaloneDeriving
-                MultiParamTypeClasses, OverlappingInstances
+                MultiParamTypeClasses,
                 UndecidableInstances
                 ScopedTypeVariables, CPP, DeriveDataTypeable,
                 PatternGuards
     Exposed-Modules:
                 System.Console.Haskeline
                 System.Console.Haskeline.Completion
-                System.Console.Haskeline.MonadException
                 System.Console.Haskeline.History
                 System.Console.Haskeline.IO
     Other-Modules:

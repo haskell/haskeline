@@ -1,3 +1,6 @@
+#if __GLASGOW_HASKELL__ < 802
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
+#endif
 module System.Console.Haskeline.Backend.Terminfo(
                             Draw(),
                             runTerminfoDraw
@@ -5,8 +8,8 @@ module System.Console.Haskeline.Backend.Terminfo(
                              where
 
 import System.Console.Terminfo
-import Control.Applicative
 import Control.Monad
+import Control.Monad.Catch
 import Data.List(foldl')
 import System.IO
 import qualified Control.Exception as Exception
@@ -103,7 +106,8 @@ newtype Draw m a = Draw {unDraw :: (ReaderT Actions
                                     (StateT TermRows
                                     (StateT TermPos
                                     (PosixT m))))) a}
-    deriving (Functor, Applicative, Monad, MonadIO, MonadException,
+    deriving (Functor, Applicative, Monad, MonadIO,
+              MonadMask, MonadThrow, MonadCatch,
               MonadReader Actions, MonadReader Terminal, MonadState TermPos,
               MonadState TermRows, MonadReader Handles)
 
@@ -134,7 +138,7 @@ runTerminfoDraw h = do
                 (evalDraw term actions)
 
 -- If the keypad on/off capabilities are defined, wrap the computation with them.
-wrapKeypad :: MonadException m => Handle -> Terminal -> m a -> m a
+wrapKeypad :: (MonadIO m, MonadMask m) => Handle -> Terminal -> m a -> m a
 wrapKeypad h term f = (maybeOutput keypadOn >> f)
                             `finally` maybeOutput keypadOff
   where
@@ -347,7 +351,7 @@ repositionT _ s = do
     put initTermRows
     drawLineDiffT ([],[]) s
 
-instance (MonadException m, MonadReader Layout m) => Term (Draw m) where
+instance (MonadIO m, MonadMask m, MonadReader Layout m) => Term (Draw m) where
     drawLineDiff xs ys = runActionT $ drawLineDiffT xs ys
     reposition layout lc = runActionT $ repositionT layout lc
     
