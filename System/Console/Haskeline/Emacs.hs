@@ -46,6 +46,8 @@ simpleActions = choiceCmd
             , completionCmd (simpleChar '\t')
             , simpleKey UpKey +> historyBack
             , simpleKey DownKey +> historyForward
+            , simpleKey SearchReverse +> searchForPrefix Reverse
+            , simpleKey SearchForward +> searchForPrefix Forward
             , searchHistory
             ] 
             
