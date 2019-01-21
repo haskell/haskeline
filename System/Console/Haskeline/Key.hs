@@ -11,19 +11,26 @@ module System.Console.Haskeline.Key(Key(..),
             parseKey
             ) where
 
-import Data.Char
-import Control.Monad
-import Data.Maybe
 import Data.Bits
+import Data.Char
+import Data.Maybe
+import Data.List (intercalate)
+import Control.Monad
 
 data Key = Key Modifier BaseKey
-            deriving (Show,Eq,Ord)
+            deriving (Eq,Ord)
+
+instance Show Key where
+    show (Key modifier base)
+        | modifier == noModifier = show base
+        | otherwise = show modifier ++ "-" ++ show base
 
 data Modifier = Modifier {hasControl, hasMeta, hasShift :: Bool}
             deriving (Eq,Ord)
 
 instance Show Modifier where
-    show m = show $ catMaybes [maybeUse hasControl "ctrl"
+    show m = intercalate "-"
+            $ catMaybes [maybeUse hasControl "ctrl"
                         , maybeUse hasMeta "meta"
                         , maybeUse hasShift "shift"
                         ]
@@ -41,7 +48,32 @@ data BaseKey = KeyChar Char
              | KillLine | Home | End | PageDown | PageUp
              | Backspace | Delete
              | SearchReverse | SearchForward
-            deriving (Show,Eq,Ord)
+            deriving (Eq, Ord)
+
+instance Show BaseKey where
+    show (KeyChar '\n') = "Return"
+    show (KeyChar '\t') = "Tab"
+    show (KeyChar '\ESC') = "Esc"
+    show (KeyChar c)
+        | isPrint c = [c]
+        | isPrint unCtrld = "ctrl-" ++ [unCtrld]
+        | otherwise = show c
+      where
+        unCtrld = toEnum (fromEnum c .|. ctrlBits)
+    show (FunKey n) = 'f' : show n
+    show LeftKey = "Left"
+    show RightKey = "Right"
+    show DownKey = "Down"
+    show UpKey = "Up"
+    show KillLine = "KillLine"
+    show Home = "Home"
+    show End = "End"
+    show PageDown = "PageDown"
+    show PageUp = "PageUp"
+    show Backspace = "Backspace"
+    show Delete = "Delete"
+    show SearchReverse = "SearchReverse"
+    show SearchForward = "SearchForward"
 
 simpleKey :: BaseKey -> Key
 simpleKey = Key noModifier
@@ -60,7 +92,10 @@ ctrlChar = simpleChar . setControlBits
 
 setControlBits :: Char -> Char
 setControlBits '?' = toEnum 127
-setControlBits c = toEnum $ fromEnum c .&. complement (bit 5 .|. bit 6)
+setControlBits c = toEnum $ fromEnum c .&. complement ctrlBits
+
+ctrlBits :: Int
+ctrlBits = bit 5 .|. bit 6
 
 specialKeys :: [(String,BaseKey)]
 specialKeys = [("left",LeftKey)

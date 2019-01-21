@@ -63,6 +63,7 @@ Library
                 System.Console.Haskeline.Completion
                 System.Console.Haskeline.History
                 System.Console.Haskeline.IO
+                System.Console.Haskeline.Internal
     Other-Modules:
                 System.Console.Haskeline.Backend
                 System.Console.Haskeline.Backend.WCWidth
