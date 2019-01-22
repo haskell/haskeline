@@ -111,7 +111,7 @@ Library
 
     ghc-options: -Wall
 
-Executable tests
+Executable haskeline-tests
     hs-source-dirs: tests
     Default-Language: Haskell98
 
@@ -124,7 +124,7 @@ Executable tests
         Other-Modules: RunTTY, Pty
 
 -- The following program is used by unit tests in `tests` executable
-Executable examples-Test
+Executable haskeline-examples-Test
     Build-depends: base, containers, haskeline
     Default-Language: Haskell2010
     hs-source-dirs: examples
