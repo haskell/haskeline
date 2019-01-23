@@ -109,4 +109,24 @@ Library
             cpp-options: -DUSE_TERMIOS_H
         }
     }
+
     ghc-options: -Wall
+
+Executable haskeline-tests
+    hs-source-dirs: tests
+    Default-Language: Haskell98
+
+    if os(windows)
+        Main-is: NotExisting.hs
+        buildable: False
+    else
+        Main-Is:    Unit.hs
+        Build-depends: base, containers, text, bytestring, HUnit, process, unix
+        Other-Modules: RunTTY, Pty
+
+-- The following program is used by unit tests in `tests` executable
+Executable haskeline-examples-Test
+    Build-depends: base, containers, haskeline
+    Default-Language: Haskell2010
+    hs-source-dirs: examples
+    Main-Is: Test.hs
