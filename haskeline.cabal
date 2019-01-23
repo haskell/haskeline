@@ -112,17 +112,17 @@ Library
 
     ghc-options: -Wall
 
-Executable haskeline-tests
+test-suite haskeline-tests
+    type: exitcode-stdio-1.0
     hs-source-dirs: tests
     Default-Language: Haskell98
 
     if os(windows)
-        Main-is: NotExisting.hs
         buildable: False
-    else
-        Main-Is:    Unit.hs
-        Build-depends: base, containers, text, bytestring, HUnit, process, unix
-        Other-Modules: RunTTY, Pty
+    Main-Is:    Unit.hs
+    Build-depends: base, containers, text, bytestring, HUnit, process, unix
+    Other-Modules: RunTTY, Pty
+    build-tool-depends: haskeline:haskeline-examples-Test
 
 -- The following program is used by unit tests in `tests` executable
 Executable haskeline-examples-Test
