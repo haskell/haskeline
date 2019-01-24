@@ -1,27 +1,24 @@
 {-# LANGUAGE OverloadedStrings #-}
--- Usage:
---   ghc ../examples/Test.hs
---   ghc Unit.hs
---   ./Unit ../examples/Test
 -- Requirements:
 -- - Empty ~/.haskeline (or set to defaults)
--- - Assumes the dummy folder is in the current folder
--- - On Mac OS X, may need to clear out /usr/lib/charset.alias
---   (In particular, the line "* UTF-8" which makes locale_charset()
---   always return UTF-8; otherwise we can't test latin-1.)
+-- - On Mac OS X, the "dumb term" test may fail.
+--   In particular, the line "* UTF-8" which makes locale_charset()
+--   always return UTF-8; otherwise we can't test latin-1.
 -- - NB: Window size isn't provided by screen so it's picked up from
 --   terminfo or defaults (either way: 80x24), rather than the user's
 --   terminal.
 module Main where
 
-import System.Environment
-import Test.HUnit
+import Control.Monad (when)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Word
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as E
 import Data.Monoid ((<>))
+import System.Exit (exitFailure)
+import System.Process (readProcess)
+import Test.HUnit
 
 import RunTTY
 
@@ -37,9 +34,10 @@ legacyEncoding = False
 whenLegacy :: BC.ByteString -> BC.ByteString
 whenLegacy s = if legacyEncoding then s else B.empty
 
-main :: IO Counts
+main :: IO ()
 main = do
-    [p] <- getArgs
+    -- forkProcess needs an absolute path to the binary.
+    p <- head . lines <$> readProcess "which" ["haskeline-examples-Test"] ""
     let i = setTerm "xterm"
             Invocation {
                 prog = p,
@@ -47,8 +45,8 @@ main = do
                 runInTTY = True,
                 environment = []
             }
-    runTestTT $ test [interactionTests i, fileStyleTests i]
-
+    result <- runTestTT $ test [interactionTests i, fileStyleTests i]
+    when (errors result > 0 || failures result > 0) exitFailure
 
 interactionTests :: Invocation -> Test
 interactionTests i = "interaction" ~: test
@@ -113,10 +111,10 @@ unicodeMovement i = "Unicode movement" ~:
 
 tabCompletion :: Invocation -> Test
 tabCompletion i = "tab completion" ~:
-    [ utf8Test i [ utf8 "dummy-μ\t\t" ]
-        [ prompt 0, utf8 "dummy-μασ/"
-            <> nl <> utf8 "bar   ςερτ" <> nl
-            <> prompt' 0 <> utf8 "dummy-μασ/"
+    [ utf8Test i [ utf8 "tests/dummy-μ\t\t" ]
+        [ prompt 0, utf8 "tests/dummy-μασ/"
+            <> nl <> utf8 "ςερτ  bar" <> nl
+            <> prompt' 0 <> utf8 "tests/dummy-μασ/"
         ]
     ]
 
