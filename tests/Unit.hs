@@ -57,6 +57,7 @@ interactionTests i = "interaction" ~: test
     , historyTests i
     , inputChar $ setCharInput i
     , dumbTests $ setTerm "dumb" i
+    , groupedKeys i
     ]
 
 unicodeEncoding :: Invocation -> Test
@@ -267,6 +268,16 @@ dumbTests i = "dumb term" ~:
     ]
   where
     wideChar = T.concat $ replicate 10 $ "안기영"
+
+groupedKeys :: Invocation -> Test
+groupedKeys i = "grouped keys" ~: test
+    [ "separate" ~: utf8Test i
+        [ utf8 "xx", utf8 "\ESC[D", utf8 "\ESC[D" ]
+        [ prompt 0, utf8 "xx", utf8 "\b", utf8 "\b"]
+    , "together" ~: utf8Test i
+        [ utf8 "xx", utf8 "\ESC[D\ESC[D"]
+        [ prompt 0, utf8 "xx", utf8 "\ESC[2D"]
+    ]
 
 -------------
 -- Building blocks for expected input/output
