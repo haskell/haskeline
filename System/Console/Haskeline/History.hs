@@ -35,23 +35,23 @@ import qualified System.IO as IO
 
 import System.Console.Haskeline.Recover
 
-data History = History {histLines :: Seq String,
-                        stifleAmt :: Maybe Int}
-                    -- stored in reverse
+data History = History
+    { oldLines :: Seq String
+    , newLines :: Seq String
+    , stifleAmt :: Maybe Int
+    }  -- Lines are stored in reverse (newest first).
+    deriving Show
 
 -- | The maximum number of lines stored in the history.  If 'Nothing', the history storage is unlimited.
 stifleAmount :: History -> Maybe Int
 stifleAmount = stifleAmt
 
-instance Show History where
-    show = show . histLines
-
 emptyHistory :: History
-emptyHistory = History Seq.empty Nothing
+emptyHistory = History Seq.empty Seq.empty Nothing
 
 -- | The input lines stored in the history (newest first)
 historyLines :: History -> [String]
-historyLines = toList . histLines
+historyLines h = toList $ newLines h Seq.>< oldLines h
 
 -- | Reads the line input history from the given file.  Returns
 -- 'emptyHistory' if the file does not exist or could not be read.
@@ -62,8 +62,11 @@ readHistory file = handle (\(_::IOException) -> return emptyHistory) $ do
         then readUTF8File file
         else return ""
     _ <- evaluate (length contents) -- force file closed
-    return History {histLines = Seq.fromList $ lines contents,
-                    stifleAmt = Nothing}
+    return History
+        { oldLines = Seq.fromList $ lines contents
+        , newLines = Seq.empty
+        , stifleAmt = Nothing
+        }
 
 -- | Writes the line history to the given file.  If there is an
 -- error when writing the file, it will be ignored.
@@ -87,38 +90,40 @@ writeHistory file hist = handle (\(_::IOException) -> return ()) $
 -- | Limit the number of lines stored in the history.
 stifleHistory :: Maybe Int -> History -> History
 stifleHistory Nothing hist = hist {stifleAmt = Nothing}
-stifleHistory a@(Just n) hist = History {histLines = stifleFnc (histLines hist),
-                                stifleAmt = a}
-    where
-        stifleFnc = if n > Seq.length (histLines hist)
-                        then id
-                        else Seq.fromList . take n . toList
+stifleHistory a@(Just n) hist = History
+    { stifleAmt = a
+    , oldLines = Seq.take n (oldLines hist)
+    , newLines = Seq.take (n - length (oldLines hist)) $ newLines hist
+    }
 
 addHistory :: String -> History -> History
-addHistory s h = h {histLines = maybeDropLast (stifleAmt h) (s <| (histLines h))}
-
--- If the sequence is too big, drop the last entry.
-maybeDropLast :: Maybe Int -> Seq a -> Seq a
-maybeDropLast maxAmt hs
-    | rightSize = hs
-    | otherwise = case viewr hs of
-                    EmptyR -> hs
-                    hs' :> _ -> hs'
+addHistory s h = truncated { newLines = s <| newLines truncated }
   where
-    rightSize = maybe True (>= Seq.length hs) maxAmt
+    truncated = case stifleAmt h of
+        Just n
+            | length (newLines h) >= n -> h
+                { oldLines = Seq.empty
+                , newLines = Seq.take (n-1) (newLines h)
+                }
+            | length (oldLines h) + length (newLines h) >= n -> h
+                { newLines = Seq.take (n - 1 - length (oldLines h)) $ newLines h }
+        _ -> h
 
 -- | Add a line to the history unless it matches the previously recorded line.
 addHistoryUnlessConsecutiveDupe :: String -> History -> History
-addHistoryUnlessConsecutiveDupe h hs = case viewl (histLines hs) of
-    h1 :< _ | h==h1   -> hs
-    _                   -> addHistory h hs
+addHistoryUnlessConsecutiveDupe h hs = case historyLines hs of
+    h1 : _ | h==h1   -> hs
+    _                -> addHistory h hs
 
 -- | Add a line to the history, and remove all previous entries which are the 
 -- same as it.
 addHistoryRemovingAllDupes :: String -> History -> History
-addHistoryRemovingAllDupes h hs = addHistory h hs {histLines = filteredHS}
+addHistoryRemovingAllDupes h hs = addHistory h hs
+    { oldLines = filterDupes $ oldLines hs
+    , newLines = filterDupes $ newLines hs
+    }
   where
-    filteredHS = Seq.fromList $ filter (/= h) $ toList $ histLines hs
+    filterDupes = Seq.fromList . filter (/= h) . toList
 
 ---------
 -- UTF-8 file I/O, for old versions of GHC
