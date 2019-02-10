@@ -24,15 +24,15 @@ module System.Console.Haskeline.History(
                         stifleAmount,
                         ) where
 
+import Control.Exception
+import Control.Monad (when)
+import Data.Foldable (toList)
 import qualified Data.Sequence as Seq
 import Data.Sequence ( Seq, (<|), ViewL(..), ViewR(..), viewl, viewr )
-import Data.Foldable (toList)
-
-import Control.Exception
-
-import System.Directory(doesFileExist)
-
+import System.Directory(doesFileExist, renameFile, removeFile)
+import System.FilePath ((</>), (<.>), splitFileName)
 import qualified System.IO as IO
+
 import System.Console.Haskeline.Recover
 
 data History = History {histLines :: Seq String,
@@ -67,10 +67,22 @@ readHistory file = handle (\(_::IOException) -> return emptyHistory) $ do
 
 -- | Writes the line history to the given file.  If there is an
 -- error when writing the file, it will be ignored.
+--
+-- This function is implemented by {hist}writing a temporary file named
+-- @{file}.XXXX@, and then renaming it to @{file}.
 writeHistory :: FilePath -> History -> IO ()
-writeHistory file = handle (\(_::IOException) -> return ())
-        . writeUTF8File file
-        . unlines . historyLines 
+writeHistory file hist = handle (\(_::IOException) -> return ()) $
+    bracket (IO.openTempFile dirPart template) cleanup $ \(tmp, h) -> do
+        putUTF8Contents h $ unlines $ historyLines hist
+        IO.hClose h
+        renameFile tmp file
+  where
+    (dirPart, filePart) = splitFileName file
+    template = dirPart </> filePart <.> "XXXX"
+    cleanup (tmp, h) = do
+        IO.hClose h -- Repeated hClose calls are OK
+        exists <- doesFileExist tmp
+        when exists $ removeFile tmp
 
 -- | Limit the number of lines stored in the history.
 stifleHistory :: Maybe Int -> History -> History
@@ -121,11 +133,9 @@ readUTF8File file = do
     IO.hClose h
     return contents
 
-writeUTF8File :: FilePath -> String -> IO ()
-writeUTF8File file contents = do
-    h <- IO.openFile file IO.WriteMode
+putUTF8Contents :: IO.Handle -> String -> IO ()
+putUTF8Contents h contents = do
     IO.hSetEncoding h IO.utf8
     -- Write a file which is portable between systems.
     IO.hSetNewlineMode h IO.noNewlineTranslation
     IO.hPutStr h contents
-    IO.hClose h
