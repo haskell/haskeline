@@ -20,6 +20,7 @@ module System.Console.Haskeline.History(
                         historyLines,
                         readHistory,
                         writeHistory,
+                        flushHistory,
                         stifleHistory,
                         stifleAmount,
                         ) where
@@ -28,7 +29,7 @@ import Control.Exception
 import Control.Monad (when)
 import Data.Foldable (toList)
 import qualified Data.Sequence as Seq
-import Data.Sequence ( Seq, (<|), ViewL(..), ViewR(..), viewl, viewr )
+import Data.Sequence ( Seq, (<|) )
 import System.Directory(doesFileExist, renameFile, removeFile)
 import System.FilePath ((</>), (<.>), splitFileName)
 import qualified System.IO as IO
@@ -56,7 +57,7 @@ historyLines h = toList $ newLines h Seq.>< oldLines h
 -- | Reads the line input history from the given file.  Returns
 -- 'emptyHistory' if the file does not exist or could not be read.
 readHistory :: FilePath -> IO History
-readHistory file = handle (\(_::IOException) -> return emptyHistory) $ do
+readHistory file = handleIOException emptyHistory $ do
     exists <- doesFileExist file
     contents <- if exists
         then readUTF8File file
@@ -68,13 +69,16 @@ readHistory file = handle (\(_::IOException) -> return emptyHistory) $ do
         , stifleAmt = Nothing
         }
 
--- | Writes the line history to the given file.  If there is an
--- error when writing the file, it will be ignored.
+-- | Writes the line history to the given file.
+--
+-- Overwrites any previous history saved in that file.
+--
+-- If there is an error when writing the file, it will be ignored.
 --
 -- This function is implemented by {hist}writing a temporary file named
 -- @{file}.XXXX@, and then renaming it to @{file}.
 writeHistory :: FilePath -> History -> IO ()
-writeHistory file hist = handle (\(_::IOException) -> return ()) $
+writeHistory file hist = handleIOException () $
     bracket (IO.openTempFile dirPart template) cleanup $ \(tmp, h) -> do
         putUTF8Contents h $ unlines $ historyLines hist
         IO.hClose h
@@ -86,6 +90,24 @@ writeHistory file hist = handle (\(_::IOException) -> return ()) $
         IO.hClose h -- Repeated hClose calls are OK
         exists <- doesFileExist tmp
         when exists $ removeFile tmp
+
+-- | Appends any new lines from the history to the given file,
+-- and returns a new history incorporating the contents of that file.
+--
+-- Note: if there are two simultaneous calls to appendHistory on the
+-- same file, it is possible that only one will be actually saved to the file.
+--
+-- Ignores any I/O errors when reading or writing files.
+flushHistory :: FilePath -> History -> IO History
+flushHistory file hist = do
+    r <- readHistory file
+    let hist' = stifleHistory (stifleAmt hist)
+                    r { newLines = newLines hist }
+    writeHistory file hist'
+    return hist'
+
+handleIOException :: a -> IO a -> IO a
+handleIOException x = handle $ \(_::IOException) -> return x
 
 -- | Limit the number of lines stored in the history.
 stifleHistory :: Maybe Int -> History -> History
@@ -115,7 +137,7 @@ addHistoryUnlessConsecutiveDupe h hs = case historyLines hs of
     h1 : _ | h==h1   -> hs
     _                -> addHistory h hs
 
--- | Add a line to the history, and remove all previous entries which are the 
+-- | Add a line to the history, and remove all previous entries which are the
 -- same as it.
 addHistoryRemovingAllDupes :: String -> History -> History
 addHistoryRemovingAllDupes h hs = addHistory h hs
