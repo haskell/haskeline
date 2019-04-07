@@ -187,13 +187,15 @@ maybeAddHistory :: forall m . MonadIO m => Maybe String -> InputT m ()
 maybeAddHistory result = do
     settings :: Settings m <- InputT ask
     histDupes <- InputT $ asks historyDuplicates
+    histSave <- InputT $ asks historySave
     case result of
         Just line | autoAddHistory settings && not (all isSpace line)
             -> let adder = case histDupes of
                         AlwaysAdd -> addHistory
                         IgnoreConsecutive -> addHistoryUnlessConsecutiveDupe
                         IgnoreAll -> addHistoryRemovingAllDupes
-               in modifyHistory (adder line)
+               in case histSave of
+                    WriteAtEnd -> modifyHistory (adder line)
         _ -> return ()
 
 ----------

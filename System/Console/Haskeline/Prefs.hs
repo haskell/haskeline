@@ -6,6 +6,7 @@ module System.Console.Haskeline.Prefs(
                         BellStyle(..),
                         EditMode(..),
                         HistoryDuplicates(..),
+                        HistorySave(..),
                         lookupKeyBinding
                         ) where
 
@@ -33,7 +34,8 @@ unparseable lines are ignored.  For example:
 data Prefs = Prefs { bellStyle :: !BellStyle,
                      editMode :: !EditMode,
                      maxHistorySize :: !(Maybe Int),
-                     historyDuplicates :: HistoryDuplicates,
+                     historyDuplicates :: !HistoryDuplicates,
+                     historySave :: !HistorySave,
                      completionType :: !CompletionType,
                      completionPaging :: !Bool, 
                         -- ^ When listing completion alternatives, only display
@@ -65,6 +67,9 @@ data EditMode = Vi | Emacs
 data HistoryDuplicates = AlwaysAdd | IgnoreConsecutive | IgnoreAll
                     deriving (Show,Read)
 
+data HistorySave = WriteAtEnd | AppendEveryLine
+                    deriving (Show, Read)
+
 -- | The default preferences which may be overwritten in the
 -- @.haskeline@ file.
 defaultPrefs :: Prefs
@@ -77,7 +82,8 @@ defaultPrefs = Prefs {bellStyle = AudibleBell,
                       listCompletionsImmediately = True,
                       historyDuplicates = AlwaysAdd,
                       customBindings = Map.empty,
-                      customKeySequences = []
+                      customKeySequences = [],
+                      historySave = WriteAtEnd
                     }
 
 mkSettor :: Read a => (a -> Prefs -> Prefs) -> String -> Prefs -> Prefs
@@ -98,6 +104,7 @@ settors = [("bellstyle", mkSettor $ \x p -> p {bellStyle = x})
           ,("completionpromptlimit", mkSettor $ \x p -> p {completionPromptLimit = x})
           ,("listcompletionsimmediately", mkSettor $ \x p -> p {listCompletionsImmediately = x})
           ,("historyduplicates", mkSettor $ \x p -> p {historyDuplicates = x})
+          ,("historysave", mkSettor $ \x p -> p {historySave = x})
           ,("bind", addCustomBinding)
           ,("keyseq", addCustomKeySequence)
           ]

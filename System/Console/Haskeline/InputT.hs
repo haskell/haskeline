@@ -155,7 +155,10 @@ execInputT :: (MonadIO m, MonadMask m) => Prefs -> Settings m -> RunTerm
 execInputT prefs settings run (InputT f)
     = runReaderT' settings $ runReaderT' prefs
             $ runKillRing
-            $ runHistoryFromFile (historyFile settings) (maxHistorySize prefs)
+            $ runHistoryFromFile
+                (historyFile settings)
+                (maxHistorySize prefs)
+                (historySave prefs)
             $ runReaderT f run
 
 -- | Map a user interaction by modifying the base monad computation.

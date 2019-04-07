@@ -3,7 +3,8 @@ module System.Console.Haskeline.Command.History where
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Command
 import System.Console.Haskeline.Key
-import Control.Monad(liftM,mplus)
+import System.Console.Haskeline.Prefs (HistorySave(..))
+import Control.Monad(liftM,mplus, void)
 import System.Console.Haskeline.Monads
 import Data.List
 import Data.Maybe(fromMaybe)
@@ -28,12 +29,18 @@ histLog :: History -> HistLog
 histLog hist = HistLog {pastHistory = map stringToGraphemes $ historyLines hist,
                         futureHistory = []}
 
-runHistoryFromFile :: (MonadIO m, MonadMask m) => Maybe FilePath -> Maybe Int
-                            -> ReaderT (IORef History) m a -> m a
-runHistoryFromFile Nothing _ f = do
+-- TODO: this should be modified now that we only want to append...
+runHistoryFromFile
+    :: (MonadIO m, MonadMask m)
+    => Maybe FilePath
+    -> Maybe Int
+    -> HistorySave
+    -> ReaderT (IORef History) m a
+    -> m a
+runHistoryFromFile Nothing _ _ f = do
     historyRef <- liftIO $ newIORef emptyHistory
     runReaderT f historyRef
-runHistoryFromFile (Just file) stifleAmt f = do
+runHistoryFromFile (Just file) stifleAmt histSave f = do
     oldHistory <- liftIO $ readHistory file
     historyRef <- liftIO $ newIORef $ stifleHistory stifleAmt oldHistory
     -- Run the action and then write the new history, even on an exception.
@@ -41,8 +48,12 @@ runHistoryFromFile (Just file) stifleAmt f = do
     -- the user's previously-entered commands.
     -- (Note that this requires using ReaderT (IORef History) instead of StateT.
     x <- runReaderT f historyRef
-            `finally` (liftIO $ readIORef historyRef >>= writeHistory file)
+            `finally` (liftIO $ readIORef historyRef >>= emit)
     return x
+  where
+    emit = case histSave of
+        WriteAtEnd -> writeHistory file
+        AppendEveryLine -> void . flushHistory file
 
 prevHistory, firstHistory :: Save s => s -> HistLog -> (s, HistLog)
 prevHistory s h = let (s',h') = fromMaybe (listSave s,h) 

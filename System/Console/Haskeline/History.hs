@@ -25,6 +25,7 @@ module System.Console.Haskeline.History(
                         stifleAmount,
                         ) where
 
+
 import Control.Exception
 import Control.Monad (when)
 import Data.Foldable (toList)
@@ -53,6 +54,10 @@ emptyHistory = History Seq.empty Seq.empty Nothing
 -- | The input lines stored in the history (newest first)
 historyLines :: History -> [String]
 historyLines h = toList $ newLines h Seq.>< oldLines h
+
+-- | The input lines added since this history was created or read from disk (newest first)
+newHistoryLines :: History -> [String]
+newHistoryLines h = toList $ newLines h
 
 -- | Reads the line input history from the given file.  Returns
 -- 'emptyHistory' if the file does not exist or could not be read.
@@ -103,6 +108,7 @@ flushHistory file hist = do
     r <- readHistory file
     let hist' = stifleHistory (stifleAmt hist)
                     r { newLines = newLines hist }
+    print $ "WRITING: " ++ show hist'
     writeHistory file hist'
     return hist'
 
