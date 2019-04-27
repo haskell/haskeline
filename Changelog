@@ -1,3 +1,6 @@
+Next
+   * Added a `MonadFail` instance for `InputT`.
+
 Changed in version 0.7.5.0:
    * Add the new function `fallbackCompletion` to combine
      multiple `CompletionFunc`s
