@@ -13,6 +13,7 @@ import System.Console.Haskeline.Term
 
 import Control.Exception (IOException)
 import Control.Monad.Catch
+import Control.Monad.Fail as Fail
 import Control.Monad.Fix
 import Data.IORef
 import System.Directory(getHomeDirectory)
@@ -57,6 +58,9 @@ newtype InputT m a = InputT {unInputT ::
 
 instance MonadTrans InputT where
     lift = InputT . lift . lift . lift . lift . lift
+
+instance ( Fail.MonadFail m ) => Fail.MonadFail (InputT m) where
+    fail = lift . Fail.fail
 
 instance ( MonadFix m ) => MonadFix (InputT m) where
     mfix f = InputT (mfix (unInputT . f))
