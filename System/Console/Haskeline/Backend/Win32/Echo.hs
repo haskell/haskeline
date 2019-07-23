@@ -4,9 +4,9 @@ module System.Console.Haskeline.Backend.Win32.Echo (hWithoutInputEcho) where
 
 import Control.Exception (throw)
 import Control.Monad (void)
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Catch (MonadMask, bracket)
+import Control.Monad.IO.Class (MonadIO(..))
 
-import System.Console.Haskeline.MonadException (MonadException, bracket)
 import System.Exit (ExitCode(..))
 import System.IO (Handle, hGetContents, hGetEcho, hSetEcho)
 import System.Process (StdStream(..), createProcess, shell,
@@ -67,7 +67,7 @@ hSetInputEchoSTTY input = void . hSttyRaw input
 --            ('liftIO' . 'hSetInputEchoState' input)
 --            (const action)
 -- @
-hBracketInputEcho :: MonadException m => Handle -> m a -> m a
+hBracketInputEcho :: (MonadIO m, MonadMask m) => Handle -> m a -> m a
 hBracketInputEcho input action =
   bracket (liftIO $ hGetInputEchoState input)
           (liftIO . hSetInputEchoState input)
@@ -76,7 +76,7 @@ hBracketInputEcho input action =
 -- | Perform a computation with the handle's input echoing disabled. Before
 -- running the computation, the handle's input 'EchoState' is saved, and the
 -- saved 'EchoState' is restored after the computation finishes.
-hWithoutInputEcho :: MonadException m => Handle -> m a -> m a
+hWithoutInputEcho :: (MonadIO m, MonadMask m) => Handle -> m a -> m a
 hWithoutInputEcho input action = do
   echo_off <- liftIO $ hEchoOff input
   hBracketInputEcho input

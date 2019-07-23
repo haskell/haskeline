@@ -9,6 +9,7 @@ import Data.List
 import Data.Maybe(fromMaybe)
 import System.Console.Haskeline.History
 import Data.IORef
+import Control.Monad.Catch
 
 data HistLog = HistLog {pastHistory, futureHistory :: [[Grapheme]]}
                     deriving Show
@@ -27,7 +28,7 @@ histLog :: History -> HistLog
 histLog hist = HistLog {pastHistory = map stringToGraphemes $ historyLines hist,
                         futureHistory = []}
 
-runHistoryFromFile :: MonadException m => Maybe FilePath -> Maybe Int
+runHistoryFromFile :: (MonadIO m, MonadMask m) => Maybe FilePath -> Maybe Int
                             -> ReaderT (IORef History) m a -> m a
 runHistoryFromFile Nothing _ f = do
     historyRef <- liftIO $ newIORef emptyHistory

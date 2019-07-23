@@ -9,6 +9,7 @@ import System.Console.Haskeline.Monads as Monads
 import System.IO
 import Control.Applicative(Applicative)
 import Control.Monad(liftM)
+import Control.Monad.Catch
 
 -- TODO: 
 ---- Put "<" and ">" at end of term if scrolls off.
@@ -21,7 +22,8 @@ initWindow :: Window
 initWindow = Window {pos=0}
 
 newtype DumbTerm m a = DumbTerm {unDumbTerm :: StateT Window (PosixT m) a}
-                deriving (Functor, Applicative, Monad, MonadIO, MonadException,
+                deriving (Functor, Applicative, Monad, MonadIO,
+                          MonadThrow, MonadCatch, MonadMask,
                           MonadState Window, MonadReader Handles)
 
 type DumbTermM a = forall m . (MonadIO m, MonadReader Layout m) => DumbTerm m a
@@ -35,7 +37,7 @@ evalDumb = EvalTerm (evalStateT' initWindow . unDumbTerm) (DumbTerm . lift)
 runDumbTerm :: Handles -> MaybeT IO RunTerm
 runDumbTerm h = liftIO $ posixRunTerm h (posixLayouts h) [] id evalDumb
                                 
-instance (MonadException m, MonadReader Layout m) => Term (DumbTerm m) where
+instance (MonadIO m, MonadMask m, MonadReader Layout m) => Term (DumbTerm m) where
     reposition _ s = refitLine s
     drawLineDiff = drawLineDiff'
     

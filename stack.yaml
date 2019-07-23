@@ -1,7 +1,10 @@
-resolver: lts-9.14
+resolver: lts-13.6
 
 packages:
 - .
+
+extra-deps:
+- exceptions-0.10.0
 
 ghc-options:
   "$locals": -Wall -Werror
