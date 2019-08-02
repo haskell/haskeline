@@ -9,7 +9,7 @@ module System.Console.Haskeline.Key(Key(..),
             metaKey,
             ctrlKey,
             parseKey,
-	setControlBits
+            setControlBits
             ) where
 
 import Data.Bits
