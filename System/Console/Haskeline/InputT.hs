@@ -11,13 +11,10 @@ import System.Console.Haskeline.Completion
 import System.Console.Haskeline.Backend
 import System.Console.Haskeline.Term
 
-import Control.Exception (IOException)
 import Control.Monad.Catch
 import Control.Monad.Fail as Fail
 import Control.Monad.Fix
 import Data.IORef
-import System.Directory(getHomeDirectory)
-import System.FilePath
 import System.IO
 
 -- | Application-specific customizations to the user interface.
@@ -143,7 +140,7 @@ withBehavior (Behavior run) f = bracket (liftIO run) (liftIO . closeTerm) f
 runInputTBehavior :: (MonadIO m, MonadMask m) => Behavior -> Settings m -> InputT m a -> m a
 runInputTBehavior behavior settings f = withBehavior behavior $ \run -> do
     prefs <- if isTerminalStyle run
-                then liftIO readPrefsFromHome
+                then liftIO readPrefs
                 else return defaultPrefs
     execInputT prefs settings run f
 
@@ -194,12 +191,3 @@ useFile file = Behavior $ do
 -- If it cannot open the user's terminal, use file-style interaction, reading input from 'stdin'.
 preferTerm :: Behavior
 preferTerm = Behavior terminalRunTerm
-
-
--- | Read 'Prefs' from @~/.haskeline.@   If there is an error reading the file,
--- the 'defaultPrefs' will be returned.
-readPrefsFromHome :: IO Prefs
-readPrefsFromHome = handle (\(_::IOException) -> return defaultPrefs) $ do
-    home <- getHomeDirectory
-    readPrefs (home </> ".haskeline")
-

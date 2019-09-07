@@ -9,19 +9,29 @@ module System.Console.Haskeline.Prefs(
                         lookupKeyBinding
                         ) where
 
-import Control.Monad.Catch (handle)
+import Control.Monad.Catch(handle)
+import Control.Monad(filterM)
 import Control.Exception (IOException)
 import Data.Char(isSpace,toLower)
+import Data.Functor((<&>))
 import Data.List(foldl')
+import Data.Maybe(listToMaybe)
 import qualified Data.Map as Map
 import System.Console.Haskeline.Key
+import System.Directory(
+  getHomeDirectory, getXdgDirectory, XdgDirectory(XdgConfig), doesFileExist
+  )
+import System.FilePath((</>))
+import System.IO(hPutStrLn,stderr)
 
 {- |
-'Prefs' allow the user to customize the terminal-style line-editing interface.  They are
-read by default from @~/.haskeline@; to override that behavior, use
-'readPrefs' and @runInputTWithPrefs@.
+'Prefs' allow the user to customize the terminal-style line-editing interface.
+They are read by default from $XDG_CONFIG_HOME/haskeline/preferences,
+%APPDATA%/haskeline/preferences or ~/.haskeline.
+They can also be read from a specific file using 'readPrefsFromFile' and
+passed to 'runInputTWithPref'.
 
-Each line of a @.haskeline@ file defines
+Each line of a preferences file defines
 one field of the 'Prefs' datatype; field names are case-insensitive and
 unparseable lines are ignored.  For example:
 
@@ -124,10 +134,24 @@ addCustomKeySequence str = maybe id addKS maybeParse
 lookupKeyBinding :: Key -> Prefs -> [Key]
 lookupKeyBinding k = Map.findWithDefault [k] k . customBindings
 
+configurationFilePaths :: IO [FilePath]
+configurationFilePaths = sequence [
+  getXdgDirectory XdgConfig "haskeline" <&> (</>"preferences"),
+  getHomeDirectory <&> (</>".haskeline")
+  ]
+
+configurationFiles :: IO [FilePath]
+configurationFiles = configurationFilePaths >>= filterM doesFileExist
+
+configurationFile :: IO (Maybe FilePath)
+configurationFile = configurationFiles <&> listToMaybe
+
 -- | Read 'Prefs' from a given file.  If there is an error reading the file,
 -- the 'defaultPrefs' will be returned.
-readPrefs :: FilePath -> IO Prefs
-readPrefs file = handle (\(_::IOException) -> return defaultPrefs) $ do
+readPrefsFromFile :: FilePath -> IO Prefs
+readPrefsFromFile file = handle (\(_::IOException) -> do
+                           hPutStrLn stderr ("haskeline: can't read preferences from " ++ file ++ ".")
+                           return defaultPrefs) $ do
     ls <- fmap lines $ readFile file
     return $! foldl' applyField defaultPrefs ls
   where
@@ -136,4 +160,13 @@ readPrefs file = handle (\(_::IOException) -> return defaultPrefs) $ do
                         Nothing -> p
                         Just set -> set (drop 1 val) p  -- drop initial ":", don't crash if val==""
     trimSpaces = dropWhile isSpace . reverse . dropWhile isSpace . reverse
-                    
+
+-- | Read 'Prefs' from $XDG_CONFIG_HOME/haskeline/preferences, %APPDATA%/haskeline/preferences or ~/.haskeline.
+readPrefs :: IO Prefs
+readPrefs = handle (\(_::IOException) -> do
+                       hPutStrLn stderr
+                           ("haskeline: IOException while looking for preferences,"
+                         ++ "falling back to defaults.")
+                       return defaultPrefs) $ do
+    path <- configurationFile
+    maybe (return defaultPrefs) readPrefsFromFile path
