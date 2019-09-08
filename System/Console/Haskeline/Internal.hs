@@ -1,6 +1,6 @@
 module System.Console.Haskeline.Internal
     ( module System.Console.Haskeline.Monads
-	, module System.Console.Haskeline.Term
+    , module System.Console.Haskeline.Term
     , module System.Console.Haskeline.Key
     , module System.Console.Haskeline.LineState
     , Behavior (..)
