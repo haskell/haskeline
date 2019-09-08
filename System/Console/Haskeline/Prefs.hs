@@ -13,7 +13,6 @@ import Control.Monad.Catch(handle)
 import Control.Monad(filterM)
 import Control.Exception (IOException)
 import Data.Char(isSpace,toLower)
-import Data.Functor((<&>))
 import Data.List(foldl')
 import Data.Maybe(listToMaybe)
 import qualified Data.Map as Map
@@ -133,6 +132,9 @@ addCustomKeySequence str = maybe id addKS maybeParse
 
 lookupKeyBinding :: Key -> Prefs -> [Key]
 lookupKeyBinding k = Map.findWithDefault [k] k . customBindings
+
+(<&>) :: Functor f => f a -> (a -> b) -> f b
+(<&>) = flip fmap
 
 configurationFilePaths :: IO [FilePath]
 configurationFilePaths = sequence [
