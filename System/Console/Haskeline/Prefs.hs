@@ -9,8 +9,8 @@ module System.Console.Haskeline.Prefs(
                         lookupKeyBinding
                         ) where
 
-import Control.Monad.Catch(handle)
-import Control.Monad(filterM)
+import Control.Monad.Catch(handle,MonadCatch)
+import Control.Monad(filterM, MonadPlus)
 import Control.Exception (IOException)
 import Data.Char(isSpace,toLower)
 import Data.List(foldl')
@@ -136,25 +136,25 @@ lookupKeyBinding k = Map.findWithDefault [k] k . customBindings
 (<&>) :: Functor f => f a -> (a -> b) -> f b
 (<&>) = flip fmap
 
-configurationFilePaths :: IO [FilePath]
-configurationFilePaths = sequence [
+getConfigurationPaths :: IO [FilePath]
+getConfigurationPaths = sequence [
   getXdgDirectory XdgConfig "haskeline" <&> (</>"preferences"),
   getHomeDirectory <&> (</>".haskeline")
   ]
 
-configurationFiles :: IO [FilePath]
-configurationFiles = configurationFilePaths >>= filterM doesFileExist
+filterPaths :: MonadPlus m => (a -> m Bool) -> m [a] -> m [a]
+filterPaths condition getPaths = getPaths >>= filterM condition
 
-configurationFile :: IO (Maybe FilePath)
-configurationFile = configurationFiles <&> listToMaybe
+getFirst :: Functor f => f [a] -> f (Maybe a)
+getFirst = fmap listToMaybe
 
 -- | Read 'Prefs' from a given file.  If there is an error reading the file,
 -- the 'defaultPrefs' will be returned.
 readPrefsFromFile :: FilePath -> IO Prefs
-readPrefsFromFile file = handle (\(_::IOException) -> do
-                           hPutStrLn stderr ("haskeline: can't read preferences from " ++ file ++ ".")
+readPrefsFromFile path = handle (\(_::IOException) -> do
+                           hPutStrLn stderr ("haskeline: can't read preferences from " ++ path ++ ".")
                            return defaultPrefs) $ do
-    ls <- fmap lines $ readFile file
+    ls <- fmap lines $ readFile path
     return $! foldl' applyField defaultPrefs ls
   where
     applyField p l = case break (==':') l of
@@ -163,12 +163,20 @@ readPrefsFromFile file = handle (\(_::IOException) -> do
                         Just set -> set (drop 1 val) p  -- drop initial ":", don't crash if val==""
     trimSpaces = dropWhile isSpace . reverse . dropWhile isSpace . reverse
 
+fallback :: IO Prefs
+fallback = do
+    hPutStrLn stderr
+        ("haskeline: IOException while looking for preferences,"
+      ++ "falling back to defaults.")
+    return defaultPrefs
+
 -- | Read 'Prefs' from $XDG_CONFIG_HOME/haskeline/preferences, %APPDATA%/haskeline/preferences or ~/.haskeline.
+readPreferences :: (MonadPlus m, MonadCatch m) => m Prefs -> (FilePath -> m Prefs) -> m (Maybe FilePath) -> m Prefs
+readPreferences exceptionHandler preferencesFromPath getPath = handle (\(_::IOException) -> exceptionHandler)
+    $ getPath >>= maybe (return defaultPrefs) preferencesFromPath
+
+findPreferencePath :: IO (Maybe FilePath)
+findPreferencePath = getFirst $ filterPaths doesFileExist getConfigurationPaths
+
 readPrefs :: IO Prefs
-readPrefs = handle (\(_::IOException) -> do
-                       hPutStrLn stderr
-                           ("haskeline: IOException while looking for preferences,"
-                         ++ "falling back to defaults.")
-                       return defaultPrefs) $ do
-    path <- configurationFile
-    maybe (return defaultPrefs) readPrefsFromFile path
+readPrefs = readPreferences fallback readPrefsFromFile findPreferencePath
