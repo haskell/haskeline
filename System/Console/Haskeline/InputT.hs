@@ -140,7 +140,7 @@ withBehavior (Behavior run) f = bracket (liftIO run) (liftIO . closeTerm) f
 runInputTBehavior :: (MonadIO m, MonadMask m) => Behavior -> Settings m -> InputT m a -> m a
 runInputTBehavior behavior settings f = withBehavior behavior $ \run -> do
     prefs <- if isTerminalStyle run
-                then liftIO readPrefs
+                then liftIO readPrefsFromHome
                 else return defaultPrefs
     execInputT prefs settings run f
 

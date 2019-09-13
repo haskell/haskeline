@@ -2,6 +2,7 @@ module System.Console.Haskeline.Prefs(
                         Prefs(..),
                         defaultPrefs,
                         readPrefs,
+                        readPrefsFromHome,
                         CompletionType(..),
                         BellStyle(..),
                         EditMode(..),
@@ -150,8 +151,8 @@ getFirst = fmap listToMaybe
 
 -- | Read 'Prefs' from a given file.  If there is an error reading the file,
 -- the 'defaultPrefs' will be returned.
-readPrefsFromFile :: FilePath -> IO Prefs
-readPrefsFromFile path = handle (\(_::IOException) -> do
+readPrefs :: FilePath -> IO Prefs
+readPrefs path = handle (\(_::IOException) -> do
                            hPutStrLn stderr ("haskeline: can't read preferences from " ++ path ++ ".")
                            return defaultPrefs) $ do
     ls <- fmap lines $ readFile path
@@ -178,5 +179,5 @@ readPreferences exceptionHandler preferencesFromPath getPath = handle (\(_::IOEx
 findPreferencePath :: IO (Maybe FilePath)
 findPreferencePath = getFirst $ filterPaths doesFileExist getConfigurationPaths
 
-readPrefs :: IO Prefs
-readPrefs = readPreferences fallback readPrefsFromFile findPreferencePath
+readPrefsFromHome :: IO Prefs
+readPrefsFromHome = readPreferences fallback readPrefs findPreferencePath
