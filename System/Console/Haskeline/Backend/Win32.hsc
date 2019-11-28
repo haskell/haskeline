@@ -226,10 +226,10 @@ writeConsole h str = writeConsole' >> writeConsole h ys
     -- To be safe, we pick a round number we know to be less than the limit.
     limit = 20000 -- known to be less than WriteConsoleW's buffer limit
     writeConsole'
-        = withArray (map (toEnum . fromEnum) xs)
-            $ \t_arr -> alloca $ \numWritten -> do
+        = withCWStringLen xs
+            $ \(t_arr, len) -> alloca $ \numWritten -> do
                     failIfFalse_ "WriteConsoleW"
-                        $ c_WriteConsoleW h t_arr (toEnum $ length xs)
+                        $ c_WriteConsoleW h t_arr (toEnum len)
                                 numWritten nullPtr
 
 foreign import WINDOWS_CCONV "windows.h MessageBeep" c_messageBeep :: UINT -> IO Bool
