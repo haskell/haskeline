@@ -13,7 +13,7 @@ import Graphics.Win32.Misc(getStdHandle, sTD_OUTPUT_HANDLE)
 import Data.List(intercalate)
 import Control.Concurrent.STM
 import Control.Concurrent hiding (throwTo)
-import Data.Char(isPrint)
+import Data.Char(isPrint, chr, ord)
 import Data.Maybe(mapMaybe)
 import Control.Exception (IOException, throwTo)
 import Control.Monad
@@ -66,7 +66,15 @@ eventReader h = do
         then eventReader h
         else do
             es <- readEvents h
-            return $ mapMaybe processEvent es
+            return $ combineSurrogatePairs $ mapMaybe processEvent es
+
+combineSurrogatePairs :: [Event] -> [Event]
+combineSurrogatePairs (KeyInput [Key m1 (KeyChar c1)] : KeyInput [Key _ (KeyChar c2)] : es)
+    | 0xD800 <= ord c1 && ord c1 < 0xDC00 && 0xDC00 <= ord c2 && ord c2 < 0xE000
+    = let c = (((ord c1 .&. 0x3FF) `shiftL` 10) .|. (ord c2 .&. 0x3FF)) + 0x10000
+      in KeyInput [Key m1 (KeyChar (chr c))] : combineSurrogatePairs es
+combineSurrogatePairs (e:es) = e : combineSurrogatePairs es
+combineSurrogatePairs [] = []
 
 consoleHandles :: MaybeT IO Handles
 consoleHandles = do
