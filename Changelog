@@ -1,12 +1,25 @@
-Next
-   * Added a `MonadFail` instance for `InputT`.
+Changed in version 0.8.0.0:
+   * Breaking changes:
+     * Add a `MonadFail` instance for `InputT`.
+     * Switch the LICENSE file from BSD2 to BSD3, to be consistent
+       with the .cabal file.
+   * Backwards-compatible changes
+     * Improve the documentation around when input functions return
+       `Nothing`.
+     * Allow binding keys to incremental search, as
+       `ReverseSearchHistory` and `ForwardSearchHistory`.
+     * Handling `STX`-wrapped control sequences on any lines of the
+       prompt, not just the last one.
+     * Add `debugTerminalKeys` to help debug input problems
+     * Add `waitForAnyKey` to wait for a single key press.
+     * Define test targest in the .cabal file
+     * Bump the upper bound to base-4.15.
 
 Changed in version 0.7.5.0:
    * Add the new function `fallbackCompletion` to combine
      multiple `CompletionFunc`s
    * Fix warnings
    * Bump the lower bound to ghc-8.0
-   * Add `debugTerminalKeys` to help debug input problems
 
 Changed in version 0.7.4.3:
    * Bump upper bounds on base, containers, stm and unix
