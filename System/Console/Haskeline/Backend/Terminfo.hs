@@ -202,7 +202,7 @@ output t = Writer.tell t  -- NB: explicit argument enables build with ghc-6.12.3
                           -- see GHC ticket #1749).
 
 outputText :: String -> ActionM ()
-outputText = output . const . termText
+outputText s = output (const (termText s))
 
 left,right,up :: Int -> TermAction
 left = flip leftA
@@ -238,7 +238,7 @@ moveToPos p = do
 
 moveRelative :: Int -> ActionM ()
 moveRelative n = liftM3 (advancePos n) ask get get
-                    >>= moveToPos
+                    >>= \p -> moveToPos p
 
 -- Note that these move by a certain number of cells, not graphemes.
 changeRight, changeLeft :: Int -> ActionM ()
