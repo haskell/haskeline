@@ -1,6 +1,6 @@
 Name:           haskeline
 Cabal-Version:  >=1.10
-Version:        0.8.0.0
+Version:        0.8.0.1
 Category:       User Interfaces
 License:        BSD3
 License-File:   LICENSE
@@ -35,6 +35,13 @@ source-repository head
 -- restricted to only one line and thus only shows part of the input at once.)
 flag terminfo
     Description: Use the terminfo package for POSIX consoles.
+    Default: True
+    Manual: True
+
+-- Help the GHC build by making it possible to disable the extra binary.
+-- TODO: Make GHC handle packages with both a library and an executable.
+flag examples
+    Description: Enable executable components used for tests.
     Default: True
     Manual: True
 
@@ -117,8 +124,12 @@ test-suite haskeline-tests
     hs-source-dirs: tests
     Default-Language: Haskell98
 
-    if os(windows)
+    if os(windows) {
         buildable: False
+    }
+    if !flag(examples) {
+        buildable: False
+    }
     Main-Is:    Unit.hs
     Build-depends: base, containers, text, bytestring, HUnit, process, unix
     Other-Modules: RunTTY, Pty
@@ -126,6 +137,9 @@ test-suite haskeline-tests
 
 -- The following program is used by unit tests in `tests` executable
 Executable haskeline-examples-Test
+    if !flag(examples) {
+        buildable: False
+    }
     Build-depends: base, containers, haskeline
     Default-Language: Haskell2010
     hs-source-dirs: examples
