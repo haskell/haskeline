@@ -21,6 +21,10 @@ import Foreign.C.Types
 import Foreign.StablePtr (StablePtr, freeStablePtr, newStablePtr)
 
 import GHC.IO.FD (FD(..))
+#if defined(__IO_MANAGER_WINIO__)
+import GHC.IO.Handle.Windows (handleToHANDLE)
+import GHC.IO.SubSystem ((<!>))
+#endif
 import GHC.IO.Handle.Types (Handle(..), Handle__(..))
 
 import System.Win32.Types (HANDLE)
@@ -145,7 +149,26 @@ foreign import ccall unsafe "_get_osfhandle"
 
 -- Originally authored by Max Bolingbroke in the ansi-terminal library
 withHandleToHANDLE :: Handle -> (HANDLE -> IO a) -> IO a
-withHandleToHANDLE haskell_handle action =
+#if defined(__IO_MANAGER_WINIO__)
+withHandleToHANDLE = withHandleToHANDLEPosix <!> withHandleToHANDLENative
+#else
+withHandleToHANDLE = withHandleToHANDLEPosix
+#endif
+
+#if defined(__IO_MANAGER_WINIO__)
+withHandleToHANDLENative :: Handle -> (HANDLE -> IO a) -> IO a
+withHandleToHANDLENative haskell_handle action =
+    -- Create a stable pointer to the Handle. This prevents the garbage collector
+    -- getting to it while we are doing horrible manipulations with it, and hence
+    -- stops it being finalized (and closed).
+    withStablePtr haskell_handle $ const $ do
+        windows_handle <- handleToHANDLE haskell_handle
+        -- Do what the user originally wanted
+        action windows_handle
+#endif
+
+withHandleToHANDLEPosix :: Handle -> (HANDLE -> IO a) -> IO a
+withHandleToHANDLEPosix haskell_handle action =
     -- Create a stable pointer to the Handle. This prevents the garbage collector
     -- getting to it while we are doing horrible manipulations with it, and hence
     -- stops it being finalized (and closed).
@@ -162,7 +185,6 @@ withHandleToHANDLE haskell_handle action =
 
         -- Finally, turn that (C-land) FD into a HANDLE using msvcrt
         windows_handle <- c_get_osfhandle fd
-
         -- Do what the user originally wanted
         action windows_handle
 
