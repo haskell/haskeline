@@ -15,7 +15,6 @@ import Control.Exception (IOException)
 import Control.Monad.Catch
 import Control.Monad.Fail as Fail
 import Control.Monad.Fix
-import Control.Monad.IO.Unlift
 import Data.IORef
 import System.Directory(getHomeDirectory)
 import System.FilePath
@@ -66,10 +65,23 @@ instance ( Fail.MonadFail m ) => Fail.MonadFail (InputT m) where
 instance ( MonadFix m ) => MonadFix (InputT m) where
     mfix f = InputT (mfix (unInputT . f))
 
-instance ( MonadUnliftIO m ) => MonadUnliftIO (InputT m) where
-    askUnliftIO = InputT $
-      fmap (\(UnliftIO u) -> UnliftIO $ \(InputT a) -> u a) askUnliftIO
-    withRunInIO inner = InputT $ withRunInIO $ \run -> inner (run . unInputT)
+-- | Run an action in the underlying monad with a function for restoring the
+-- current 'InputT' context.
+withRunInBase :: Monad m =>
+    ((forall a . InputT m a -> m a) -> m b) -> InputT m b
+withRunInBase inner = InputT $ do
+    runTerm <- ask
+    history <- ask
+    killRing <- ask
+    prefs <- ask
+    settings <- ask
+    lift $ lift $ lift $ lift $ lift $ inner $
+        flip runReaderT settings .
+        flip runReaderT prefs .
+        flip runReaderT killRing .
+        flip runReaderT history .
+        flip runReaderT runTerm .
+        unInputT
 
 -- | Get the current line input history.
 getHistory :: MonadIO m => InputT m History
