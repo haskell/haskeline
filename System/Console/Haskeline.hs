@@ -64,6 +64,7 @@ module System.Console.Haskeline(
                     defaultPrefs,
                     runInputTWithPrefs,
                     runInputTBehaviorWithPrefs,
+                    withRunInBase,
                     -- ** History
                     -- $history
                     getHistory,

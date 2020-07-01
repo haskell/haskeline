@@ -65,6 +65,27 @@ instance ( Fail.MonadFail m ) => Fail.MonadFail (InputT m) where
 instance ( MonadFix m ) => MonadFix (InputT m) where
     mfix f = InputT (mfix (unInputT . f))
 
+-- | Run an action in the underlying monad, as per 'lift', passing it a runner
+-- function which restores the current 'InputT' context. This can be used in
+-- the event that we have some function that takes an action in the underlying
+-- monad as an argument (such as 'lift', 'hoist', 'forkIO', etc) and we want
+-- to compose it with actions in 'InputT'.
+withRunInBase :: Monad m =>
+    ((forall a . InputT m a -> m a) -> m b) -> InputT m b
+withRunInBase inner = InputT $ do
+    runTerm <- ask
+    history <- ask
+    killRing <- ask
+    prefs <- ask
+    settings <- ask
+    lift $ lift $ lift $ lift $ lift $ inner $
+        flip runReaderT settings .
+        flip runReaderT prefs .
+        flip runReaderT killRing .
+        flip runReaderT history .
+        flip runReaderT runTerm .
+        unInputT
+
 -- | Get the current line input history.
 getHistory :: MonadIO m => InputT m History
 getHistory = InputT get
