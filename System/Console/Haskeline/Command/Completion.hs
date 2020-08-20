@@ -5,6 +5,7 @@ module System.Console.Haskeline.Command.Completion(
                             completionCmd
                             ) where
 
+import System.Console.Haskeline.Backend.WCWidth (gsWidth)
 import System.Console.Haskeline.Command
 import System.Console.Haskeline.Command.Undo
 import System.Console.Haskeline.Key
@@ -120,27 +121,26 @@ makeLines :: [String] -> Layout -> [String]
 makeLines ws layout = let
     minColPad = 2
     printWidth = width layout
-    maxLength = min printWidth (maximum (map length ws) + minColPad)
-    numCols = printWidth `div` maxLength
-    ls = if maxLength >= printWidth
+    maxWidth = min printWidth (maximum (map (gsWidth . stringToGraphemes) ws) + minColPad)
+    numCols = printWidth `div` maxWidth
+    ls = if maxWidth >= printWidth
                     then map (: []) ws
                     else splitIntoGroups numCols ws
-    in map (padWords maxLength) ls
+    in map (padWords maxWidth) ls
 
--- Add spaces to the end of each word so that it takes up the given length.
--- Don't padd the word in the last column, since printing a space in the last column
+-- Add spaces to the end of each word so that it takes up the given visual width.
+-- Don't pad the word in the last column, since printing a space in the last column
 -- causes a line wrap on some terminals.
 padWords :: Int -> [String] -> String
 padWords _ [x] = x
 padWords _ [] = ""
-padWords len (x:xs) = x ++ replicate (len - glength x) ' '
-                        ++ padWords len xs
+padWords wid (x:xs) = x ++ replicate (wid - widthOf x) ' '
+                        ++ padWords wid xs
     where
-        -- kludge: compute the length in graphemes, not chars.
-        -- but don't use graphemes for the max length, since I'm not convinced
-        -- that would work correctly. (This way, the worst that can happen is
-        -- that columns are longer than necessary.)
-        glength = length . stringToGraphemes
+        -- kludge: compute the width in graphemes, not chars.
+        -- also use graphemes for the max width so that multi-width characters
+        -- such as CJK letters are aligned correctly.
+        widthOf = gsWidth . stringToGraphemes
 
 -- Split xs into rows of length n,
 -- such that the list increases incrementally along the columns.
