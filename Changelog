@@ -1,3 +1,12 @@
+Changed in version 0.8.1.0:
+   * Use grapheme's width to align a list of completions (#143)
+   * Add withRunInBase to help decompose InputT (#131)
+   * Add support for WINIO to haskeline. (#140)
+   * Allow base-4.15
+   * Eta expand as required by simplified subsumption rules in newer GHC
+   * Remove unused iconv cbits (#135)
+   * Support non-BMP characters (or, surrogate pairs) on Windows (#125)
+
 Changed in version 0.8.0.1:
    * Add a Cabal flag to disable the example executable as well as
      the test that uses it.
