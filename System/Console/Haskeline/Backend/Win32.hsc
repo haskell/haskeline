@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module System.Console.Haskeline.Backend.Win32(
                 win32Term,
                 win32TermStdin,
@@ -8,7 +10,11 @@ module System.Console.Haskeline.Backend.Win32(
 import System.IO
 import Foreign
 import Foreign.C
+#if MIN_VERSION_Win32(2,9,0)
+import System.Win32 hiding (multiByteToWideChar, setConsoleMode, getConsoleMode)
+#else
 import System.Win32 hiding (multiByteToWideChar)
+#endif
 import Graphics.Win32.Misc(getStdHandle, sTD_OUTPUT_HANDLE)
 import Data.List(intercalate)
 import Control.Concurrent.STM
@@ -185,9 +191,9 @@ instance Storable Coord where
     sizeOf _ = (#size COORD)
     alignment _ = (#alignment COORD)
     peek p = do
-        x :: CShort <- (#peek COORD, X) p
-        y :: CShort <- (#peek COORD, Y) p
-        return Coord {coordX = fromEnum x, coordY = fromEnum y}
+        cx :: CShort <- (#peek COORD, X) p
+        cy :: CShort <- (#peek COORD, Y) p
+        return Coord {coordX = fromEnum cx, coordY = fromEnum cy}
     poke p c = do
         (#poke COORD, X) p (toEnum (coordX c) :: CShort)
         (#poke COORD, Y) p (toEnum (coordY c) :: CShort)
