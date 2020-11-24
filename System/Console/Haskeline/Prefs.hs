@@ -49,7 +49,7 @@ data Prefs = Prefs { bellStyle :: !BellStyle,
                      customBindings :: Map.Map Key [Key],
                         -- (termName, keysequence, key)
                      customKeySequences :: [(Maybe String, String,Key)],
-                     flushEveryCommand :: Bool 
+                     incAppendHistory :: Bool
                         -- ^ If 'True' and @historyFile@ not 'Nothing'    
                         -- flushes command history after every command
                      }
@@ -81,8 +81,8 @@ defaultPrefs = Prefs {bellStyle = AudibleBell,
                       historyDuplicates = AlwaysAdd,
                       customBindings = Map.empty,
                       customKeySequences = [],
-                      flushEveryCommand = False
-                     }
+                      incAppendHistory = False
+                    }
 
 mkSettor :: Read a => (a -> Prefs -> Prefs) -> String -> Prefs -> Prefs
 mkSettor f str = maybe id f (readMaybe str)
@@ -104,6 +104,7 @@ settors = [("bellstyle", mkSettor $ \x p -> p {bellStyle = x})
           ,("historyduplicates", mkSettor $ \x p -> p {historyDuplicates = x})
           ,("bind", addCustomBinding)
           ,("keyseq", addCustomKeySequence)
+          ,("incappendhistory", mkSettor $ \x p -> p {incAppendHistory = x})
           ]
 
 addCustomBinding :: String -> Prefs -> Prefs

@@ -25,9 +25,10 @@ data Settings m = Settings {complete :: CompletionFunc m, -- ^ Custom tab comple
                             historyFile :: Maybe FilePath, -- ^ Where to read/write the history at the
                                                         -- start and end of each
                                                         -- line input session.
-                            autoAddHistory :: Bool  -- ^ If 'True', each nonblank line returned by
+                            autoAddHistory :: Bool -- ^ If 'True', each nonblank line returned by
                                 -- @getInputLine@ will be automatically added to the history.
-                           }
+
+                            }
 
 -- | Because 'complete' is the only field of 'Settings' depending on @m@,
 -- the expression @defaultSettings {completionFunc = f}@ leads to a type error
@@ -92,17 +93,6 @@ getHistory = InputT get
 -- | Set the line input history.
 putHistory :: MonadIO m => History -> InputT m ()
 putHistory = InputT . put
-
--- | Writes command history to file if 'historyFile' is not 'Nothing'
-flushHistory :: forall m . MonadIO m => InputT m ()
-flushHistory = do
-    settings :: Settings m <- InputT ask
-    getHistory >>= maybeFlushHistory (historyFile settings)
-
--- | Flushes history if given filepath is not 'Nothing'
-maybeFlushHistory :: MonadIO m => Maybe FilePath -> History -> InputT m ()
-maybeFlushHistory Nothing _ = return ()
-maybeFlushHistory (Just f) hist = liftIO $ writeHistory f hist
 
 -- | Change the current line input history.
 modifyHistory :: MonadIO m => (History -> History) -> InputT m ()
@@ -191,6 +181,7 @@ execInputT prefs settings run (InputT f)
     = runReaderT' settings $ runReaderT' prefs
             $ runKillRing
             $ runHistoryFromFile (historyFile settings) (maxHistorySize prefs)
+              (incAppendHistory prefs)
             $ runReaderT f run
 
 -- | Map a user interaction by modifying the base monad computation.

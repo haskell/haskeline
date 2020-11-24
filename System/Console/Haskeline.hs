@@ -70,7 +70,6 @@ module System.Console.Haskeline(
                     getHistory,
                     putHistory,
                     modifyHistory,
-                    flushHistory,
                     -- * Ctrl-C handling
                     withInterrupt,
                     Interrupt(..),
@@ -190,7 +189,7 @@ maybeAddHistory :: forall m . MonadIO m => Maybe String -> InputT m ()
 maybeAddHistory result = do
     settings :: Settings m <- InputT ask
     histDupes <- InputT $ asks historyDuplicates
-    doFlush <- InputT $ asks flushEveryCommand
+    doFlush <- InputT $ asks incAppendHistory
     case result of
         Just line | autoAddHistory settings && not (all isSpace line)
             -> let adder = case histDupes of
@@ -198,8 +197,10 @@ maybeAddHistory result = do
                         IgnoreConsecutive -> addHistoryUnlessConsecutiveDupe
                         IgnoreAll -> addHistoryRemovingAllDupes
                in do
-                modifyHistory (adder line)
-                when doFlush flushHistory
+                 modifyHistory (adder line)
+                 when doFlush $ case historyFile settings of
+                   Nothing -> pure ()
+                   Just f -> liftIO $ appendFile f (line ++ "\n")
         _ -> return ()
 
 ----------
