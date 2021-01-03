@@ -50,7 +50,7 @@ Library
     -- though it was implemented in earlier releases, due to GHC bug #5436 which
     -- wasn't fixed until 7.4.1
     Build-depends: base >=4.9 && < 4.17, containers>=0.4 && < 0.7,
-                   directory>=1.1 && < 1.4, bytestring>=0.9 && < 0.11,
+                   directory>=1.1 && < 1.4, bytestring>=0.9 && < 0.12,
                    filepath >= 1.2 && < 1.5, transformers >= 0.2 && < 0.6,
                    process >= 1.0 && < 1.7, stm >= 2.4 && < 2.6,
                    exceptions == 0.10.*
