@@ -1,3 +1,7 @@
+Changed in version 0.8.1.1:
+   * Allow bytestring-0.11 and base-4.16
+   * Fix name conflicts with Win32-2.9 (#145)
+
 Changed in version 0.8.1.0:
    * Use grapheme's width to align a list of completions (#143)
    * Add withRunInBase to help decompose InputT (#131)
