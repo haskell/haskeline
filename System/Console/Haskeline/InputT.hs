@@ -216,6 +216,50 @@ useFile file = Behavior $ do
 preferTerm :: Behavior
 preferTerm = Behavior terminalRunTerm
 
+#ifndef MINGW
+-- | Use terminal-style interaction on the given input and output handles,
+-- taking the terminal type from the @TERM@ environment variable.
+--
+-- This behavior is for driving Haskeline against a terminal that is not the
+-- process's controlling terminal — for example, a serial console, a PTY pair
+-- you opened yourself, or a socket-backed TTY.  The caller is responsible for
+-- closing @input@ and @output@ after use.  Not available on Windows.
+--
+-- See 'useTermHandlesWith' to override the terminal type.
+useTermHandles :: Handle -> Handle -> Behavior
+useTermHandles input output =
+    Behavior $ useTermHandlesRunTerm Nothing input output
+
+-- | Like 'useTermHandles', but with the terminal type given explicitly
+-- (e.g. @\"xterm-256color\"@ or @\"vt100\"@) instead of read from the @TERM@
+-- environment variable.
+--
+-- The terminal type is only consulted when haskeline is built with terminfo
+-- support; in non-terminfo builds it is ignored and a dumb terminal is used.
+--
+-- ==== __Example: a Haskeline session on a serial port__
+--
+-- > import System.IO (withFile, IOMode(..))
+-- > import System.Console.Haskeline
+-- >
+-- > serialUI :: FilePath -> IO ()
+-- > serialUI devPath =
+-- >     withFile devPath ReadMode  $ \input  ->
+-- >     withFile devPath WriteMode $ \output ->
+-- >         runInputTBehavior (useTermHandlesWith "vt100" input output)
+-- >                           defaultSettings
+-- >                           loop
+-- >   where
+-- >     loop = do
+-- >         minput <- getInputLine "% "
+-- >         case minput of
+-- >             Nothing     -> return ()
+-- >             Just "quit" -> return ()
+-- >             Just s      -> outputStrLn ("got: " ++ s) >> loop
+useTermHandlesWith :: String -> Handle -> Handle -> Behavior
+useTermHandlesWith termtype input output =
+    Behavior $ useTermHandlesRunTerm (Just termtype) input output
+#endif
 
 -- | Read 'Prefs' from @$XDG_CONFIG_HOME/haskeline/haskeline@ if present
 -- ortherwise @~/.haskeline.@ If there is an error reading the file,
