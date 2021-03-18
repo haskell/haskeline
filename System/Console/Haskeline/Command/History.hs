@@ -5,7 +5,7 @@ import System.Console.Haskeline.Command
 import System.Console.Haskeline.Key
 import Control.Monad(liftM,mplus)
 import System.Console.Haskeline.Monads
-import Data.List
+import Data.List (isPrefixOf, unfoldr)
 import Data.Maybe(fromMaybe)
 import System.Console.Haskeline.History
 import Data.IORef

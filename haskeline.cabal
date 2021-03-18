@@ -117,7 +117,7 @@ Library
         }
     }
 
-    ghc-options: -Wall
+    ghc-options: -Wall -Wcompat
 
 test-suite haskeline-tests
     type: exitcode-stdio-1.0
