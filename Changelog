@@ -1,3 +1,6 @@
+Changed in version 0.8.1.2:
+   * Add import list to Data.List (#153)
+
 Changed in version 0.8.1.1:
    * Allow bytestring-0.11 and base-4.16
    * Fix name conflicts with Win32-2.9 (#145)
