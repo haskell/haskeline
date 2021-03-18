@@ -25,7 +25,7 @@ import Control.Concurrent hiding (throwTo)
 import Data.Maybe (catMaybes)
 import System.Posix.Signals.Exts
 import System.Posix.Types(Fd(..))
-import Data.List
+import Data.Foldable (foldl')
 import System.IO
 import System.Environment
 
