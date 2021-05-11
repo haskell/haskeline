@@ -222,7 +222,7 @@ preferTerm = Behavior terminalRunTerm
 -- the 'defaultPrefs' will be returned.
 readUserPrefs :: IO Prefs
 readUserPrefs = handle (\(_::IOException) -> return defaultPrefs) $ do
-    xdg    <- getXdgDirectory XdgConfig ("haskline/haskeline")
+    xdg    <- getXdgDirectory XdgConfig ("haskeline/haskeline")
     exists <- doesFileExist xdg
     home   <- getHomeDirectory
     readPrefs (if exists then xdg else (home </> ".haskeline"))
