@@ -14,6 +14,7 @@ import Control.Exception (IOException)
 import Data.Char(isSpace,toLower)
 import Data.List(foldl')
 import qualified Data.Map as Map
+import Data.Word (Word)
 import System.Console.Haskeline.Key
 
 {- |
@@ -48,7 +49,16 @@ data Prefs = Prefs { bellStyle :: !BellStyle,
                         -- presses @TAB@ again.
                      customBindings :: Map.Map Key [Key],
                         -- (termName, keysequence, key)
-                     customKeySequences :: [(Maybe String, String,Key)]
+                     customKeySequences :: [(Maybe String, String,Key)],
+                     keyseqTimeoutMs :: !Word
+                        -- ^ After an @ESC@ byte is read, how long to wait
+                        -- (in milliseconds) for the rest of an escape
+                        -- sequence before treating the @ESC@ as a
+                        -- standalone keypress.  Matters on slow links
+                        -- (e.g. low-bandwidth serial), where the bytes of
+                        -- a sequence such as @\\ESC[A@ may not arrive in
+                        -- a single read.  Mirrors GNU Readline's
+                        -- @keyseq-timeout@.
                      }
                         deriving Show
 
@@ -77,7 +87,8 @@ defaultPrefs = Prefs {bellStyle = AudibleBell,
                       listCompletionsImmediately = True,
                       historyDuplicates = AlwaysAdd,
                       customBindings = Map.empty,
-                      customKeySequences = []
+                      customKeySequences = [],
+                      keyseqTimeoutMs = 50
                     }
 
 mkSettor :: Read a => (a -> Prefs -> Prefs) -> String -> Prefs -> Prefs
@@ -98,6 +109,7 @@ settors = [("bellstyle", mkSettor $ \x p -> p {bellStyle = x})
           ,("completionpromptlimit", mkSettor $ \x p -> p {completionPromptLimit = x})
           ,("listcompletionsimmediately", mkSettor $ \x p -> p {listCompletionsImmediately = x})
           ,("historyduplicates", mkSettor $ \x p -> p {historyDuplicates = x})
+          ,("keyseqtimeoutms", mkSettor $ \x p -> p {keyseqTimeoutMs = x})
           ,("bind", addCustomBinding)
           ,("keyseq", addCustomKeySequence)
           ]

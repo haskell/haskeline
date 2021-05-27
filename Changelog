@@ -7,6 +7,11 @@ Changed in unreleased:
      Haskeline against caller-supplied input/output handles (e.g. a serial
      console or a PTY pair other than the controlling terminal).  POSIX only.
 
+   * On POSIX, fixed escape sequences breaking when their bytes arrive in
+     separate reads (e.g. on slow serial links).  Added `keyseqTimeoutMs`
+     to `Prefs` to configure the wait, mirroring GNU Readline's
+     `keyseq-timeout`.
+
 Changed in version 0.8.4.1:
 
    * Implemented ; and , movements and enabled them for d, c, and y actions.

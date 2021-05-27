@@ -202,15 +202,54 @@ lexKeys baseMap ('\ESC':cs)
             = metaKey k : ks
 lexKeys baseMap (c:cs) = simpleChar c : lexKeys baseMap cs
 
-lookupChars :: TreeMap Char Key -> [Char] -> Maybe (Key,[Char])
-lookupChars _ [] = Nothing
-lookupChars (TreeMap tm) (c:cs) = case Map.lookup c tm of
-    Nothing -> Nothing
-    Just (Nothing,t) -> lookupChars t cs
-    Just (Just k, t@(TreeMap tm2))
-                | not (null cs) && not (Map.null tm2) -- ?? lookup d tm2?
-                    -> lookupChars t cs
-                | otherwise -> Just (k, cs)
+-- | Walk @cs@ through the tree, returning the /longest/ key found along
+-- the path together with whatever bytes follow it.
+--
+-- If a longer match is attempted but doesn't pan out (the next byte
+-- isn't in the deeper subtree), we fall back to the most recent shorter
+-- key we passed.  This avoids the well-known sharp edge where input
+-- like @\\ESC[AC@ — with @\\ESC[A@ registered (up-arrow) and the @A@
+-- node having children that don't include @C@ — would previously be
+-- reported as no match at all, instead of @up-arrow + 'C'@.
+--
+-- 'Nothing' is returned only when no key is reached anywhere along the
+-- walk.
+lookupChars :: TreeMap Char Key -> [Char] -> Maybe (Key, [Char])
+lookupChars _    [] = Nothing
+lookupChars tree cs = go Nothing tree cs
+  where
+    -- 'best' holds the longest committed match so far (or Nothing if
+    -- we haven't passed a key node yet).  When the next byte doesn't
+    -- extend the path we return 'best'.
+    go best (TreeMap m) (c:cs') = case Map.lookup c m of
+        Nothing          -> best
+        Just (mKey, sub) ->
+            let best' = maybe best (\k -> Just (k, cs')) mKey
+            in case cs' of
+                _:_ -> go best' sub cs'
+                []  -> best'
+    go best _ [] = best  -- unreachable: top-level [] handled above
+
+-- | Greedily peel complete keys off the front of @cs@.  Returns the
+-- decoded keys (in forward order) and the leftover bytes that didn't
+-- (yet) form a complete tree match.
+peelCompleteKeys :: TreeMap Char Key -> [Char] -> ([Key], [Char])
+peelCompleteKeys tree = go id
+  where
+    go acc cs = case lookupChars tree cs of
+        Just (k, rest) -> go (acc . (k:)) rest
+        Nothing        -> (acc [], cs)
+
+-- | True if @cs@ matches a /strict/ (non-terminal) prefix of some path
+-- in the @TreeMap@ — i.e. it could still be extended into a complete
+-- key sequence if more bytes arrive.
+isStrictTreePrefix :: TreeMap Char b -> [Char] -> Bool
+isStrictTreePrefix _ [] = False
+isStrictTreePrefix (TreeMap m) (c:cs) = case Map.lookup c m of
+    Nothing                    -> False
+    Just (_, sub@(TreeMap sm)) -> case cs of
+        [] -> not (Map.null sm)
+        _  -> isStrictTreePrefix sub cs
 
 -----------------------------
 
@@ -219,8 +258,9 @@ withPosixGetEvent :: (MonadIO m, MonadMask m, MonadReader Prefs m)
                 -> (m Event -> m a) -> m a
 withPosixGetEvent eventChan h termKeys f = wrapTerminalOps h $ do
     baseMap <- getKeySequences (ehIn h) termKeys
+    timeoutMs <- asks (fromIntegral . keyseqTimeoutMs :: Prefs -> Int)
     withWindowHandler eventChan
-        $ f $ liftIO $ getEvent (ehIn h) baseMap eventChan
+        $ f $ liftIO $ getEvent (ehIn h) timeoutMs baseMap eventChan
 
 withWindowHandler :: (MonadIO m, MonadMask m) => TChan Event -> m a -> m a
 withWindowHandler eventChan = withHandler windowChange $
@@ -238,27 +278,62 @@ withHandler signal handler f = do
     old_handler <- liftIO $ installHandler signal handler Nothing
     f `finally` liftIO (installHandler signal old_handler Nothing)
 
-getEvent :: Handle -> TreeMap Char Key -> TChan Event -> IO Event
-getEvent h baseMap = keyEventLoop $ do
-        cs <- getBlockOfChars h
-        return [KeyInput $ lexKeys baseMap cs]
+getEvent :: Handle -> Int -> TreeMap Char Key -> TChan Event -> IO Event
+getEvent h timeoutMs baseMap = keyEventLoop $ do
+        ks <- getBlockOfKeys h baseMap timeoutMs
+        return [KeyInput ks]
 
--- Read at least one character of input, and more if immediately
--- available.  In particular the characters making up a control sequence
--- will all be available at once, so they can be processed together
--- (with Posix.lexKeys).
-getBlockOfChars :: Handle -> IO String
-getBlockOfChars h = do
+-- | Read at least one key of input, and more if available.
+--
+-- A multi-byte control sequence (e.g. @\\ESC[A@ for arrow-up) may not
+-- arrive in a single read on a slow link such as a low-bandwidth serial
+-- port: the @\\ESC@ can land before the @[A@.  When the buffer ends in
+-- bytes that are a strict prefix of some known key sequence, we wait up
+-- to @timeoutMs@ for the rest before returning.  Otherwise we return as
+-- soon as nothing more is buffered.  This mirrors GNU Readline's
+-- @keyseq-timeout@.
+--
+-- The loop tracks bytes and decoded keys side by side: every time we
+-- run out of immediately-available input we peel complete keys from the
+-- front of the byte buffer and shrink it down to just its trailing
+-- (possibly partial) prefix.  That keeps the per-decision work bounded
+-- by the size of the in-flight sequence rather than the whole accrued
+-- buffer, which matters when bytes trickle in slowly.
+--
+-- Win32 is unaffected: that backend reads structured @INPUT_RECORD@
+-- key events rather than raw bytes, so escape sequences are never
+-- fragmented in the first place.
+getBlockOfKeys :: Handle -> TreeMap Char Key -> Int -> IO [Key]
+getBlockOfKeys h baseMap timeoutMs = do
     c <- hGetChar h
-    loop [c]
+    loop [c] []
   where
-    loop cs = do
-        isReady <- hReady h
-        if not isReady
-            then return $ reverse cs
-            else do
-                    c <- hGetChar h
-                    loop (c:cs)
+    -- Both lists hold values in reverse (newest first) so that consing a
+    -- new element is O(1).  We reverse only at decision points or on
+    -- return.
+    loop bytesRev keysRev = do
+        ready <- hWaitForInput h 0
+        if ready
+            then do
+                c <- hGetChar h
+                loop (c:bytesRev) keysRev
+            else
+                -- Drain whatever complete keys are sitting at the head of
+                -- the byte buffer; what's left is either empty (done) or a
+                -- still-in-flight partial sequence.
+                let (peeled, partial) = peelCompleteKeys baseMap (reverse bytesRev)
+                    keysRev'          = reverse peeled ++ keysRev
+                in if null partial
+                    then pure (reverse keysRev')
+                    else if isStrictTreePrefix baseMap partial
+                        then do
+                            arrived <- hWaitForInput h timeoutMs
+                            if arrived
+                                then do
+                                    c <- hGetChar h
+                                    loop (c : reverse partial) keysRev'
+                                else pure (reverse keysRev' ++ lexKeys baseMap partial)
+                        else pure (reverse keysRev' ++ lexKeys baseMap partial)
 
 stdinTTYHandles, ttyHandles :: MaybeT IO Handles
 stdinTTYHandles = do
