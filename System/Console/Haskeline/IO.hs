@@ -88,7 +88,7 @@ cancelInput hd = killThread (forkedThread hd) >> takeMVar (subthreadFinished hd)
 -- | Run one action (for example, 'getInputLine') as part of a session of user interaction.
 --
 -- For example, multiple calls to 'queryInput' using the same 'InputState' will share
--- the same input history.  In constrast, multiple calls to 'runInputT' will use distinct
+-- the same input history.  In contrast, multiple calls to 'runInputT' will use distinct
 -- histories unless they share the same history file.
 --
 -- This function should not be called on a closed or cancelled 'InputState'.
