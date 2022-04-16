@@ -144,7 +144,7 @@ data InputEvent = KeyEvent {keyDown :: BOOL,
                           unicodeChar :: Char,
                           controlKeyState :: DWORD}
             -- TODO: WINDOW_BUFFER_SIZE_RECORD
-            -- I cant figure out how the user generates them.
+            -- I can't figure out how the user generates them.
            | WindowEvent
            | OtherEvent
                         deriving Show
