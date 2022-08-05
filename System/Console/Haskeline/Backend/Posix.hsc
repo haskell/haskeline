@@ -141,7 +141,7 @@ ansiKeys = [("\ESC[D",  simpleKey LeftKey)
             -- Terminal.app:
             ,("\ESC[5D", ctrlKey $ simpleKey LeftKey)
             ,("\ESC[5C", ctrlKey $ simpleKey RightKey)
-            -- rxvt: (Note: these will be superceded by e.g. xterm-color,
+            -- rxvt: (Note: these will be superseded by e.g. xterm-color,
             -- which uses them as regular arrow keys.)
             ,("\ESC[OD", ctrlKey $ simpleKey LeftKey)
             ,("\ESC[OC", ctrlKey $ simpleKey RightKey)

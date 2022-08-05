@@ -81,7 +81,7 @@ insertChars = useChar $ loop []
                                                 >|> return . Left
 
 -- If we receive a ^D and the line is empty, return Nothing
--- otherwise, act like '\n' (mimicing how Readline behaves)
+-- otherwise, act like '\n' (mimicking how Readline behaves)
 eofIfEmpty :: (Monad m, Save s, Result s) => Command m s (Maybe String)
 eofIfEmpty s
     | save s == emptyIM = return Nothing
