@@ -66,8 +66,6 @@ eventReader :: HANDLE -> IO [Event]
 eventReader h = do
     let waitTime = 500 -- milliseconds
     ret <- c_WaitForSingleObject h waitTime
-    yield -- otherwise, the above foreign call causes the loop to never
-          -- respond to the killThread
     if ret /= (#const WAIT_OBJECT_0)
         then eventReader h
         else do
