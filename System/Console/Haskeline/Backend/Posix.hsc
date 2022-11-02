@@ -51,6 +51,8 @@ import System.Posix.Internals (FD)
 #endif
 #include <sys/ioctl.h>
 
+#include <HsBaseConfig.h>
+
 -----------------------------------------------
 -- Input/output handles
 data Handles = Handles {hIn, hOut :: ExternalHandle
@@ -63,6 +65,10 @@ ehOut = eH . hOut
 -------------------
 -- Window size
 
+#if !defined(HAVE_TERMIOS_H)
+posixLayouts :: Handles -> [IO (Maybe Layout)]
+posixLayouts _ = error "System.Console.Haskeline.Backend.Posix.posixLayouts"
+#else
 foreign import capi "sys/ioctl.h ioctl" ioctl :: FD -> CULong -> Ptr a -> IO CInt
 
 posixLayouts :: Handles -> [IO (Maybe Layout)]
@@ -77,6 +83,8 @@ ioctlLayout h = allocaBytes (#size struct winsize) $ \ws -> do
                 if ret >= 0
                     then return $ Just Layout {height=fromEnum rows,width=fromEnum cols}
                     else return Nothing
+
+#endif
 
 unsafeHandleToFD :: Handle -> IO FD
 unsafeHandleToFD h =
