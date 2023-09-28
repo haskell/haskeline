@@ -19,11 +19,26 @@ Homepage:       https://github.com/judah/haskeline
 Bug-Reports:    https://github.com/judah/haskeline/issues
 Stability:      Stable
 Build-Type:     Simple
+
+tested-with:
+  GHC == 9.8.0
+  GHC == 9.6.3
+  GHC == 9.4.7
+  GHC == 9.2.8
+  GHC == 9.0.2
+  GHC == 8.10.7
+  GHC == 8.8.4
+  GHC == 8.6.5
+  GHC == 8.4.4
+  GHC == 8.2.2
+  GHC == 8.0.2
+  GHC == 7.10.3
+
 extra-source-files: examples/Test.hs Changelog includes/*.h
 
 source-repository head
     type: git
-    location: git://github.com/judah/haskeline.git
+    location: https://github.com/judah/haskeline.git
 
 -- There are three main advantages to the terminfo backend over the portable,
 -- "dumb" alternative.  First, it enables more efficient control sequences
@@ -49,7 +64,7 @@ Library
     -- We require ghc>=7.4.1 (base>=4.5) to use the base library encodings, even
     -- though it was implemented in earlier releases, due to GHC bug #5436 which
     -- wasn't fixed until 7.4.1
-    Build-depends: base >=4.9 && < 4.20, containers>=0.4 && < 0.7,
+    Build-depends: base >=4.9 && < 4.20, containers>=0.4 && < 0.8,
                    directory>=1.1 && < 1.4, bytestring>=0.9 && < 0.13,
                    filepath >= 1.2 && < 1.5, transformers >= 0.2 && < 0.7,
                    process >= 1.0 && < 1.7, stm >= 2.4 && < 2.6,
