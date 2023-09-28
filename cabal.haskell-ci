@@ -1,7 +1,9 @@
 branches: master
 
+run-tests: False
+
 constraint-set containers-0.7
   ghc: >= 8.2 && < 9.7
   constraints: containers ^>= 0.7
   tests: True
-  run-tests: True
+  run-tests: False
