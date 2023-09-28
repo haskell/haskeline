@@ -32,7 +32,6 @@ tested-with:
   GHC == 8.4.4
   GHC == 8.2.2
   GHC == 8.0.2
-  GHC == 7.10.3
 
 extra-source-files: examples/Test.hs Changelog includes/*.h
 
