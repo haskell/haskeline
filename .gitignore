@@ -4,3 +4,5 @@ dist-install
 ghc.mk
 .stack-work
 myhist
+/dist-newstyle/
+/stack.yaml.lock

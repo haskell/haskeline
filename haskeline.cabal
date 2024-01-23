@@ -19,11 +19,25 @@ Homepage:       https://github.com/judah/haskeline
 Bug-Reports:    https://github.com/judah/haskeline/issues
 Stability:      Stable
 Build-Type:     Simple
+
+tested-with:
+  GHC == 9.8.0
+  GHC == 9.6.3
+  GHC == 9.4.7
+  GHC == 9.2.8
+  GHC == 9.0.2
+  GHC == 8.10.7
+  GHC == 8.8.4
+  GHC == 8.6.5
+  GHC == 8.4.4
+  GHC == 8.2.2
+  GHC == 8.0.2
+
 extra-source-files: examples/Test.hs Changelog includes/*.h
 
 source-repository head
     type: git
-    location: git://github.com/judah/haskeline.git
+    location: https://github.com/judah/haskeline.git
 
 -- There are three main advantages to the terminfo backend over the portable,
 -- "dumb" alternative.  First, it enables more efficient control sequences
