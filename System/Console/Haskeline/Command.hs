@@ -22,6 +22,7 @@ module System.Console.Haskeline.Command(
                         changeFromChar,
                         (+>),
                         useChar,
+                        useChar',
                         choiceCmd,
                         keyChoiceCmd,
                         keyChoiceCmdM,
@@ -94,6 +95,12 @@ useKey k x = KeyMap $ \k' -> if k==k' then Just (Consumed x) else Nothing
 useChar :: (Char -> Command m s t) -> KeyCommand m s t
 useChar act = KeyMap $ \k -> case k of
                     Key m (KeyChar c) | isPrint c && m==noModifier
+                        -> Just $ Consumed (act c)
+                    _ -> Nothing
+
+useChar' :: (Char -> Command m s t) -> KeyCommand m s t
+useChar' act = KeyMap $ \k -> case k of
+                    Key _m (KeyChar c)
                         -> Just $ Consumed (act c)
                     _ -> Nothing
 
