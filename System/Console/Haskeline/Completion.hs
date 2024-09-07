@@ -38,6 +38,9 @@ data Completion = Completion {replacement  :: String, -- ^ Text to insert in lin
                         display  :: String,
                                 -- ^ Text to display when listing
                                 -- alternatives.
+                        description :: Maybe String,
+                                -- ^ Description to display when listing
+                                -- alternatives.
                         isFinished :: Bool
                             -- ^ Whether this word should be followed by a
                             -- space, end quote, etc.
@@ -121,7 +124,7 @@ completeFilename  = completeQuotedWord (Just '\\') "\"'" listFiles
                                 listFiles
 
 completion :: String -> Completion
-completion str = Completion str str True
+completion str = Completion str str Nothing True
 
 setReplacement :: (String -> String) -> Completion -> Completion
 setReplacement f c = c {replacement = f $ replacement c}
