@@ -6,3 +6,6 @@ ghc.mk
 myhist
 /dist-newstyle/
 /stack.yaml.lock
+
+# IDEs
+.vscode
