@@ -10,7 +10,19 @@ module System.Console.Haskeline.Backend.Win32(
 import System.IO
 import Foreign
 import Foreign.C
-#if MIN_VERSION_Win32(2,9,0)
+#if MIN_VERSION_Win32(2,14,1)
+import System.Win32 hiding (
+                multiByteToWideChar,
+                setConsoleMode,
+                getConsoleMode,
+                KeyEvent,
+                InputEvent,
+                keyDown,
+                virtualKeyCode,
+                repeatCount,
+                virtualScanCode
+                )
+#elif MIN_VERSION_Win32(2,9,0)
 import System.Win32 hiding (multiByteToWideChar, setConsoleMode, getConsoleMode)
 #else
 import System.Win32 hiding (multiByteToWideChar)
