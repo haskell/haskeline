@@ -16,11 +16,11 @@ import System.Win32 hiding (
                 setConsoleMode,
                 getConsoleMode,
                 KeyEvent,
-                InputEvent,
                 keyDown,
                 virtualKeyCode,
                 repeatCount,
-                virtualScanCode
+                virtualScanCode,
+                windowSize
                 )
 #elif MIN_VERSION_Win32(2,9,0)
 import System.Win32 hiding (multiByteToWideChar, setConsoleMode, getConsoleMode)
