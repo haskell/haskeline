@@ -1,3 +1,7 @@
+Changed in version 0.8.3.0:
+
+   * User preferences are now read from $XDG_CONFIG_HOME/haskeline/haskeline.
+
 Changed in version 0.8.2.1:
    * Add `configure` check for `termios.h` and fallbacks for wasi.
 
