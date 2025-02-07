@@ -21,9 +21,10 @@ Stability:      Stable
 Build-Type:     Simple
 
 tested-with:
-  GHC == 9.8.0
-  GHC == 9.6.3
-  GHC == 9.4.7
+  GHC == 9.10.1
+  GHC == 9.8.2
+  GHC == 9.6.5
+  GHC == 9.4.8
   GHC == 9.2.8
   GHC == 9.0.2
   GHC == 8.10.7
@@ -60,14 +61,16 @@ flag examples
     Manual: True
 
 Library
-    -- We require ghc>=7.4.1 (base>=4.5) to use the base library encodings, even
-    -- though it was implemented in earlier releases, due to GHC bug #5436 which
-    -- wasn't fixed until 7.4.1
-    Build-depends: base >=4.9 && < 4.22, containers>=0.4 && < 0.8,
-                   directory>=1.1 && < 1.4, bytestring>=0.9 && < 0.13,
-                   filepath >= 1.2 && < 1.6, transformers >= 0.2 && < 0.7,
-                   process >= 1.0 && < 1.7, stm >= 2.4 && < 2.6,
-                   exceptions == 0.10.*
+    Build-depends:
+        base         >= 4.9 && < 4.21
+      , containers   >= 0.4 && < 0.8
+      , directory    >= 1.1 && < 1.4
+      , bytestring   >= 0.9 && < 0.13
+      , filepath     >= 1.2 && < 1.6
+      , transformers >= 0.2 && < 0.7
+      , process      >= 1.0 && < 1.7
+      , stm          >= 2.4 && < 2.6
+      , exceptions   == 0.10.*
     Default-Language: Haskell98
     Default-Extensions:
                 ForeignFunctionInterface, Rank2Types, FlexibleInstances,
@@ -145,7 +148,17 @@ test-suite haskeline-tests
         buildable: False
     }
     Main-Is:    Unit.hs
-    Build-depends: base, containers, text, bytestring, HUnit, process, unix
+    Build-depends:
+      -- shared dependencies with library
+        base         >= 4.9 && < 4.21
+      , containers   >= 0.4 && < 0.8
+      , bytestring   >= 0.9 && < 0.13
+      , process      >= 1.0 && < 1.7
+      -- dependencies for test-suite
+      , HUnit
+      , text
+      , unix         >= 2.0 && < 2.9
+
     Other-Modules: RunTTY, Pty
     build-tool-depends: haskeline:haskeline-examples-Test
 
