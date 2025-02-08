@@ -110,7 +110,7 @@ Library
     include-dirs: includes
     c-sources: cbits/h_wcwidth.c
 
-    if os(windows) {
+    if os(windows)
         Build-depends: Win32 >= 2.1 && < 2.10 || >= 2.12
         Other-modules: System.Console.Haskeline.Backend.Win32
                        System.Console.Haskeline.Backend.Win32.Echo
@@ -118,7 +118,7 @@ Library
         includes: win_console.h, windows_cconv.h
         install-includes: win_console.h
         cpp-options: -DMINGW
-    } else {
+    else
         Build-depends: unix>=2.0 && < 2.9
         Other-modules:
                 System.Console.Haskeline.Backend.Posix
@@ -132,7 +132,6 @@ Library
         if os(solaris) {
             cpp-options: -DUSE_TERMIOS_H
         }
-    }
 
     ghc-options: -Wall -Wcompat
 
