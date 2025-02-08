@@ -6,7 +6,7 @@ License:        BSD3
 License-File:   LICENSE
 Copyright:      (c) Judah Jacobson
 Author:         Judah Jacobson
-Maintainer:     Judah Jacobson <judah.jacobson@gmail.com>
+Maintainer:     Troels Henriksen <athas@sigkill.dk>
 Synopsis:       A command-line interface for user input, written in Haskell.
 Description:
                 Haskeline provides a user interface for line input in command-line
