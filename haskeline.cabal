@@ -15,8 +15,8 @@ Description:
                 Haskell programs.
                 .
                 Haskeline runs both on POSIX-compatible systems and on Windows.
-Homepage:       https://github.com/judah/haskeline
-Bug-Reports:    https://github.com/judah/haskeline/issues
+Homepage:       https://github.com/haskell/haskeline
+Bug-Reports:    https://github.com/haskell/haskeline/issues
 Stability:      Stable
 Build-Type:     Simple
 
