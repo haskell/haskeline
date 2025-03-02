@@ -144,6 +144,10 @@ They return `Nothing` if they encounter the end of input.  More specifically:
 
 If @'autoAddHistory' == 'True'@ and the line input is nonblank (i.e., is not all
 spaces), it will be automatically added to the history.
+
+To include ANSI escape sequences in the input prompt, terminate them by @\STX@.
+See <https://github.com/haskell/haskeline/wiki/ControlSequencesInPrompt> for
+more information.
 -}
 getInputLine :: (MonadIO m, MonadMask m)
             => String -- ^ The input prompt
