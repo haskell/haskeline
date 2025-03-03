@@ -21,6 +21,7 @@ Stability:      Stable
 Build-Type:     Simple
 
 tested-with:
+  GHC == 9.12.1
   GHC == 9.10.1
   GHC == 9.8.2
   GHC == 9.6.5
@@ -62,8 +63,8 @@ flag examples
 
 Library
     Build-depends:
-        base         >= 4.9 && < 4.21
-      , containers   >= 0.4 && < 0.8
+        base         >= 4.9 && < 4.22
+      , containers   >= 0.4 && < 0.9
       , directory    >= 1.1 && < 1.4
       , bytestring   >= 0.9 && < 0.13
       , filepath     >= 1.2 && < 1.6
@@ -149,8 +150,8 @@ test-suite haskeline-tests
     Main-Is:    Unit.hs
     Build-depends:
       -- shared dependencies with library
-        base         >= 4.9 && < 4.21
-      , containers   >= 0.4 && < 0.8
+        base         >= 4.9 && < 4.22
+      , containers   >= 0.4 && < 0.9
       , bytestring   >= 0.9 && < 0.13
       , process      >= 1.0 && < 1.7
       -- dependencies for test-suite
