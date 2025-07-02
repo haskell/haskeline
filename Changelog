@@ -1,3 +1,7 @@
+Changed in version 0.8.4.0:
+
+   * Added `System.Console.Haskeline.ReaderT` module for `ReaderT` interface.
+
 Changed in version 0.8.3.0:
 
    * User preferences are now read from $XDG_CONFIG_HOME/haskeline/haskeline.
