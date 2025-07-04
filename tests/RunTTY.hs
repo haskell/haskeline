@@ -11,12 +11,14 @@ module RunTTY (Invocation(..),
             setUTF8
             ) where
 
+import Data.Char (ord)
 import Control.Concurrent
 import Data.ByteString as B
 import System.IO
 import System.Process
 import Test.HUnit
 import qualified Data.ByteString.Char8 as BC
+import qualified System.IO as IO
 
 import Pty
 
