@@ -287,7 +287,7 @@ cr :: B.ByteString
 cr = raw [13]
 
 nl :: B.ByteString
-nl = raw [13,10] -- NB: see fixNL: this is really [13,13,10]
+nl = raw [27, 69]
 
 output :: Int -> B.ByteString -> B.ByteString
 output k s = utf8 (T.pack $ "line " ++ show k ++ ":")
