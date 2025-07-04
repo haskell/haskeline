@@ -1,9 +1,7 @@
 module Main where
 
-import Control.Monad.IO.Class
 import System.Console.Haskeline
 import System.Environment
-import qualified System.IO as IO
 
 {--
 Testing the line-input functions and their interaction with ctrl-c signals.
@@ -21,8 +19,6 @@ mySettings = defaultSettings {historyFile = Just "myhist"}
 
 main :: IO ()
 main = do
-        IO.hSetEncoding IO.stdin IO.utf8
-        IO.hSetEncoding IO.stdout IO.utf8
         args <- getArgs
         let inputFunc = case args of
                 ["chars"] -> fmap (fmap (\c -> [c])) . getInputChar
