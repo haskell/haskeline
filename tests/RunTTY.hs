@@ -96,6 +96,7 @@ fixOutput :: B.ByteString -> B.ByteString
 fixOutput = BC.pack . loop . BC.unpack
   where
     loop ('\r':'\n':rest) = '\n' : loop rest
+    loop ('\ESC':'E':rest) = '\r' : '\n' : loop rest -- XXX: why is this needed?
     loop (c:cs) = c : loop cs
     loop [] = []
 
