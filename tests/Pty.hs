@@ -19,7 +19,6 @@ import Foreign.C.Error
 import Foreign.C.Types
 import Foreign.Ptr
 import Control.Concurrent
-import qualified  System.IO as IO
 
 -- Run the given command in a pseudoterminal, and return its output chunks.
 -- Read the initial output, then feed the given input to it
@@ -29,8 +28,6 @@ runCommandInPty :: String -> [String] -> Maybe [(String,String)]
         -> [B.ByteString] -> IO [B.ByteString]
 runCommandInPty prog args env inputs = do
     (fd,pid) <- forkCommandInPty prog args env
-    h <- fdToHandle fd
-    IO.hSetEncoding h IO.utf8
     -- Block until the initial output from the program.
     -- After that, only use non-blocking reads.  Otherwise,
     -- we would hang the program in cases where the program has no output
