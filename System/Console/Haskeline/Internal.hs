@@ -9,6 +9,8 @@ import System.Console.Haskeline.Monads
 import System.Console.Haskeline.RunCommand
 import System.Console.Haskeline.Term
 
+import Control.Monad ((>=>))
+
 -- | This function may be used to debug Haskeline's input.
 --
 -- It loops indefinitely; every time a key is pressed, it will
@@ -33,5 +35,5 @@ debugTerminalKeys = runInputT defaultSettings $ do
                 effect (LineChange $ const ([],[]))
                 effect (PrintLines [show k])
                 setState emptyIM)
-            >|> keyCommand loop
+            >=> keyCommand loop
     prompt = stringToGraphemes "> "

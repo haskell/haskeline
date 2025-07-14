@@ -84,7 +84,7 @@ instance MonadIO m => MonadState s (ReaderT (IORef s) m) where
     put s = ask >>= liftIO . flip writeIORef s
 
 evalStateT' :: Monad m => s -> StateT s m a -> m a
-evalStateT' s f = liftM fst $ runStateT f s
+evalStateT' = flip evalStateT
 
 orElse :: Monad m => MaybeT m a -> m a -> m a
 orElse (MaybeT f) g = f >>= maybe g return
