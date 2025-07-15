@@ -8,7 +8,6 @@ module System.Console.Haskeline.Command(
                         KeyConsumed(..),
                         withoutConsuming,
                         keyCommand,
-                        (>|>),
                         (>+>),
                         try,
                         effect,
@@ -29,8 +28,7 @@ module System.Console.Haskeline.Command(
                         ) where
 
 import Data.Char(isPrint)
-import Control.Applicative(Applicative(..))
-import Control.Monad(ap, mplus, liftM)
+import Control.Monad(ap, mplus, liftM, (>=>))
 import Control.Monad.Trans.Class
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Key
@@ -45,7 +43,7 @@ lineChange = LineChange . flip lineChars
 
 data KeyMap a = KeyMap {lookupKM :: Key -> Maybe (KeyConsumed a)}
 
-data KeyConsumed a = NotConsumed a | Consumed a
+data KeyConsumed a = NotConsumed a | Consumed a deriving Show
 
 instance Functor KeyMap where
     fmap f km = KeyMap $ fmap (fmap f) . lookupKM km
@@ -55,10 +53,10 @@ instance Functor KeyConsumed where
     fmap f (Consumed x) = Consumed (f x)
 
 
-data CmdM m a   = GetKey (KeyMap (CmdM m a))
-                | DoEffect Effect (CmdM m a)
-                | CmdM (m (CmdM m a))
-                | Result a
+data CmdM m a = GetKey (KeyMap (CmdM m a))
+              | DoEffect Effect (CmdM m a)
+              | CmdM (m (CmdM m a))
+              | Result a
 
 type Command m s t = s -> CmdM m t
 
@@ -112,20 +110,16 @@ keyChoiceCmd = keyCommand . choiceCmd
 keyChoiceCmdM :: [KeyMap (CmdM m a)] -> CmdM m a
 keyChoiceCmdM = GetKey . choiceCmd
 
-infixr 6 >|>
-(>|>) :: Monad m => Command m s t -> Command m t u -> Command m s u
-f >|> g = \x -> f x >>= g
-
 infixr 6 >+>
 (>+>) :: Monad m => KeyCommand m s t -> Command m t u -> KeyCommand m s u
-km >+> g = fmap (>|> g) km
+km >+> g = fmap (>=> g) km
 
 -- attempt to run the command (predicated on getting a valid key); but if it fails, just keep
 -- going.
 try :: Monad m => KeyCommand m s s -> Command m s s
 try f = keyChoiceCmd [f,withoutConsuming return]
 
-infixr 6 +>
+infixr 0 +>
 (+>) :: Key -> a -> KeyMap a
 (+>) = useKey
 
@@ -163,4 +157,4 @@ changeFromChar :: (LineState t, Monad m) => (Char -> s -> t) -> KeyCommand m s t
 changeFromChar f = useChar $ change . f
 
 doBefore :: Monad m => Command m s t -> KeyCommand m t u -> KeyCommand m s u
-doBefore cmd = fmap (cmd >|>)
+doBefore cmd = fmap (cmd >=>)

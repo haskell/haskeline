@@ -13,6 +13,7 @@ import System.Console.Haskeline.Command.KillRing
 import System.Console.Haskeline.LineState
 import System.Console.Haskeline.InputT
 
+import Control.Monad ((>=>))
 import Control.Monad.Catch (MonadMask)
 import Data.Char
 
@@ -32,7 +33,7 @@ enders = choiceCmd [simpleChar '\n' +> finish, eotKey +> deleteCharOrEOF]
         deleteCharOrEOF s
             | s == emptyIM  = return Nothing
             | otherwise = change deleteNext s >>= justDelete
-        justDelete = keyChoiceCmd [eotKey +> change deleteNext >|> justDelete
+        justDelete = keyChoiceCmd [eotKey +> change deleteNext >=> justDelete
                             , emacsCommands]
 
 
