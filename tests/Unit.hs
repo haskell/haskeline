@@ -113,7 +113,7 @@ tabCompletion :: Invocation -> Test
 tabCompletion i = "tab completion" ~:
     [ utf8Test i [ utf8 "tests/dummy-μ\t\t" ]
         [ prompt 0, utf8 "tests/dummy-μασ/"
-            <> nl <> utf8 "ςερτ  bar" <> nl
+            <> nl <> utf8 "bar   ςερτ" <> nl
             <> prompt' 0 <> utf8 "tests/dummy-μασ/"
         ]
     ]
@@ -287,7 +287,7 @@ cr :: B.ByteString
 cr = raw [13]
 
 nl :: B.ByteString
-nl = raw [13,10] -- NB: see fixNL: this is really [13,13,10]
+nl = raw [27, 69]
 
 output :: Int -> B.ByteString -> B.ByteString
 output k s = utf8 (T.pack $ "line " ++ show k ++ ":")
