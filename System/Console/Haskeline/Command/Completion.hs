@@ -15,6 +15,7 @@ import System.Console.Haskeline.Prefs
 import System.Console.Haskeline.Completion
 import System.Console.Haskeline.Monads
 
+import Control.Monad ((>=>))
 import Data.List(transpose, unfoldr)
 
 useCompletion :: InsertMode -> Completion -> InsertMode
@@ -35,7 +36,7 @@ askIMCompletions (IMode xs ys) = do
 -- | Create a 'Command' for word completion.
 completionCmd :: (MonadState Undo m, CommandMonad m)
                 => Key -> KeyCommand m InsertMode InsertMode
-completionCmd k = k +> saveForUndo >|> \oldIM -> do
+completionCmd k = k +> saveForUndo >=> \oldIM -> do
     (rest,cs) <- askIMCompletions oldIM
     case cs of
         [] -> effect RingBell >> return oldIM
@@ -59,7 +60,7 @@ menuCompletion :: Monad m => Key -> [InsertMode] -> Command m InsertMode InsertM
 menuCompletion k = loop
     where
         loop [] = setState
-        loop (c:cs) = change (const c) >|> try (k +> loop cs)
+        loop (c:cs) = change (const c) >=> try (k +> loop cs)
 
 makePartialCompletion :: InsertMode -> [Completion] -> InsertMode
 makePartialCompletion im completions = insertString partial im

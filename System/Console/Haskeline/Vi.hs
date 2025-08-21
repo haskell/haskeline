@@ -1,7 +1,7 @@
 #if __GLASGOW_HASKELL__ < 802
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 #endif
-module System.Console.Haskeline.Vi where
+module System.Console.Haskeline.Vi (emptyViState, viKeyCommands) where
 
 import System.Console.Haskeline.Command
 import System.Console.Haskeline.Monads
@@ -14,14 +14,14 @@ import System.Console.Haskeline.LineState
 import System.Console.Haskeline.InputT
 
 import Data.Char
-import Control.Monad(liftM)
+import Control.Monad(liftM, (>=>))
 import Control.Monad.Catch (MonadMask)
 
 type EitherMode = Either CommandMode InsertMode
 
 type SavedCommand m = Command (ViT m) (ArgMode CommandMode) EitherMode
 
-data ViState m = ViState { 
+data ViState m = ViState {
             lastCommand :: SavedCommand m,
             lastSearch :: [Grapheme]
          }
@@ -43,7 +43,7 @@ viKeyCommands = choiceCmd [
                 , ctrlChar 'd' +> eofIfEmpty
                 , simpleInsertions >+> viCommands
                 , simpleChar '\ESC' +> change enterCommandMode
-                    >|> viCommandActions
+                    >=> viCommandActions
                 ]
 
 viCommands :: InputCmd InsertMode (Maybe String)
@@ -51,10 +51,10 @@ viCommands = keyCommand viKeyCommands
 
 simpleInsertions :: InputKeyCmd InsertMode InsertMode
 simpleInsertions = choiceCmd
-                [  simpleKey LeftKey +> change goLeft 
+                [  simpleKey LeftKey +> change goLeft
                    , simpleKey RightKey +> change goRight
-                   , simpleKey Backspace +> change deletePrev 
-                   , simpleKey Delete +> change deleteNext 
+                   , simpleKey Backspace +> change deletePrev
+                   , simpleKey Delete +> change deleteNext
                    , simpleKey Home +> change moveToStart
                    , simpleKey End +> change moveToEnd
                    , insertChars
@@ -72,13 +72,13 @@ simpleInsertions = choiceCmd
 insertChars :: InputKeyCmd InsertMode InsertMode
 insertChars = useChar $ loop []
     where
-        loop ds d = change (insertChar d) >|> keyChoiceCmd [
+        loop ds d = change (insertChar d) >=> keyChoiceCmd [
                         useChar $ loop (d:ds)
                         , withoutConsuming (storeCharInsertion (reverse ds))
                         ]
-        storeCharInsertion s = storeLastCmd $ change (applyArg 
+        storeCharInsertion s = storeLastCmd $ change (applyArg
                                                         $ withCommandMode $ insertString s)
-                                                >|> return . Left
+                                                >=> return . Left
 
 -- If we receive a ^D and the line is empty, return Nothing
 -- otherwise, act like '\n' (mimicking how Readline behaves)
@@ -101,7 +101,7 @@ viCommandActions = keyChoiceCmd [
         chooseEitherMode (Right im) = viCommands im
 
 exitingCommands :: InputKeyCmd CommandMode InsertMode
-exitingCommands =  choiceCmd [ 
+exitingCommands =  choiceCmd [
                       simpleChar 'i' +> change insertFromCommandMode
                     , simpleChar 'I' +> change (moveToStart . insertFromCommandMode)
                     , simpleKey Home +> change (moveToStart . insertFromCommandMode)
@@ -109,29 +109,29 @@ exitingCommands =  choiceCmd [
                     , simpleChar 'A' +> change (moveToEnd . appendFromCommandMode)
                     , simpleKey End +> change (moveToStart  . insertFromCommandMode)
                     , simpleChar 's' +> change (insertFromCommandMode . deleteChar)
-                    , simpleChar 'S' +> noArg >|> killAndStoreI killAll
-                    , simpleChar 'C' +> noArg >|> killAndStoreI (SimpleMove moveToEnd)
+                    , simpleChar 'S' +> noArg >=> killAndStoreI killAll
+                    , simpleChar 'C' +> noArg >=> killAndStoreI (SimpleMove moveToEnd)
                     ]
 
 simpleCmdActions :: InputKeyCmd CommandMode CommandMode
-simpleCmdActions = choiceCmd [ 
+simpleCmdActions = choiceCmd [
                     simpleChar '\ESC' +> change id -- helps break out of loops
-                    , simpleChar 'r'   +> replaceOnce 
+                    , simpleChar 'r'   +> replaceOnce
                     , simpleChar 'R'   +> replaceLoop
-                    , simpleChar 'D' +> noArg >|> killAndStoreCmd (SimpleMove moveToEnd)
+                    , simpleChar 'D' +> noArg >=> killAndStoreCmd (SimpleMove moveToEnd)
                     , ctrlChar 'l' +> clearScreenCmd
                     , simpleChar 'u' +> commandUndo
                     , ctrlChar 'r' +> commandRedo
                     -- vi-mode quirk: history is put at the start of the line.
-                    , simpleChar 'j' +> historyForward >|> change moveToStart
-                    , simpleChar 'k' +> historyBack >|> change moveToStart
-                    , simpleKey DownKey +> historyForward  >|> change moveToStart
-                    , simpleKey UpKey +> historyBack >|> change moveToStart
+                    , simpleChar 'j' +> historyForward >=> change moveToStart
+                    , simpleChar 'k' +> historyBack >=> change moveToStart
+                    , simpleKey DownKey +> historyForward  >=> change moveToStart
+                    , simpleKey UpKey +> historyBack >=> change moveToStart
                     , simpleChar '/' +> viEnterSearch '/' Reverse
                     , simpleChar '?' +> viEnterSearch '?' Forward
                     , simpleChar 'n' +> viSearchHist Reverse []
                     , simpleChar 'N' +> viSearchHist Forward []
-                    , simpleKey KillLine +> noArg >|> killAndStoreCmd (SimpleMove moveToStart)
+                    , simpleKey KillLine +> noArg >=> killAndStoreCmd (SimpleMove moveToStart)
                     ]
 
 replaceOnce :: InputCmd CommandMode CommandMode
@@ -186,7 +186,7 @@ repeatableCommands :: InputKeyCmd (ArgMode CommandMode) EitherMode
 repeatableCommands = choiceCmd
                         [ repeatableCmdToIMode
                         , repeatableCmdMode >+> return . Left
-                        , simpleChar '.' +> saveForUndo >|> runLastCommand
+                        , simpleChar '.' +> saveForUndo >=> runLastCommand
                         ]
     where
         runLastCommand s = liftM lastCommand get >>= ($ s)
@@ -204,7 +204,7 @@ repeatableCmdMode = choiceCmd
                     , pureMovements
                     ]
     where
-        repeatableChange f = storedCmdAction (saveForUndo >|> change (applyArg f))
+        repeatableChange f = storedCmdAction (saveForUndo >=> change (applyArg f))
 
 flipCase :: CommandMode -> CommandMode
 flipCase CEmpty = CEmpty
@@ -288,14 +288,14 @@ movements = [ (simpleChar 'h', goLeft)
             , (simpleChar 'E', goRightUntil (atEnd isBigWordChar))
             ]
 
-{- 
+{-
 From IEEE 1003.1:
 A "bigword" consists of: a maximal sequence of non-blanks preceded and followed by blanks
 A "word" consists of either:
  - a maximal sequence of wordChars, delimited at both ends by non-wordchars
  - a maximal sequence of non-blank non-wordchars, delimited at both ends by either blanks
    or a wordchar.
--}            
+-}
 isBigWordChar, isWordChar, isOtherChar :: Char -> Bool
 isBigWordChar = not . isSpace
 isWordChar = isAlphaNum .||. (=='_')
@@ -304,7 +304,7 @@ isOtherChar = not . (isSpace .||. isWordChar)
 (.||.) :: (a -> Bool) -> (a -> Bool) -> a -> Bool
 (f .||. g) x = f x || g x
 
-foreachDigit :: (Monad m, LineState t) => (Int -> s -> t) -> [Char] 
+foreachDigit :: (Monad m, LineState t) => (Int -> s -> t) -> [Char]
                 -> KeyCommand m s t
 foreachDigit f ds = choiceCmd $ map digitCmd ds
     where digitCmd d = simpleChar d +> change (f (toDigit d))
@@ -348,7 +348,7 @@ scanBraces c d = scanBraces' (1::Int) []
                     | baseChar x == d = n-1
                     | otherwise = n
 
-matchingRightBrace, matchingLeftBrace :: Char -> Maybe Char 
+matchingRightBrace, matchingLeftBrace :: Char -> Maybe Char
 matchingRightBrace = flip lookup braceList
 matchingLeftBrace = flip lookup (map (\(c,d) -> (d,c)) braceList)
 
@@ -358,8 +358,8 @@ braceList = [('(',')'), ('[',']'), ('{','}')]
 ---------------
 -- Replace mode
 replaceLoop :: InputCmd CommandMode CommandMode
-replaceLoop = saveForUndo >|> change insertFromCommandMode >|> loop
-                >|> change enterCommandModeRight
+replaceLoop = saveForUndo >=> change insertFromCommandMode >=> loop
+                >=> change enterCommandModeRight
     where
         loop = try (oneReplaceCmd >+> loop)
         oneReplaceCmd = choiceCmd [
@@ -378,15 +378,15 @@ storeLastCmd act = \s -> do
         return s
 
 storedAction :: Monad m => SavedCommand m -> SavedCommand m
-storedAction act = storeLastCmd act >|> act
+storedAction act = storeLastCmd act >=> act
 
 storedCmdAction :: Monad m => Command (ViT m) (ArgMode CommandMode) CommandMode
                             -> Command (ViT m) (ArgMode CommandMode) CommandMode
-storedCmdAction act = storeLastCmd (liftM Left . act) >|> act
+storedCmdAction act = storeLastCmd (liftM Left . act) >=> act
 
 storedIAction :: Monad m => Command (ViT m) (ArgMode CommandMode) InsertMode
                         -> Command (ViT m) (ArgMode CommandMode) InsertMode
-storedIAction act = storeLastCmd (liftM Right . act) >|> act
+storedIAction act = storeLastCmd (liftM Right . act) >=> act
 
 killAndStoreCmd :: MonadIO m => KillHelper -> Command (ViT m) (ArgMode CommandMode) CommandMode
 killAndStoreCmd = storedCmdAction . killFromArgHelper
@@ -395,7 +395,7 @@ killAndStoreI :: MonadIO m => KillHelper -> Command (ViT m) (ArgMode CommandMode
 killAndStoreI = storedIAction . killFromArgHelper
 
 killAndStoreIE :: MonadIO m => KillHelper -> Command (ViT m) (ArgMode CommandMode) EitherMode
-killAndStoreIE helper = storedAction (killFromArgHelper helper >|> return . Right)
+killAndStoreIE helper = storedAction (killFromArgHelper helper >=> return . Right)
 
 noArg :: Monad m => Command m s (ArgMode s)
 noArg = return . startArg 1
@@ -423,7 +423,7 @@ viEnterSearch c dir s = setState (SearchEntry emptyIM c) >>= loopEntry
         modifySE f se = se {entryState = f (entryState se)}
         loopEntry = keyChoiceCmd [
                         editEntry >+> loopEntry
-                        , simpleChar '\n' +> \se -> 
+                        , simpleChar '\n' +> \se ->
                             viSearchHist dir (searchText se) s
                         , withoutConsuming (change (const s))
                         ]
@@ -433,7 +433,7 @@ viEnterSearch c dir s = setState (SearchEntry emptyIM c) >>= loopEntry
                         , simpleKey RightKey +> change (modifySE goRight)
                         , simpleKey Backspace +> change (modifySE deletePrev)
                         , simpleKey Delete +> change (modifySE deleteNext)
-                        ] 
+                        ]
 
 viSearchHist :: forall m . Monad m
     => Direction -> [Grapheme] -> Command (ViT m) CommandMode CommandMode

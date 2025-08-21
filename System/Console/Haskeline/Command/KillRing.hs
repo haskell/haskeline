@@ -55,14 +55,14 @@ deleteFromDiff' (IMode xs1 ys1) (IMode xs2 ys2)
 killFromHelper :: (MonadState KillRing m, MonadState Undo m,
                         Save s, Save t)
                 => KillHelper -> Command m s t
-killFromHelper helper = saveForUndo >|> \oldS -> do
+killFromHelper helper = saveForUndo >=> \oldS -> do
     let (gs,newIM) = applyHelper helper (save oldS)
     modify (push gs)
     setState (restore newIM)
 
 killFromArgHelper :: (MonadState KillRing m, MonadState Undo m, Save s, Save t)
                 => KillHelper -> Command m (ArgMode s) t
-killFromArgHelper helper = saveForUndo >|> \oldS -> do
+killFromArgHelper helper = saveForUndo >=> \oldS -> do
     let (gs,newIM) = applyArgHelper helper (fmap save oldS)
     modify (push gs)
     setState (restore newIM)

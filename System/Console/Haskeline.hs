@@ -91,6 +91,7 @@ import System.Console.Haskeline.Term
 import System.Console.Haskeline.Key
 import System.Console.Haskeline.RunCommand
 
+import Control.Monad ((>=>))
 import Control.Monad.Catch (MonadMask, handle)
 import Data.Char (isSpace, isPrint)
 import Data.Maybe (isJust)
@@ -232,7 +233,7 @@ getInputCmdChar tops prefix = runInputCmdT tops
 acceptOneChar :: Monad m => KeyCommand m InsertMode (Maybe Char)
 acceptOneChar = choiceCmd [useChar $ \c s -> change (insertChar c) s
                                                 >> return (Just c)
-                          , ctrlChar 'l' +> clearScreenCmd >|>
+                          , ctrlChar 'l' +> clearScreenCmd >=>
                                         keyCommand acceptOneChar
                           , ctrlChar 'd' +> failCmd]
 
@@ -286,12 +287,12 @@ getPassword x = promptedInput
  where
     loop = choiceCmd [ simpleChar '\n' +> finish
                      , simpleKey Backspace +> change deletePasswordChar
-                                                >|> loop'
-                     , useChar $ \c -> change (addPasswordChar c) >|> loop'
+                                                >=> loop'
+                     , useChar $ \c -> change (addPasswordChar c) >=> loop'
                      , ctrlChar 'd' +> \p -> if null (passwordState p)
                                                 then failCmd p
                                                 else finish p
-                     , ctrlChar 'l' +> clearScreenCmd >|> loop'
+                     , ctrlChar 'l' +> clearScreenCmd >=> loop'
                      ]
     loop' = keyCommand loop
 
