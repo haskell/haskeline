@@ -113,7 +113,7 @@ tabCompletion :: Invocation -> Test
 tabCompletion i = "tab completion" ~:
     [ utf8Test i [ utf8 "tests/dummy-μ\t\t" ]
         [ prompt 0, utf8 "tests/dummy-μασ/"
-            <> nl <> utf8 "ςερτ  bar" <> nl
+            <> nl <> utf8 "bar   ςερτ" <> nl
             <> prompt' 0 <> utf8 "tests/dummy-μασ/"
         ]
     ]
@@ -259,13 +259,14 @@ dumbTests i = "dumb term" ~:
         ]
     , "line char input" ~: utf8Test (setCharInput i)
         [utf8 "xαβ"]
-        [ prompt' 0, utf8 "x" <> nl <> output 0 (utf8 "x")
-          <> prompt' 1 <> utf8 "α" <> nl <> output 1 (utf8 "α")
-          <> prompt' 2 <> utf8 "β" <> nl <> output 2 (utf8 "β")
+        [ prompt' 0, utf8 "x" <> dumbnl <> output 0 (utf8 "x")
+          <> prompt' 1 <> utf8 "α" <> dumbnl <> output 1 (utf8 "α")
+          <> prompt' 2 <> utf8 "β" <> dumbnl <> output 2 (utf8 "β")
           <> prompt' 3
         ]
     ]
   where
+    dumbnl = raw [13,10]
     wideChar = T.concat $ replicate 10 $ "안기영"
 
 -------------
@@ -287,7 +288,7 @@ cr :: B.ByteString
 cr = raw [13]
 
 nl :: B.ByteString
-nl = raw [13,10] -- NB: see fixNL: this is really [13,13,10]
+nl = raw [27, 69]
 
 output :: Int -> B.ByteString -> B.ByteString
 output k s = utf8 (T.pack $ "line " ++ show k ++ ":")
