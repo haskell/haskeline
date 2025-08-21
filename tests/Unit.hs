@@ -113,7 +113,7 @@ tabCompletion :: Invocation -> Test
 tabCompletion i = "tab completion" ~:
     [ utf8Test i [ utf8 "tests/dummy-μ\t\t" ]
         [ prompt 0, utf8 "tests/dummy-μασ/"
-            <> nl <> utf8 "bar    zςερτ" <> nl
+            <> nl <> utf8 "bar   ςερτ" <> nl
             <> prompt' 0 <> utf8 "tests/dummy-μασ/"
         ]
     ]
