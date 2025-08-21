@@ -130,6 +130,7 @@ jobs:
         run: |
           echo "$HOME/.cabal/bin" >> $GITHUB_PATH
           echo "LANG=en_US.UTF-8" >> "$GITHUB_ENV"
+          echo LC_ALL=en_US.UTF-8" >> "$GITHUB_ENV"
           echo "CABAL_DIR=$HOME/.cabal" >> "$GITHUB_ENV"
           echo "CABAL_CONFIG=$HOME/.cabal/config" >> "$GITHUB_ENV"
           HCNUMVER=$(${HC} --numeric-version|perl -ne '/^(\d+)\.(\d+)\.(\d+)(\.(\d+))?$/; print(10000 * $1 + 100 * $2 + ($3 == 0 ? $5 != 1 : $3))')
