@@ -35,7 +35,7 @@ tested-with:
   GHC == 8.2.2
   GHC == 8.0.2
 
-extra-source-files: examples/Test.hs Changelog includes/*.h
+extra-source-files: examples/Test.hs Changelog tests/dummy-μασ/bar tests/dummy-μασ/ςερτ
 
 source-repository head
     type: git
