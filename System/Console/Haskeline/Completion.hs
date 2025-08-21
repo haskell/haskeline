@@ -18,7 +18,7 @@ module System.Console.Haskeline.Completion(
 
 
 import System.FilePath
-import Data.List(isPrefixOf)
+import Data.List(isPrefixOf, sort)
 import Control.Monad(forM)
 
 import System.Console.Haskeline.Directory
@@ -186,7 +186,7 @@ listFiles path = liftIO $ do
     -- get all of the files in that directory, as basenames
     allFiles <- if not dirExists
                     then return []
-                    else fmap (map completion . filterPrefix)
+                    else fmap (sort . map completion . filterPrefix)
                             $ getDirectoryContents fixedDir
     -- The replacement text should include the directory part, and also
     -- have a trailing slash if it's itself a directory.
