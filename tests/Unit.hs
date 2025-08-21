@@ -259,13 +259,14 @@ dumbTests i = "dumb term" ~:
         ]
     , "line char input" ~: utf8Test (setCharInput i)
         [utf8 "xαβ"]
-        [ prompt' 0, utf8 "x" <> nl <> output 0 (utf8 "x")
-          <> prompt' 1 <> utf8 "α" <> nl <> output 1 (utf8 "α")
-          <> prompt' 2 <> utf8 "β" <> nl <> output 2 (utf8 "β")
+        [ prompt' 0, utf8 "x" <> dumbnl <> output 0 (utf8 "x")
+          <> prompt' 1 <> utf8 "α" <> dumbnl <> output 1 (utf8 "α")
+          <> prompt' 2 <> utf8 "β" <> dumbnl <> output 2 (utf8 "β")
           <> prompt' 3
         ]
     ]
   where
+    dumbnl = raw [13,10]
     wideChar = T.concat $ replicate 10 $ "안기영"
 
 -------------
