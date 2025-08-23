@@ -46,6 +46,7 @@ module System.Console.Haskeline(
                     getInputLine,
                     getInputLineWithInitial,
                     getInputChar,
+                    getInputChar',
                     getPassword,
                     waitForAnyKey,
                     -- ** Outputting text
@@ -236,6 +237,20 @@ acceptOneChar = choiceCmd [useChar $ \c s -> change (insertChar c) s
                           , ctrlChar 'l' +> clearScreenCmd >=>
                                         keyCommand acceptOneChar
                           , ctrlChar 'd' +> failCmd]
+
+{- | Reads one character of input, including non-printable.
+-}
+getInputChar' :: (MonadIO m, MonadMask m) => String -- ^ The input prompt
+              -> InputT m (Maybe Char)
+getInputChar' = promptedInput getInputCmdChar' $
+  runMaybeT . getLocaleChar
+
+getInputCmdChar' :: (MonadIO m, MonadMask m) => TermOps -> Prefix -> InputT m (Maybe Char)
+getInputCmdChar' tops prefix = runInputCmdT tops
+        $ runCommandLoop tops prefix acceptOneChar' emptyIM
+
+acceptOneChar' :: Monad m => KeyCommand m InsertMode (Maybe Char)
+acceptOneChar' = useChar' $ \c _s -> return (Just c)
 
 ----------
 {- | Waits for one key to be pressed, then returns.  Ignores the value
