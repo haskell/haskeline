@@ -113,7 +113,7 @@ Library
     c-sources: cbits/h_wcwidth.c
 
     if os(windows)
-        Build-depends: Win32 >= 2.1 && < 2.10 || >= 2.12
+        Build-depends: Win32 >= 2.1 && < 2.10 || >= 2.12, mintty
         Other-modules: System.Console.Haskeline.Backend.Win32
                        System.Console.Haskeline.Backend.Win32.Echo
         c-sources: cbits/win_console.c
