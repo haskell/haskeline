@@ -1,11 +1,9 @@
-Changed in version UNRELEASED:
+Changed in version 0.8.4.0:
 
    * On Windows, when terminal-style and printing output, no longer skips
      `"\ESC...\STX"` sequences. (If used with legacy ConHost directly (for
      example, `conhost.exe cmd.exe`), it will require ConHost's ANSI-capability
      to be enabled separately.) (#126)
-
-Changed in version 0.8.4.0:
 
    * Added `System.Console.Haskeline.ReaderT` module for `ReaderT` interface.
 
