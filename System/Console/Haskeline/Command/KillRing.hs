@@ -38,7 +38,7 @@ runKillRing act = do
 pasteCommand :: (Save s, MonadState KillRing m, MonadState Undo m)
             => ([Grapheme] -> s -> s) -> Command m (ArgMode s) s
 pasteCommand use = \s -> do
-    ms <- liftM peek get
+    ms <- peek <$> get
     case ms of
         Nothing -> return $ argState s
         Just p -> do
