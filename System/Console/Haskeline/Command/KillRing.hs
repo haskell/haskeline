@@ -45,10 +45,10 @@ pasteCommand use = \s -> do
             modify $ saveToUndo $ argState s
             setState $ applyArg (use p) s
 
-deleteFromDiff' :: InsertMode -> InsertMode -> ([Grapheme],InsertMode)
+deleteFromDiff' :: InsertMode -> InsertMode -> ([Grapheme], InsertMode)
 deleteFromDiff' (IMode xs1 ys1) (IMode xs2 ys2)
     | posChange >= 0 = (take posChange ys1, IMode xs1 ys2)
-    | otherwise = (take (negate posChange) ys2 ,IMode xs2 ys1)
+    | otherwise = (take (negate posChange) ys2, IMode xs2 ys1)
   where
     posChange = length xs2 - length xs1
 
@@ -56,37 +56,37 @@ killFromHelper :: (MonadState KillRing m, MonadState Undo m,
                         Save s, Save t)
                 => KillHelper -> Command m s t
 killFromHelper helper = saveForUndo >=> \oldS -> do
-    let (gs,newIM) = applyHelper helper (save oldS)
+    let (gs, newIM) = applyHelper helper (save oldS)
     modify (push gs)
     setState (restore newIM)
 
 killFromArgHelper :: (MonadState KillRing m, MonadState Undo m, Save s, Save t)
                 => KillHelper -> Command m (ArgMode s) t
 killFromArgHelper helper = saveForUndo >=> \oldS -> do
-    let (gs,newIM) = applyArgHelper helper (fmap save oldS)
+    let (gs, newIM) = applyArgHelper helper (fmap save oldS)
     modify (push gs)
     setState (restore newIM)
 
 copyFromArgHelper :: (MonadState KillRing m, Save s)
                 => KillHelper -> Command m (ArgMode s) s
 copyFromArgHelper helper = \oldS -> do
-    let (gs,_) = applyArgHelper helper (fmap save oldS)
+    let (gs, _) = applyArgHelper helper (fmap save oldS)
     modify (push gs)
     setState (argState oldS)
 
 
 data KillHelper = SimpleMove (InsertMode -> InsertMode)
-                 | GenericKill (InsertMode -> ([Grapheme],InsertMode))
+                | GenericKill (InsertMode -> ([Grapheme], InsertMode))
         -- a generic kill gives more flexibility, but isn't repeatable.
-        -- for example: dd,cc, %
+        -- for example: dd, cc, %
 
 killAll :: KillHelper
 killAll = GenericKill $ \(IMode xs ys) -> (reverse xs ++ ys, emptyIM)
 
-applyHelper :: KillHelper -> InsertMode -> ([Grapheme],InsertMode)
+applyHelper :: KillHelper -> InsertMode -> ([Grapheme], InsertMode)
 applyHelper (SimpleMove move) im = deleteFromDiff' im (move im)
 applyHelper (GenericKill act) im = act im
 
-applyArgHelper :: KillHelper -> ArgMode InsertMode -> ([Grapheme],InsertMode)
+applyArgHelper :: KillHelper -> ArgMode InsertMode -> ([Grapheme], InsertMode)
 applyArgHelper (SimpleMove move) im = deleteFromDiff' (argState im) (applyArg move im)
 applyArgHelper (GenericKill act) im = act (argState im)

@@ -163,7 +163,7 @@ listRestore xs = restore $ IMode (reverse xs) []
 
 class Move s where
     goLeft, goRight, moveToStart, moveToEnd :: s -> s
-    
+
 -- | The standard line state representation; considers the cursor to be located
 -- between two characters.  The first list is reversed.
 data InsertMode = IMode [Grapheme] [Grapheme]
@@ -181,7 +181,7 @@ instance Save InsertMode where
     restore = id
 
 instance Move InsertMode where
-    goLeft im@(IMode [] _) = im 
+    goLeft im@(IMode [] _) = im
     goLeft (IMode (x:xs) ys) = IMode xs (x:ys)
 
     goRight im@(IMode _ []) = im
@@ -194,7 +194,7 @@ emptyIM :: InsertMode
 emptyIM = IMode [] []
 
 -- | Insert one character, which may be combining, to the left of the cursor.
---  
+--
 insertChar :: Char -> InsertMode -> InsertMode
 insertChar c im@(IMode xs ys)
     | isCombiningChar c = case xs of
@@ -203,7 +203,7 @@ insertChar c im@(IMode xs ys)
                             z:zs -> IMode (addCombiner z c : zs) ys
     | otherwise         = IMode (baseGrapheme c : xs) ys
 
--- | Insert a sequence of characters to the left of the cursor. 
+-- | Insert a sequence of characters to the left of the cursor.
 insertString :: String -> InsertMode -> InsertMode
 insertString s (IMode xs ys) = IMode (reverse (stringToGraphemes s) ++ xs) ys
 
@@ -212,12 +212,12 @@ deleteNext im@(IMode _ []) = im
 deleteNext (IMode xs (_:ys)) = IMode xs ys
 
 deletePrev im@(IMode [] _) = im
-deletePrev (IMode (_:xs) ys) = IMode xs ys 
+deletePrev (IMode (_:xs) ys) = IMode xs ys
 
 skipLeft, skipRight :: (Char -> Bool) -> InsertMode -> InsertMode
-skipLeft f (IMode xs ys) = let (ws,zs) = span (f . baseChar) xs 
+skipLeft f (IMode xs ys) = let (ws,zs) = span (f . baseChar) xs
                            in IMode zs (reverse ws ++ ys)
-skipRight f (IMode xs ys) = let (ws,zs) = span (f . baseChar) ys 
+skipRight f (IMode xs ys) = let (ws,zs) = span (f . baseChar) ys
                             in IMode (reverse ws ++ xs) zs
 
 transposeChars :: InsertMode -> InsertMode
@@ -326,7 +326,7 @@ instance Functor ArgMode where
 
 instance LineState s => LineState (ArgMode s) where
     beforeCursor _ am = let pre = map baseGrapheme $ "(arg: " ++ show (arg am) ++ ") "
-                             in beforeCursor pre (argState am) 
+                             in beforeCursor pre (argState am)
     afterCursor = afterCursor . argState
 
 instance Result s => Result (ArgMode s) where
@@ -342,15 +342,15 @@ startArg = ArgMode
 addNum :: Int -> ArgMode s -> ArgMode s
 addNum n am
     | arg am >= 1000 = am -- shouldn't ever need more than 4 digits
-    | otherwise = am {arg = arg am * 10 + n} 
+    | otherwise = am {arg = arg am * 10 + n}
 
--- todo: negatives
+-- TODO: negatives
 applyArg :: (s -> s) -> ArgMode s -> s
 applyArg f am = repeatN (arg am) f (argState am)
 
 repeatN :: Int -> (a -> a) -> a -> a
 repeatN n f | n <= 1 = f
-          | otherwise = f . repeatN (n-1) f
+            | otherwise = f . repeatN (n-1) f
 
 applyCmdArg :: (InsertMode -> InsertMode) -> ArgMode CommandMode -> CommandMode
 applyCmdArg f am = withCommandMode (repeatN (arg am) f) (argState am)
@@ -406,10 +406,9 @@ afterChar _ _ = False
 goRightUntil, goLeftUntil :: (InsertMode -> Bool) -> InsertMode -> InsertMode
 goRightUntil f = loop . goRight
     where
-        loop im@(IMode _ ys) | null ys || f im  = im
+        loop im@(IMode _ ys) | null ys || f im = im
                              | otherwise = loop (goRight im)
 goLeftUntil f = loop . goLeft
     where
-        loop im@(IMode xs _)   | null xs || f im = im
-                            | otherwise = loop (goLeft im)
-
+        loop im@(IMode xs _) | null xs || f im = im
+                             | otherwise = loop (goLeft im)
