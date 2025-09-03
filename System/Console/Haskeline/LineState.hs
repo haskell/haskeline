@@ -5,6 +5,7 @@ module System.Console.Haskeline.LineState(
                     -- * Graphemes
                     Grapheme(),
                     baseChar,
+                    baseGrapheme, -- XXX The author says no!
                     stringToGraphemes,
                     graphemesToString,
                     modifyBaseChar,
