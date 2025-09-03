@@ -5,6 +5,7 @@ module System.Console.Haskeline.LineState(
                     -- * Graphemes
                     Grapheme(),
                     baseChar,
+                    baseGrapheme, -- XXX The author says no!
                     stringToGraphemes,
                     graphemesToString,
                     modifyBaseChar,
@@ -74,7 +75,7 @@ import Data.Char
 -- can represent one grapheme; for example, an @a@ followed by the diacritic @\'\\768\'@ should
 -- be treated as one unit.
 data Grapheme = Grapheme {gBaseChar :: Char,
-                            combiningChars :: [Char]}
+                          combiningChars :: [Char]}
                     deriving Eq
 
 instance Show Grapheme where

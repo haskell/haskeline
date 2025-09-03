@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 #if __GLASGOW_HASKELL__ < 802
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 #endif
@@ -21,15 +22,20 @@ type EitherMode = Either CommandMode InsertMode
 
 type SavedCommand m = Command (ViT m) (ArgMode CommandMode) EitherMode
 
+data InlineSearch = F -- f | F
+                  | T -- t | T
+
 data ViState m = ViState {
             lastCommand :: SavedCommand m,
-            lastSearch :: [Grapheme]
+            lastSearch :: [Grapheme],
+            lastInlineSearch :: Maybe (Char, InlineSearch, Direction)
          }
 
 emptyViState :: Monad m => ViState m
 emptyViState = ViState {
             lastCommand = return . Left . argState,
-            lastSearch = []
+            lastSearch = [],
+            lastInlineSearch = Nothing
         }
 
 type ViT m = StateT (ViState m) (InputCmdT m)
@@ -134,6 +140,40 @@ simpleCmdActions = choiceCmd [
                     , simpleKey KillLine `useKey` (noArg >=> killAndStoreC (SimpleMove moveToStart))
                     ]
 
+inlineSearchActions :: InputKeyCmd (ArgMode CommandMode) CommandMode
+inlineSearchActions = choiceCmd
+                    [ simpleChar 'f' `useKey` keyCommand (useChar $ \c -> (saveInlineSearch F Forward c >>=) . viInlineSearch id)
+                    , simpleChar 'F' `useKey` keyCommand (useChar $ \c -> (saveInlineSearch F Reverse c >>=) . viInlineSearch id)
+                    , simpleChar 't' `useKey` keyCommand (useChar $ \c -> (saveInlineSearch T Forward c >>=) . viInlineSearch id)
+                    , simpleChar 'T' `useKey` keyCommand (useChar $ \c -> (saveInlineSearch T Reverse c >>=) . viInlineSearch id)
+                    , simpleChar ';' `useKey` ((getLastInlineSearch >>=) . viInlineSearch id)
+                    , simpleChar ',' `useKey` ((getLastInlineSearch >>=) . viInlineSearch flipDir)
+                    ]
+
+viInlineSearch :: Monad m => (Direction -> Direction)
+                          -> ArgMode CommandMode
+                          -> (Maybe (Char, InlineSearch, Direction))
+                          -> CmdM (ViT m) CommandMode
+viInlineSearch flipdir = \s -> \case
+    Nothing -> return $ argState s
+    Just (g, fOrT, dir) -> setState $ (applyArg . withCommandMode . search fOrT (flipdir dir)) (== g) s
+    where
+        search :: InlineSearch -> Direction -> (Char -> Bool) -> InsertMode -> InsertMode
+        search F Forward = goRightUntil . overChar
+        search F Reverse = goLeftUntil . overChar
+        search T Forward = goRightUntil . beforeChar
+        search T Reverse = goLeftUntil . afterChar
+
+getLastInlineSearch :: forall m. Monad m => CmdM (ViT m) (Maybe (Char, InlineSearch, Direction))
+getLastInlineSearch = lastInlineSearch <$> (get :: CmdM (ViT m) (ViState m)) -- TODO: ideally this is a usage of `gets`
+
+saveInlineSearch :: forall m. Monad m => InlineSearch -> Direction -> Char
+                                      -> CmdM (ViT m) (Maybe (Char, InlineSearch, Direction))
+saveInlineSearch fOrT dir char
+  = do let ret = Just (char, fOrT, dir)
+       modify $ \(vs :: ViState m) -> vs {lastInlineSearch = ret}
+       return ret
+
 replaceOnce :: InputCmd CommandMode CommandMode
 replaceOnce = try $ changeFromChar replaceChar
 
@@ -150,37 +190,38 @@ repeatedCommands = choiceCmd [argumented, doBefore noArg repeatableCommands]
                             ]
 
 pureMovements :: InputKeyCmd (ArgMode CommandMode) CommandMode
-pureMovements = choiceCmd $ charMovements ++ map mkSimpleCommand movements
+pureMovements = choiceCmd $ map mkSimpleCommand movements
     where
-        charMovements = [ charMovement 'f' $ \c -> goRightUntil $ overChar (==c)
-                        , charMovement 'F' $ \c -> goLeftUntil $ overChar (==c)
-                        , charMovement 't' $ \c -> goRightUntil $ beforeChar (==c)
-                        , charMovement 'T' $ \c -> goLeftUntil $ afterChar (==c)
-                        ]
-        mkSimpleCommand (k,move) = k +> change (applyCmdArg move)
-        charMovement c move = simpleChar c +> keyChoiceCmd [
-                                        useChar (change . applyCmdArg . move)
-                                        , withoutConsuming (change argState)
-                                        ]
+        mkSimpleCommand (k, move) = k `useKey` change (applyCmdArg move)
 
-useMovementsForKill :: Command m s t -> (KillHelper -> Command m s t) -> KeyCommand m s t
-useMovementsForKill alternate useHelper = choiceCmd $
+useMovementsForKill :: (KillHelper -> Command m s t) -> KeyCommand m s t
+useMovementsForKill useHelper = choiceCmd $
             specialCases
             ++ map (\(k,move) -> k `useKey` useHelper (SimpleMove move)) movements
     where
         specialCases = [ simpleChar 'e' `useKey` useHelper (SimpleMove goToWordDelEnd)
                        , simpleChar 'E' `useKey` useHelper (SimpleMove goToBigWordDelEnd)
                        , simpleChar '%' `useKey` useHelper (GenericKill deleteMatchingBrace)
-                       -- Note 't' and 'f' behave differently than in pureMovements.
-                       , charMovement 'f' $ \c -> goRightUntil $ afterChar (==c)
-                       , charMovement 'F' $ \c -> goLeftUntil $ overChar (==c)
-                       , charMovement 't' $ \c -> goRightUntil $ overChar (==c)
-                       , charMovement 'T' $ \c -> goLeftUntil $ afterChar (==c)
                        ]
-        charMovement c move = simpleChar c +> keyChoiceCmd [
-                                    useChar (useHelper . SimpleMove . move)
-                                    , withoutConsuming alternate]
 
+useInlineSearchForKill :: Monad m => Command (ViT m) s t -> (KillHelper -> Command (ViT m) s t) -> KeyMap (Command (ViT m) s t)
+useInlineSearchForKill alternate killCmd = choiceCmd
+        [ simpleChar 'f' `useKey` keyCommand (useChar $ \c -> (saveInlineSearch F Forward c >>=) . getSearchAndKill)
+        , simpleChar 'F' `useKey` keyCommand (useChar $ \c -> (saveInlineSearch F Reverse c >>=) . getSearchAndKill)
+        , simpleChar 't' `useKey` keyCommand (useChar $ \c -> (saveInlineSearch T Forward c >>=) . getSearchAndKill)
+        , simpleChar 'T' `useKey` keyCommand (useChar $ \c -> (saveInlineSearch T Reverse c >>=) . getSearchAndKill)
+        , simpleChar ';' `useKey` ((getLastInlineSearch >>=) . getSearchAndKill)
+        , simpleChar ',' `useKey` ((reverseDir <$> getLastInlineSearch >>=) . getSearchAndKill)
+        ]
+    where
+        getSearchAndKill = \s
+          -> \case (Just (g, fOrT, forOrRev)) -> killCmd (SimpleMove $ moveForKill fOrT forOrRev $ (== g)) s
+                   Nothing -> alternate s
+
+        moveForKill F Forward = goRightUntil . afterChar
+        moveForKill F Reverse = goLeftUntil . overChar
+        moveForKill T Forward = goRightUntil . overChar
+        moveForKill T Reverse = goLeftUntil . afterChar
 
 repeatableCommands :: InputKeyCmd (ArgMode CommandMode) EitherMode
 repeatableCommands = choiceCmd
@@ -201,6 +242,7 @@ repeatableCmdMode = choiceCmd
                     , simpleChar 'd' `useKey` deletionCmd
                     , simpleChar 'y' `useKey` yankCommand
                     , ctrlChar 'w' `useKey` killAndStoreC wordErase
+                    , inlineSearchActions
                     , pureMovements
                     ]
     where
@@ -220,7 +262,8 @@ deletionCmd :: InputCmd (ArgMode CommandMode) CommandMode
 deletionCmd = keyChoiceCmd
         [ reinputArg >+> deletionCmd
         , simpleChar 'd' `useKey` killAndStoreC killAll
-        , useMovementsForKill (change argState) killAndStoreC
+        , useMovementsForKill killAndStoreC
+        , useInlineSearchForKill (change argState) killAndStoreC
         , withoutConsuming (change argState)
         ]
 
@@ -232,7 +275,8 @@ deletionToInsertCmd = keyChoiceCmd
         -- readline does this too, so we should also.
         , simpleChar 'w' `useKey` killAndStoreE (SimpleMove goToWordDelEnd)
         , simpleChar 'W' `useKey` killAndStoreE (SimpleMove goToBigWordDelEnd)
-        , useMovementsForKill (fmap Left . change argState) killAndStoreE
+        , useMovementsForKill killAndStoreE
+        , useInlineSearchForKill (fmap Left . change argState) killAndStoreE
         , withoutConsuming (return . Left . argState)
         ]
 
@@ -241,7 +285,8 @@ yankCommand :: InputCmd (ArgMode CommandMode) CommandMode
 yankCommand = keyChoiceCmd
         [ reinputArg >+> yankCommand
         , simpleChar 'y' `useKey` copyAndStore killAll
-        , useMovementsForKill (change argState) copyAndStore
+        , useMovementsForKill copyAndStore
+        , useInlineSearchForKill (change argState) copyAndStore
         , withoutConsuming (change argState)
         ]
 
@@ -451,3 +496,8 @@ viSearchHist dir toSearch cm = do
         Right sm -> do
             put vstate {lastSearch = toSearch'}
             setState (restore (foundHistory sm))
+
+reverseDir :: Maybe (a, b, Direction) -> Maybe (a, b, Direction)
+reverseDir = (third3 flipDir <$>)
+    where
+        third3 f (a, b, c) = (a, b, f c)
