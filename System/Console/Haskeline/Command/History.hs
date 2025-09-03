@@ -17,7 +17,7 @@ data HistLog = HistLog {pastHistory, futureHistory :: [[Grapheme]]}
 prevHistoryM :: [Grapheme] -> HistLog -> Maybe ([Grapheme],HistLog)
 prevHistoryM _ HistLog {pastHistory = []} = Nothing
 prevHistoryM s HistLog {pastHistory=ls:past, futureHistory=future}
-        = Just (ls, 
+        = Just (ls,
             HistLog {pastHistory=past, futureHistory= s:future})
 
 prevHistories :: [Grapheme] -> HistLog -> [([Grapheme],HistLog)]
@@ -45,7 +45,7 @@ runHistoryFromFile (Just file) stifleAmt f = do
     return x
 
 prevHistory, firstHistory :: Save s => s -> HistLog -> (s, HistLog)
-prevHistory s h = let (s',h') = fromMaybe (listSave s,h) 
+prevHistory s h = let (s',h') = fromMaybe (listSave s,h)
                                     $ prevHistoryM (listSave s) h
                   in (listRestore s',h')
 
@@ -73,7 +73,7 @@ reverseHist f = do
     modify reverser
     return y
   where
-    reverser h = HistLog {futureHistory=pastHistory h, 
+    reverser h = HistLog {futureHistory=pastHistory h,
                             pastHistory=futureHistory h}
 
 data SearchMode = SearchMode {searchTerm :: [Grapheme],
@@ -90,7 +90,7 @@ directionName Reverse = "reverse-i-search"
 
 instance LineState SearchMode where
     beforeCursor _ sm = beforeCursor prefix (foundHistory sm)
-        where 
+        where
             prefix = stringToGraphemes ("(" ++ directionName (direction sm) ++ ")`")
                             ++ searchTerm sm ++ stringToGraphemes "': "
     afterCursor = afterCursor . foundHistory
@@ -105,14 +105,14 @@ startSearchMode :: Direction -> InsertMode -> SearchMode
 startSearchMode dir im = SearchMode {searchTerm = [],foundHistory=im, direction=dir}
 
 addChar :: Char -> SearchMode -> SearchMode
-addChar c s = s {searchTerm = listSave $ insertChar c 
+addChar c s = s {searchTerm = listSave $ insertChar c
                                 $ listRestore $ searchTerm s}
 
 searchHistories :: Direction -> [Grapheme] -> [([Grapheme],HistLog)]
             -> Maybe (SearchMode,HistLog)
 searchHistories dir text = foldr mplus Nothing . map findIt
     where
-        findIt (l,h) = do 
+        findIt (l,h) = do
             im <- findInLine text l
             return (SearchMode text im dir,h)
 

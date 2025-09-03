@@ -1,7 +1,7 @@
 module System.Console.Haskeline.Command(
                         -- * Commands
                         Effect(..),
-                        KeyMap(..), 
+                        KeyMap(..),
                         CmdM(..),
                         Command,
                         KeyCommand,
@@ -34,9 +34,9 @@ import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Key
 
 data Effect = LineChange (Prefix -> LineChars)
-              | PrintLines [String]
-              | ClearScreen
-              | RingBell
+            | PrintLines [String]
+            | ClearScreen
+            | RingBell
 
 lineChange :: LineState s => s -> Effect
 lineChange = LineChange . flip lineChars
@@ -91,7 +91,7 @@ useKey k x = KeyMap $ \k' -> if k==k' then Just (Consumed x) else Nothing
 -- TODO: could just be a monadic action that returns a Char.
 useChar :: (Char -> Command m s t) -> KeyCommand m s t
 useChar act = KeyMap $ \k -> case k of
-                    Key m (KeyChar c) | isPrint c && m==noModifier
+                    Key m (KeyChar c) | isPrint c && m == noModifier
                         -> Just $ Consumed (act c)
                     _ -> Nothing
 
