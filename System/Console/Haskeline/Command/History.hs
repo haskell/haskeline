@@ -84,6 +84,10 @@ data SearchMode = SearchMode {searchTerm :: [Grapheme],
 data Direction = Forward | Reverse
                     deriving (Show,Eq)
 
+flipDir :: Direction -> Direction
+flipDir Forward = Reverse
+flipDir Reverse = Forward
+
 directionName :: Direction -> String
 directionName Forward = "i-search"
 directionName Reverse = "reverse-i-search"

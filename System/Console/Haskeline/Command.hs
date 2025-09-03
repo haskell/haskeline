@@ -20,10 +20,12 @@ module System.Console.Haskeline.Command(
                         change,
                         changeFromChar,
                         (+>),
+                        useKey,
                         useChar,
                         choiceCmd,
                         keyChoiceCmd,
                         keyChoiceCmdM,
+                        doAfter,
                         doBefore
                         ) where
 
@@ -110,9 +112,15 @@ keyChoiceCmd = keyCommand . choiceCmd
 keyChoiceCmdM :: [KeyMap (CmdM m a)] -> CmdM m a
 keyChoiceCmdM = GetKey . choiceCmd
 
+doBefore :: Monad m => Command m s t -> KeyCommand m t u -> KeyCommand m s u
+doBefore g km = fmap (g >=>) km
+
+doAfter :: Monad m => KeyCommand m s t -> Command m t u -> KeyCommand m s u
+doAfter km g = fmap (>=> g) km
+
 infixr 6 >+>
 (>+>) :: Monad m => KeyCommand m s t -> Command m t u -> KeyCommand m s u
-km >+> g = fmap (>=> g) km
+(>+>) = doAfter
 
 -- attempt to run the command (predicated on getting a valid key); but if it fails, just keep
 -- going.
@@ -155,6 +163,3 @@ change = (setState .)
 
 changeFromChar :: (LineState t, Monad m) => (Char -> s -> t) -> KeyCommand m s t
 changeFromChar f = useChar $ change . f
-
-doBefore :: Monad m => Command m s t -> KeyCommand m t u -> KeyCommand m s u
-doBefore cmd = fmap (cmd >=>)
