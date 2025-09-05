@@ -9,3 +9,6 @@ myhist
 
 # IDEs
 .vscode
+
+# Test suite
+tests/dummy-μασ
