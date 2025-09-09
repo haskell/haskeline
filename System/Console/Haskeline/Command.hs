@@ -1,7 +1,7 @@
 module System.Console.Haskeline.Command(
                         -- * Commands
                         Effect(..),
-                        KeyMap(..), 
+                        KeyMap(..),
                         CmdM(..),
                         Command,
                         KeyCommand,
@@ -20,10 +20,12 @@ module System.Console.Haskeline.Command(
                         change,
                         changeFromChar,
                         (+>),
+                        useKey,
                         useChar,
                         choiceCmd,
                         keyChoiceCmd,
                         keyChoiceCmdM,
+                        doAfter,
                         doBefore
                         ) where
 
@@ -34,9 +36,9 @@ import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Key
 
 data Effect = LineChange (Prefix -> LineChars)
-              | PrintLines [String]
-              | ClearScreen
-              | RingBell
+            | PrintLines [String]
+            | ClearScreen
+            | RingBell
 
 lineChange :: LineState s => s -> Effect
 lineChange = LineChange . flip lineChars
@@ -91,7 +93,7 @@ useKey k x = KeyMap $ \k' -> if k==k' then Just (Consumed x) else Nothing
 -- TODO: could just be a monadic action that returns a Char.
 useChar :: (Char -> Command m s t) -> KeyCommand m s t
 useChar act = KeyMap $ \k -> case k of
-                    Key m (KeyChar c) | isPrint c && m==noModifier
+                    Key m (KeyChar c) | isPrint c && m == noModifier
                         -> Just $ Consumed (act c)
                     _ -> Nothing
 
@@ -110,9 +112,15 @@ keyChoiceCmd = keyCommand . choiceCmd
 keyChoiceCmdM :: [KeyMap (CmdM m a)] -> CmdM m a
 keyChoiceCmdM = GetKey . choiceCmd
 
+doBefore :: Monad m => Command m s t -> KeyCommand m t u -> KeyCommand m s u
+doBefore g km = fmap (g >=>) km
+
+doAfter :: Monad m => KeyCommand m s t -> Command m t u -> KeyCommand m s u
+doAfter km g = fmap (>=> g) km
+
 infixr 6 >+>
 (>+>) :: Monad m => KeyCommand m s t -> Command m t u -> KeyCommand m s u
-km >+> g = fmap (>=> g) km
+(>+>) = doAfter
 
 -- attempt to run the command (predicated on getting a valid key); but if it fails, just keep
 -- going.
@@ -155,6 +163,3 @@ change = (setState .)
 
 changeFromChar :: (LineState t, Monad m) => (Char -> s -> t) -> KeyCommand m s t
 changeFromChar f = useChar $ change . f
-
-doBefore :: Monad m => Command m s t -> KeyCommand m t u -> KeyCommand m s u
-doBefore cmd = fmap (cmd >=>)
