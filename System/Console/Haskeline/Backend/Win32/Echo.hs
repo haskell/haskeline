@@ -12,22 +12,8 @@ import System.IO (Handle, hGetContents, hGetEcho, hSetEcho)
 import System.Process (StdStream(..), createProcess, shell,
                        std_in, std_out, waitForProcess)
 
-#if MIN_VERSION_Win32(2,5,0)
-import Control.Concurrent.MVar (readMVar)
-
-import Data.Typeable (cast)
-
-import Foreign.C.Types
-import Foreign.StablePtr (StablePtr, freeStablePtr, newStablePtr)
-
-import GHC.IO.FD (FD(..))
-#if defined(__IO_MANAGER_WINIO__)
-import GHC.IO.Handle.Windows (handleToHANDLE)
-import GHC.IO.SubSystem ((<!>))
-#endif
-import GHC.IO.Handle.Types (Handle(..), Handle__(..))
-
-import System.Win32.Types (HANDLE)
+#if MIN_VERSION_Win32(2,5,1)
+import System.Win32.Types (withHandleToHANDLE)
 import System.Win32.MinTTY (isMinTTYHandle)
 #endif
 
@@ -133,61 +119,9 @@ type STTYSettings = String
 
 -- | Is the current process attached to a MinTTY console (e.g., Cygwin or MSYS)?
 minTTY :: Handle -> IO Bool
-#if MIN_VERSION_Win32(2,5,0)
+#if MIN_VERSION_Win32(2,5,1)
 minTTY input = withHandleToHANDLE input isMinTTYHandle
 #else
 -- On older versions of Win32, we simply punt.
 minTTY _     = return False
-#endif
-
-#if MIN_VERSION_Win32(2,5,0)
-foreign import ccall unsafe "_get_osfhandle"
-  c_get_osfhandle :: CInt -> IO HANDLE
-
--- | Extract a Windows 'HANDLE' from a Haskell 'Handle' and perform
--- an action on it.
-
--- Originally authored by Max Bolingbroke in the ansi-terminal library
-withHandleToHANDLE :: Handle -> (HANDLE -> IO a) -> IO a
-#if defined(__IO_MANAGER_WINIO__)
-withHandleToHANDLE = withHandleToHANDLEPosix <!> withHandleToHANDLENative
-#else
-withHandleToHANDLE = withHandleToHANDLEPosix
-#endif
-
-#if defined(__IO_MANAGER_WINIO__)
-withHandleToHANDLENative :: Handle -> (HANDLE -> IO a) -> IO a
-withHandleToHANDLENative haskell_handle action =
-    -- Create a stable pointer to the Handle. This prevents the garbage collector
-    -- getting to it while we are doing horrible manipulations with it, and hence
-    -- stops it being finalized (and closed).
-    withStablePtr haskell_handle $ const $ do
-        windows_handle <- handleToHANDLE haskell_handle
-        -- Do what the user originally wanted
-        action windows_handle
-#endif
-
-withHandleToHANDLEPosix :: Handle -> (HANDLE -> IO a) -> IO a
-withHandleToHANDLEPosix haskell_handle action =
-    -- Create a stable pointer to the Handle. This prevents the garbage collector
-    -- getting to it while we are doing horrible manipulations with it, and hence
-    -- stops it being finalized (and closed).
-    withStablePtr haskell_handle $ const $ do
-        -- Grab the write handle variable from the Handle
-        let write_handle_mvar = case haskell_handle of
-                FileHandle _ handle_mvar     -> handle_mvar
-                DuplexHandle _ _ handle_mvar -> handle_mvar
-                  -- This is "write" MVar, we could also take the "read" one
-
-        -- Get the FD from the algebraic data type
-        Just fd <- fmap (\(Handle__ { haDevice = dev }) -> fmap fdFD (cast dev))
-                 $ readMVar write_handle_mvar
-
-        -- Finally, turn that (C-land) FD into a HANDLE using msvcrt
-        windows_handle <- c_get_osfhandle fd
-        -- Do what the user originally wanted
-        action windows_handle
-
-withStablePtr :: a -> (StablePtr a -> IO b) -> IO b
-withStablePtr value = bracket (newStablePtr value) freeStablePtr
 #endif
