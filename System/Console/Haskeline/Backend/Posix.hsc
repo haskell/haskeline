@@ -38,12 +38,8 @@ import System.Console.Haskeline.Prefs
 
 import System.Console.Haskeline.Backend.Posix.Encoder
 
-import GHC.IO.FD (fdFD)
-import Data.Typeable (cast)
-import System.IO.Error
 import GHC.IO.Exception
-import GHC.IO.Handle.Types hiding (getState)
-import GHC.IO.Handle.Internals
+import System.IO.OS (withFileDescriptorReadingBiasedRaw)
 import System.Posix.Internals (FD)
 
 #if defined(USE_TERMIOS_H) || defined(__ANDROID__)
@@ -87,13 +83,7 @@ ioctlLayout h = allocaBytes (#size struct winsize) $ \ws -> do
 #endif
 
 unsafeHandleToFD :: Handle -> IO FD
-unsafeHandleToFD h =
-  withHandle_ "unsafeHandleToFd" h $ \Handle__{haDevice=dev} -> do
-  case cast dev of
-    Nothing -> ioError (ioeSetErrorString (mkIOError IllegalOperation
-                                           "unsafeHandleToFd" (Just h) Nothing)
-                        "handle is not a file descriptor")
-    Just fd -> return (fdFD fd)
+unsafeHandleToFD h = withFileDescriptorReadingBiasedRaw h $ return
 
 envLayout :: IO (Maybe Layout)
 envLayout = handle (\(_::IOException) -> return Nothing) $ do
