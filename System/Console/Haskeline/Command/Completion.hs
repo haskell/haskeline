@@ -17,6 +17,7 @@ import System.Console.Haskeline.Monads
 
 import Control.Monad ((>=>))
 import Data.List(transpose, unfoldr)
+import Data.Maybe(fromMaybe, catMaybes)
 
 useCompletion :: InsertMode -> Completion -> InsertMode
 useCompletion im c = insertString r im
@@ -72,7 +73,7 @@ makePartialCompletion im completions = insertString partial im
 pagingCompletion :: MonadReader Layout m => Key -> Prefs
                 -> [Completion] -> Command m InsertMode InsertMode
 pagingCompletion k prefs completions = \im -> do
-        ls <- asks $ makeLines (map display completions)
+        ls <- asks $ makeLines completions
         let pageAction = do
                 askFirst prefs (length completions) $
                             if completionPaging prefs
@@ -118,16 +119,25 @@ printPage ls = do
 
 -----------------------------------------------
 -- Splitting the list of completions into lines for paging.
-makeLines :: [String] -> Layout -> [String]
-makeLines ws layout = let
-    minColPad = 2
+makeLines :: [Completion] -> Layout -> [String]
+makeLines cs layout = let
+    descM = description <$> cs
+    descs = fromMaybe [] <$> descM
+    disps = display <$> cs
+    singleColumnMode = not . null . catMaybes $ descM
+    minColPad = if singleColumnMode then 8 else 2
     printWidth = width layout
-    maxWidth = min printWidth (maximum (map (gsWidth . stringToGraphemes) ws) + minColPad)
-    numCols = printWidth `div` maxWidth
+    maxWidth = min printWidth (maximum (map (gsWidth . stringToGraphemes) disps) + minColPad)
+    numCols = if singleColumnMode then 1 else printWidth `div` maxWidth
+    ws = if singleColumnMode then padLines maxWidth disps descs else disps
     ls = if maxWidth >= printWidth
                     then map (: []) ws
                     else splitIntoGroups numCols ws
     in map (padWords maxWidth) ls
+
+padLines :: Int -> [String] -> [String] -> [String]
+padLines wid = zipWith (\x y -> x ++ replicate (wid - widthOf x) ' ' ++ y)
+  where widthOf = gsWidth . stringToGraphemes
 
 -- Add spaces to the end of each word so that it takes up the given visual width.
 -- Don't pad the word in the last column, since printing a space in the last column
