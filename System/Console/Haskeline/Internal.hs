@@ -1,3 +1,5 @@
+-- | A module containing semi-public internals. The functions here are not
+-- stable.
 module System.Console.Haskeline.Internal
     ( module System.Console.Haskeline.Monads
     , module System.Console.Haskeline.Term
