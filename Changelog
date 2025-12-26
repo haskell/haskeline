@@ -1,3 +1,8 @@
+Changed in unreleased:
+
+   * System.Console.Haskeline.Internal now exposes far more internals of
+     Haskeline.
+
 Changed in version 0.8.4.1:
 
    * Implemented ; and , movements and enabled them for d, c, and y actions.
