@@ -1,3 +1,15 @@
+Changed in unreleased:
+
+   * System.Console.Haskeline.Internal now exposes far more internals of
+     Haskeline.
+
+Changed in version 0.8.4.1:
+
+   * Implemented ; and , movements and enabled them for d, c, and y actions.
+
+   * Internal refactoring of f, F, t, T commands to allow implementation of ;
+     and , commands.
+
 Changed in version 0.8.4.0:
 
    * On Windows, when terminal-style and printing output, no longer skips
@@ -41,6 +53,7 @@ Changed in version 0.8.1.0:
 Changed in version 0.8.0.1:
    * Add a Cabal flag to disable the example executable as well as
      the test that uses it.
+
 Changed in version 0.8.0.0:
    * Breaking changes:
      * Add a `MonadFail` instance for `InputT`.

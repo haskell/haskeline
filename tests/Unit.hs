@@ -16,6 +16,7 @@ import Data.Word
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as E
 import Data.Monoid ((<>))
+import System.Directory (createDirectoryIfMissing)
 import System.Exit (exitFailure)
 import System.Process (readProcess)
 import Test.HUnit
@@ -34,6 +35,13 @@ legacyEncoding = False
 whenLegacy :: BC.ByteString -> BC.ByteString
 whenLegacy s = if legacyEncoding then s else B.empty
 
+-- These files are used to test tab completion.
+makeTestFiles :: IO ()
+makeTestFiles = do
+  createDirectoryIfMissing True "tests/dummy-μασ"
+  writeFile "tests/dummy-μασ/bar" ""
+  writeFile "tests/dummy-μασ/ςερτ" ""
+
 main :: IO ()
 main = do
     -- forkProcess needs an absolute path to the binary.
@@ -45,6 +53,7 @@ main = do
                 runInTTY = True,
                 environment = []
             }
+    makeTestFiles
     result <- runTestTT $ test [interactionTests i, fileStyleTests i]
     when (errors result > 0 || failures result > 0) exitFailure
 
