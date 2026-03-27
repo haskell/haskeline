@@ -1,3 +1,46 @@
+Changed in unreleased:
+
+   * System.Console.Haskeline.Internal now exposes far more internals of
+     Haskeline.
+
+Changed in version 0.8.4.1:
+
+   * Implemented ; and , movements and enabled them for d, c, and y actions.
+
+   * Internal refactoring of f, F, t, T commands to allow implementation of ;
+     and , commands.
+
+Changed in version 0.8.4.0:
+
+   * On Windows, when terminal-style and printing output, no longer skips
+     `"\ESC...\STX"` sequences. (If used with legacy ConHost directly (for
+     example, `conhost.exe cmd.exe`), it will require ConHost's ANSI-capability
+     to be enabled separately.) (#126)
+
+   * Added `System.Console.Haskeline.ReaderT` module for `ReaderT` interface.
+
+   * `System.Console.Haskeline.Completion.listFiles` now returns a sorted list.
+
+Changed in version 0.8.3.0:
+
+   * User preferences are now read from $XDG_CONFIG_HOME/haskeline/haskeline.
+
+Changed in version 0.8.2.1:
+   * Add `configure` check for `termios.h` and fallbacks for wasi.
+
+Changed in version 0.8.2:
+   * Add versions of `completeWord{,withPrev}` that take predicates for word break chars (#164)
+
+Changed in version 0.8.1.3:
+   * Use the capi calling convention for ioctl (#163).
+
+Changed in version 0.8.1.2:
+   * Add import list to Data.List (#153)
+
+Changed in version 0.8.1.1:
+   * Allow bytestring-0.11 and base-4.16
+   * Fix name conflicts with Win32-2.9 (#145)
+
 Changed in version 0.8.1.0:
    * Use grapheme's width to align a list of completions (#143)
    * Add withRunInBase to help decompose InputT (#131)
@@ -10,6 +53,7 @@ Changed in version 0.8.1.0:
 Changed in version 0.8.0.1:
    * Add a Cabal flag to disable the example executable as well as
      the test that uses it.
+
 Changed in version 0.8.0.0:
    * Breaking changes:
      * Add a `MonadFail` instance for `InputT`.
@@ -76,7 +120,7 @@ Changed in version 0.7.2.1:
    * Fix build on Windows.
 
 Changed in version 0.7.2.0:
-   * Bump upper-bound on base and filepath libraries to accomodate GHC HEAD (7.10)
+   * Bump upper-bound on base and filepath libraries to accommodate GHC HEAD (7.10)
    * Drop Cabal dependency to 1.10
    * Use explicit forall syntax to avoid warning
    * Support Applicative/Monad proposal in Win32/Draw backend

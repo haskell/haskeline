@@ -1,3 +1,5 @@
+{-# LANGUAGE CApiFFI #-}
+
 module System.Console.Haskeline.Backend.Posix (
                         withPosixGetEvent,
                         posixLayouts,
@@ -25,7 +27,7 @@ import Control.Concurrent hiding (throwTo)
 import Data.Maybe (catMaybes)
 import System.Posix.Signals.Exts
 import System.Posix.Types(Fd(..))
-import Data.List
+import Data.Foldable (foldl')
 import System.IO
 import System.Environment
 
@@ -49,6 +51,8 @@ import System.Posix.Internals (FD)
 #endif
 #include <sys/ioctl.h>
 
+#include <HsBaseConfig.h>
+
 -----------------------------------------------
 -- Input/output handles
 data Handles = Handles {hIn, hOut :: ExternalHandle
@@ -61,7 +65,11 @@ ehOut = eH . hOut
 -------------------
 -- Window size
 
-foreign import ccall ioctl :: FD -> CULong -> Ptr a -> IO CInt
+#if !defined(HAVE_TERMIOS_H)
+posixLayouts :: Handles -> [IO (Maybe Layout)]
+posixLayouts _ = error "System.Console.Haskeline.Backend.Posix.posixLayouts"
+#else
+foreign import capi "sys/ioctl.h ioctl" ioctl :: FD -> CULong -> Ptr a -> IO CInt
 
 posixLayouts :: Handles -> [IO (Maybe Layout)]
 posixLayouts h = [ioctlLayout $ ehOut h, envLayout]
@@ -75,6 +83,8 @@ ioctlLayout h = allocaBytes (#size struct winsize) $ \ws -> do
                 if ret >= 0
                     then return $ Just Layout {height=fromEnum rows,width=fromEnum cols}
                     else return Nothing
+
+#endif
 
 unsafeHandleToFD :: Handle -> IO FD
 unsafeHandleToFD h =
@@ -139,7 +149,7 @@ ansiKeys = [("\ESC[D",  simpleKey LeftKey)
             -- Terminal.app:
             ,("\ESC[5D", ctrlKey $ simpleKey LeftKey)
             ,("\ESC[5C", ctrlKey $ simpleKey RightKey)
-            -- rxvt: (Note: these will be superceded by e.g. xterm-color,
+            -- rxvt: (Note: these will be superseded by e.g. xterm-color,
             -- which uses them as regular arrow keys.)
             ,("\ESC[OD", ctrlKey $ simpleKey LeftKey)
             ,("\ESC[OC", ctrlKey $ simpleKey RightKey)

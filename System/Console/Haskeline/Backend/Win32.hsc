@@ -10,7 +10,19 @@ module System.Console.Haskeline.Backend.Win32(
 import System.IO
 import Foreign
 import Foreign.C
-#if MIN_VERSION_Win32(2,9,0)
+#if MIN_VERSION_Win32(2,14,1)
+import System.Win32 hiding (
+                multiByteToWideChar,
+                setConsoleMode,
+                getConsoleMode,
+                KeyEvent,
+                keyDown,
+                virtualKeyCode,
+                repeatCount,
+                virtualScanCode,
+                windowSize
+                )
+#elif MIN_VERSION_Win32(2,9,0)
 import System.Win32 hiding (multiByteToWideChar, setConsoleMode, getConsoleMode)
 #else
 import System.Win32 hiding (multiByteToWideChar)
@@ -144,7 +156,7 @@ data InputEvent = KeyEvent {keyDown :: BOOL,
                           unicodeChar :: Char,
                           controlKeyState :: DWORD}
             -- TODO: WINDOW_BUFFER_SIZE_RECORD
-            -- I cant figure out how the user generates them.
+            -- I can't figure out how the user generates them.
            | WindowEvent
            | OtherEvent
                         deriving Show
@@ -369,9 +381,7 @@ crlf :: String
 crlf = "\r\n"
 
 instance (MonadMask m, MonadIO m, MonadReader Layout m) => Term (Draw m) where
-    drawLineDiff (xs1,ys1) (xs2,ys2) = let
-        fixEsc = filter ((/= '\ESC') . baseChar)
-        in drawLineDiffWin (fixEsc xs1, fixEsc ys1) (fixEsc xs2, fixEsc ys2)
+    drawLineDiff = drawLineDiffWin
     -- TODO now that we capture resize events.
     -- first, looks like the cursor stays on the same line but jumps
     -- to the beginning if cut off.

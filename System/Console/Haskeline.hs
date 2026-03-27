@@ -91,6 +91,7 @@ import System.Console.Haskeline.Term
 import System.Console.Haskeline.Key
 import System.Console.Haskeline.RunCommand
 
+import Control.Monad ((>=>))
 import Control.Monad.Catch (MonadMask, handle)
 import Data.Char (isSpace, isPrint)
 import Data.Maybe (isJust)
@@ -145,6 +146,10 @@ They return `Nothing` if they encounter the end of input.  More specifically:
 
 If @'autoAddHistory' == 'True'@ and the line input is nonblank (i.e., is not all
 spaces), it will be automatically added to the history.
+
+To include ANSI escape sequences in the input prompt, terminate them by @\STX@.
+See <https://github.com/haskell/haskeline/wiki/ControlSequencesInPrompt> for
+more information.
 -}
 getInputLine :: (MonadIO m, MonadMask m)
             => String -- ^ The input prompt
@@ -234,7 +239,7 @@ getInputCmdChar tops prefix = runInputCmdT tops
 acceptOneChar :: Monad m => KeyCommand m InsertMode (Maybe Char)
 acceptOneChar = choiceCmd [useChar $ \c s -> change (insertChar c) s
                                                 >> return (Just c)
-                          , ctrlChar 'l' +> clearScreenCmd >|>
+                          , ctrlChar 'l' +> clearScreenCmd >=>
                                         keyCommand acceptOneChar
                           , ctrlChar 'd' +> failCmd]
 
@@ -288,12 +293,12 @@ getPassword x = promptedInput
  where
     loop = choiceCmd [ simpleChar '\n' +> finish
                      , simpleKey Backspace +> change deletePasswordChar
-                                                >|> loop'
-                     , useChar $ \c -> change (addPasswordChar c) >|> loop'
+                                                >=> loop'
+                     , useChar $ \c -> change (addPasswordChar c) >=> loop'
                      , ctrlChar 'd' +> \p -> if null (passwordState p)
                                                 then failCmd p
                                                 else finish p
-                     , ctrlChar 'l' +> clearScreenCmd >|> loop'
+                     , ctrlChar 'l' +> clearScreenCmd >=> loop'
                      ]
     loop' = keyCommand loop
 
@@ -336,7 +341,7 @@ promptedInput doTerm doFile prompt = do
 of type 'Interrupt'.  For example:
 
 > tryAction :: InputT IO ()
-> tryAction = handle (\Interrupt -> outputStrLn "Cancelled.")
+> tryAction = handleInterrupt (outputStrLn "Cancelled.")
 >                $ withInterrupt $ someLongAction
 
 The action can handle the interrupt itself; a new 'Interrupt' exception will be thrown
@@ -344,7 +349,7 @@ every time Ctrl-C is pressed.
 
 > tryAction :: InputT IO ()
 > tryAction = withInterrupt loop
->     where loop = handle (\Interrupt -> outputStrLn "Cancelled; try again." >> loop)
+>     where loop = handleInterrupt (outputStrLn "Cancelled; try again." >> loop)
 >                    someLongAction
 
 This behavior differs from GHC's built-in Ctrl-C handling, which
@@ -357,9 +362,10 @@ withInterrupt act = do
     rterm <- InputT ask
     wrapInterrupt rterm act
 
--- | Catch and handle an exception of type 'Interrupt'.
+-- | Catch and handle an exception of type 'Interrupt'. See 'withInterrupt' for
+-- more explanation.
 --
--- > handleInterrupt f = handle $ \Interrupt -> f
+-- > handleInterrupt (outputStrLn "Ctrl+C was pressed, aborting!") someLongAction
 handleInterrupt :: MonadMask m => m a -> m a -> m a
 handleInterrupt f = handle $ \Interrupt -> f
 

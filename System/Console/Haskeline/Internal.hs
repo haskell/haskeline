@@ -1,5 +1,12 @@
+-- | A module containing semi-public internals. The functions here are not
+-- stable.
 module System.Console.Haskeline.Internal
-    ( debugTerminalKeys ) where
+    ( module System.Console.Haskeline.Monads
+    , module System.Console.Haskeline.Term
+    , module System.Console.Haskeline.Key
+    , module System.Console.Haskeline.LineState
+    , Behavior (..)
+    , debugTerminalKeys ) where
 
 import System.Console.Haskeline (defaultSettings, outputStrLn)
 import System.Console.Haskeline.Command
@@ -8,6 +15,9 @@ import System.Console.Haskeline.LineState
 import System.Console.Haskeline.Monads
 import System.Console.Haskeline.RunCommand
 import System.Console.Haskeline.Term
+import System.Console.Haskeline.Key
+
+import Control.Monad ((>=>))
 
 -- | This function may be used to debug Haskeline's input.
 --
@@ -33,5 +43,5 @@ debugTerminalKeys = runInputT defaultSettings $ do
                 effect (LineChange $ const ([],[]))
                 effect (PrintLines [show k])
                 setState emptyIM)
-            >|> keyCommand loop
+            >=> keyCommand loop
     prompt = stringToGraphemes "> "

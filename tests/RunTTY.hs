@@ -41,9 +41,9 @@ setTerm = setEnv "TERM"
 
 
 setUTF8 :: Invocation -> Invocation
-setUTF8 = setLang "en_US.UTF-8"
+setUTF8 = setLang "C.UTF-8"
 setLatin1 :: Invocation -> Invocation
-setLatin1 = setLang "en_US.ISO8859-1"
+setLatin1 = setLang "C.ISO8859-1"
 
 
 runInvocation :: Invocation
