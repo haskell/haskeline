@@ -50,7 +50,7 @@ data Prefs = Prefs { bellStyle :: !BellStyle,
                         -- (termName, keysequence, key)
                      customKeySequences :: [(Maybe String, String,Key)],
                      incAppendHistory :: Bool
-                        -- ^ If 'True' and @historyFile@ not 'Nothing'    
+                        -- ^ If 'True' and @historyFile@ is not 'Nothing'
                         -- flushes command history after every command
                      }
                         deriving Show
