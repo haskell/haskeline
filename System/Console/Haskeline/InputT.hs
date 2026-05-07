@@ -237,18 +237,38 @@ useTermHandles input output =
 -- The terminal type is only consulted when haskeline is built with terminfo
 -- support; in non-terminfo builds it is ignored and a dumb terminal is used.
 --
--- ==== __Example: a Haskeline session on a serial port__
+-- ==== __Example: a Haskeline session over a WebSocket__
 --
--- > import System.IO (withFile, IOMode(..))
+-- Bridge a WebSocket to the master end of a PTY pair and run Haskeline
+-- against the slave end.  Uses the @websockets@ and @unix@ packages.
+-- Pair this with a browser-side terminal emulator such as
+-- <https://xtermjs.org/ Xterm.js> for an in-browser shell.
+--
+-- > import qualified Network.WebSockets as WS
+-- > import System.Posix.Terminal (openPseudoTerminal)
+-- > import System.Posix.IO (dup, fdToHandle)
+-- > import Control.Applicative ((<|>))
+-- > import Control.Concurrent.Async (Concurrently(..), runConcurrently)
+-- > import Control.Monad (forever)
+-- > import qualified Data.ByteString as BS
+-- > import System.IO (hSetBuffering, BufferMode(..))
 -- > import System.Console.Haskeline
 -- >
--- > serialUI :: FilePath -> IO ()
--- > serialUI devPath =
--- >     withFile devPath ReadMode  $ \input  ->
--- >     withFile devPath WriteMode $ \output ->
--- >         runInputTBehavior (useTermHandlesWith "vt100" input output)
--- >                           defaultSettings
--- >                           loop
+-- > websocketUI :: WS.Connection -> IO ()
+-- > websocketUI conn = do
+-- >     (master, slave) <- openPseudoTerminal
+-- >     slaveDup <- dup slave
+-- >     masterH  <- fdToHandle master
+-- >     slaveIn  <- fdToHandle slave
+-- >     slaveOut <- fdToHandle slaveDup
+-- >     hSetBuffering masterH NoBuffering
+-- >     -- Whichever of the three actions finishes first cancels the others.
+-- >     runConcurrently
+-- >         $   Concurrently (forever $ WS.receiveData conn >>= BS.hPut masterH)
+-- >         <|> Concurrently (forever $ BS.hGetSome masterH 4096 >>= WS.sendBinaryData conn)
+-- >         <|> Concurrently (runInputTBehavior
+-- >                              (useTermHandlesWith "vt100" slaveIn slaveOut)
+-- >                              defaultSettings loop)
 -- >   where
 -- >     loop = do
 -- >         minput <- getInputLine "% "
