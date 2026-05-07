@@ -23,10 +23,17 @@ import Pty
 
 data Invocation = Invocation {
             prog :: FilePath
-            , progArgs :: [String]
+              -- | Mode-selection flags passed before any positional args
+              -- (e.g. @[\"--mode\", \"useTermHandles\"]@).
+            , progModeArgs :: [String]
+              -- | Positional input-mode args (e.g. @[\"chars\"]@).
+            , progInputArgs :: [String]
             , runInTTY :: Bool
             , environment :: [(String,String)]
             }
+
+progArgs :: Invocation -> [String]
+progArgs Invocation{..} = progModeArgs ++ progInputArgs
 
 setEnv :: String -> String -> Invocation -> Invocation
 setEnv var val Invocation {..} = Invocation{
@@ -51,11 +58,11 @@ runInvocation :: Invocation
                         -- simulate real user input and prevent Haskeline
                         -- from coalescing the changes.)
         -> IO [B.ByteString]
-runInvocation Invocation {..} inputs
-    | runInTTY = runCommandInPty prog progArgs (Just environment) inputs
+runInvocation inv@Invocation {..} inputs
+    | runInTTY = runCommandInPty prog (progArgs inv) (Just environment) inputs
     | otherwise = do
     (Just inH, Just outH, Nothing, ph)
-        <- createProcess (proc prog progArgs)
+        <- createProcess (proc prog (progArgs inv))
                             { env = Just environment
                             , std_in = CreatePipe
                             , std_out = CreatePipe
