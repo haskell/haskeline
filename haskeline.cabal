@@ -169,7 +169,7 @@ Executable haskeline-examples-Test
     if !flag(examples) {
         buildable: False
     }
-    Build-depends: base, containers, haskeline
+    Build-depends: base, containers, haskeline, optparse-applicative
     Default-Language: Haskell2010
     hs-source-dirs: examples
     Main-Is: Test.hs

@@ -49,24 +49,55 @@ main = do
     let i = setTerm "xterm"
             Invocation {
                 prog = p,
-                progArgs = [],
+                progModeArgs = [],
+                progInputArgs = [],
                 runInTTY = True,
                 environment = []
             }
     makeTestFiles
-    result <- runTestTT $ test [interactionTests i, fileStyleTests i]
+    result <- runTestTT $ test
+        [ interactionTests UseTerm i
+        , interactionTests UseTermHandles i
+        , interactionTests (UseTermHandlesWith "xterm") i
+        -- dumbTests sets TERM=dumb in env to drive Haskeline into the dumb
+        -- backend.  That works for UseTerm and UseTermHandles (both consult
+        -- env), but not for UseTermHandlesWith — it ignores env and uses its
+        -- explicit term type — so we skip it for that mode.
+        , dumbTests UseTerm i
+        , dumbTests UseTermHandles i
+        , fileStyleTests i
+        ]
     when (errors result > 0 || failures result > 0) exitFailure
 
-interactionTests :: Invocation -> Test
-interactionTests i = "interaction" ~: test
-    [ unicodeEncoding i
-    , unicodeMovement i
-    , tabCompletion i
-    , incorrectInput i
-    , historyTests i
-    , inputChar $ setCharInput i
-    , dumbTests $ setTerm "dumb" i
+-- | Which haskeline Behavior the test program should run under.
+data Mode
+    = UseTerm                     -- ^ runInputT (defaultBehavior)
+    | UseTermHandles              -- ^ useTermHandles on /dev/tty
+    | UseTermHandlesWith String   -- ^ useTermHandlesWith TERM on /dev/tty
+
+modeName :: Mode -> String
+modeName UseTerm                 = "useTerm"
+modeName UseTermHandles          = "useTermHandles"
+modeName (UseTermHandlesWith t)  = "useTermHandlesWith=" ++ t
+
+setMode :: Mode -> Invocation -> Invocation
+setMode m i = i { progModeArgs = modeArgs m }
+  where
+    modeArgs UseTerm                 = []
+    modeArgs UseTermHandles          = ["--mode", "useTermHandles"]
+    modeArgs (UseTermHandlesWith t)  = ["--mode", "useTermHandlesWith", "--term-type", t]
+
+interactionTests :: Mode -> Invocation -> Test
+interactionTests m i = ("interaction (" ++ modeName m ++ ")") ~: test
+    [ unicodeEncoding ii
+    , unicodeMovement ii
+    , tabCompletion ii
+    , incorrectInput ii
+    , historyTests ii
+    , inputChar $ setCharInput ii
     ]
+  where
+    ii = setMode m i
 
 unicodeEncoding :: Invocation -> Test
 unicodeEncoding i = "Unicode encoding (valid)" ~:
@@ -195,7 +226,7 @@ inputChar i = "getInputChar" ~:
     ]
 
 setCharInput :: Invocation -> Invocation
-setCharInput i = i { progArgs = ["chars"] }
+setCharInput i = i { progInputArgs = ["chars"] }
 
 
 fileStyleTests :: Invocation -> Test
@@ -255,18 +286,18 @@ fileStyleTests i = "file style" ~:
 -- If all the above tests work for the terminfo backend,
 -- then we just need to make sure the dumb term plugs into everything
 -- correctly, i.e., encodes the input/output and doesn't double-encode.
-dumbTests :: Invocation -> Test
-dumbTests i = "dumb term" ~:
-    [ "line input" ~: utf8Test i
+dumbTests :: Mode -> Invocation -> Test
+dumbTests m i = ("dumb term (" ++ modeName m ++ ")") ~:
+    [ "line input" ~: utf8Test ii
         [ utf8 "xαβγy" ]
         [ prompt' 0, utf8 "xαβγy" ]
-    , "line input wide movement" ~: utf8Test i
+    , "line input wide movement" ~: utf8Test ii
         [ utf8 wideChar, raw [1], raw [5] ]
         [ prompt' 0, utf8 wideChar
         , utf8 (T.replicate 60 "\b")
         , utf8 wideChar
         ]
-    , "line char input" ~: utf8Test (setCharInput i)
+    , "line char input" ~: utf8Test (setCharInput ii)
         [utf8 "xαβ"]
         [ prompt' 0, utf8 "x" <> dumbnl <> output 0 (utf8 "x")
           <> prompt' 1 <> utf8 "α" <> dumbnl <> output 1 (utf8 "α")
@@ -275,6 +306,7 @@ dumbTests i = "dumb term" ~:
         ]
     ]
   where
+    ii = setMode m $ setTerm "dumb" i
     dumbnl = raw [13,10]
     wideChar = T.concat $ replicate 10 $ "안기영"
 

@@ -216,6 +216,70 @@ useFile file = Behavior $ do
 preferTerm :: Behavior
 preferTerm = Behavior terminalRunTerm
 
+#ifndef MINGW
+-- | Use terminal-style interaction on the given input and output handles,
+-- taking the terminal type from the @TERM@ environment variable.
+--
+-- This behavior is for driving Haskeline against a terminal that is not the
+-- process's controlling terminal — for example, a serial console, a PTY pair
+-- you opened yourself, or a socket-backed TTY.  The caller is responsible for
+-- closing @input@ and @output@ after use.  Not available on Windows.
+--
+-- See 'useTermHandlesWith' to override the terminal type.
+useTermHandles :: Handle -> Handle -> Behavior
+useTermHandles input output =
+    Behavior $ useTermHandlesRunTerm Nothing input output
+
+-- | Like 'useTermHandles', but with the terminal type given explicitly
+-- (e.g. @\"xterm-256color\"@ or @\"vt100\"@) instead of read from the @TERM@
+-- environment variable.
+--
+-- The terminal type is only consulted when haskeline is built with terminfo
+-- support; in non-terminfo builds it is ignored and a dumb terminal is used.
+--
+-- ==== __Example: a Haskeline session over a WebSocket__
+--
+-- Bridge a WebSocket to the master end of a PTY pair and run Haskeline
+-- against the slave end.  Uses the @websockets@ and @unix@ packages.
+-- Pair this with a browser-side terminal emulator such as
+-- <https://xtermjs.org/ Xterm.js> for an in-browser shell.
+--
+-- > import qualified Network.WebSockets as WS
+-- > import System.Posix.Terminal (openPseudoTerminal)
+-- > import System.Posix.IO (dup, fdToHandle)
+-- > import Control.Applicative ((<|>))
+-- > import Control.Concurrent.Async (Concurrently(..), runConcurrently)
+-- > import Control.Monad (forever)
+-- > import qualified Data.ByteString as BS
+-- > import System.IO (hSetBuffering, BufferMode(..))
+-- > import System.Console.Haskeline
+-- >
+-- > websocketUI :: WS.Connection -> IO ()
+-- > websocketUI conn = do
+-- >     (master, slave) <- openPseudoTerminal
+-- >     slaveDup <- dup slave
+-- >     masterH  <- fdToHandle master
+-- >     slaveIn  <- fdToHandle slave
+-- >     slaveOut <- fdToHandle slaveDup
+-- >     hSetBuffering masterH NoBuffering
+-- >     -- Whichever of the three actions finishes first cancels the others.
+-- >     runConcurrently
+-- >         $   Concurrently (forever $ WS.receiveData conn >>= BS.hPut masterH)
+-- >         <|> Concurrently (forever $ BS.hGetSome masterH 4096 >>= WS.sendBinaryData conn)
+-- >         <|> Concurrently (runInputTBehavior
+-- >                              (useTermHandlesWith "vt100" slaveIn slaveOut)
+-- >                              defaultSettings loop)
+-- >   where
+-- >     loop = do
+-- >         minput <- getInputLine "% "
+-- >         case minput of
+-- >             Nothing     -> return ()
+-- >             Just "quit" -> return ()
+-- >             Just s      -> outputStrLn ("got: " ++ s) >> loop
+useTermHandlesWith :: String -> Handle -> Handle -> Behavior
+useTermHandlesWith termtype input output =
+    Behavior $ useTermHandlesRunTerm (Just termtype) input output
+#endif
 
 -- | Read 'Prefs' from @$XDG_CONFIG_HOME/haskeline/haskeline@ if present
 -- ortherwise @~/.haskeline.@ If there is an error reading the file,
