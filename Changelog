@@ -3,6 +3,10 @@ Changed in unreleased:
    * System.Console.Haskeline.Internal now exposes far more internals of
      Haskeline.
 
+   * Added `useTermHandles` and `useTermHandlesWith` Behaviors for driving
+     Haskeline against caller-supplied input/output handles (e.g. a serial
+     console or a PTY pair other than the controlling terminal).  POSIX only.
+
 Changed in version 0.8.4.1:
 
    * Implemented ; and , movements and enabled them for d, c, and y actions.
