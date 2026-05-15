@@ -64,6 +64,7 @@ module System.Console.Haskeline(
                     setComplete,
                     -- ** User preferences
                     Prefs(),
+                    keyseqTimeoutMs,
                     readPrefs,
                     defaultPrefs,
                     runInputTWithPrefs,
