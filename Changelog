@@ -1,4 +1,4 @@
-Changed in unreleased:
+Changed in version 8.4.5.0:
 
    * System.Console.Haskeline.Internal now exposes far more internals of
      Haskeline.
