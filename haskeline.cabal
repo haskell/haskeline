@@ -21,9 +21,10 @@ Stability:      Stable
 Build-Type:     Simple
 
 tested-with:
-  GHC == 9.12.1
-  GHC == 9.10.1
-  GHC == 9.8.2
+  GHC == 9.14.1
+  GHC == 9.12.4
+  GHC == 9.10.3
+  GHC == 9.8.4
   GHC == 9.6.5
   GHC == 9.4.8
   GHC == 9.2.8
@@ -113,7 +114,7 @@ Library
     c-sources: cbits/h_wcwidth.c
 
     if os(windows)
-        Build-depends: Win32 >= 2.1 && < 2.10 || >= 2.12
+        Build-depends: Win32 >= 2.1 && < 2.10 || >= 2.12 && < 3
         Other-modules: System.Console.Haskeline.Backend.Win32
                        System.Console.Haskeline.Backend.Win32.Echo
         c-sources: cbits/win_console.c
@@ -169,7 +170,7 @@ Executable haskeline-examples-Test
     if !flag(examples) {
         buildable: False
     }
-    Build-depends: base, containers, haskeline, optparse-applicative
+    Build-depends: base, containers, haskeline, optparse-applicative < 1
     Default-Language: Haskell2010
     hs-source-dirs: examples
     Main-Is: Test.hs
